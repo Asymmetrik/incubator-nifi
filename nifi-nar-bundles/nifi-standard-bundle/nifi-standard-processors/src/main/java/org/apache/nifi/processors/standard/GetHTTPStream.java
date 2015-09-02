@@ -77,12 +77,14 @@ import org.apache.http.impl.client.HttpClients;
 import org.apache.http.impl.conn.BasicHttpClientConnectionManager;
 import org.apache.http.ssl.SSLContextBuilder;
 import org.apache.http.ssl.SSLContexts;
+import org.apache.nifi.annotation.behavior.TriggerSerially;
 import org.apache.nifi.annotation.behavior.WritesAttribute;
 import org.apache.nifi.annotation.behavior.WritesAttributes;
 import org.apache.nifi.annotation.documentation.CapabilityDescription;
 import org.apache.nifi.annotation.documentation.Tags;
 import org.apache.nifi.annotation.lifecycle.OnRemoved;
 import org.apache.nifi.annotation.lifecycle.OnStopped;
+import org.apache.nifi.annotation.lifecycle.OnUnscheduled;
 import org.apache.nifi.components.PropertyDescriptor;
 import org.apache.nifi.components.ValidationContext;
 import org.apache.nifi.components.ValidationResult;
@@ -99,8 +101,8 @@ import org.apache.nifi.processor.io.OutputStreamCallback;
 import org.apache.nifi.processor.util.StandardValidators;
 import org.apache.nifi.ssl.SSLContextService;
 import org.apache.nifi.ssl.SSLContextService.ClientAuth;
-import org.apache.nifi.util.StopWatch;
 
+@TriggerSerially
 @Tags({"get", "fetch", "poll", "http", "https", "ingest", "source", "input"})
 @CapabilityDescription("Fetches a file via HTTP")
 @WritesAttributes({
@@ -225,11 +227,11 @@ public class GetHTTPStream extends AbstractSessionFactoryProcessor {
 
     /**
      * State variable for this processor indicating whether the
-     * user has declared that it should be stopped. Set to false
+     * user has declared that it should be streaming. Set to false
      * in the {@link #onStopped()} method and reset to true in
-     * {@link #onScheduled(ProcessContext)}
+     * {@link #onTrigger(ProcessContext, ProcessSessionFactory)}
      */
-    private boolean streaming = true;
+    private boolean readyToStream = false;
 
     @Override
     protected void init(final ProcessorInitializationContext context) {
@@ -279,9 +281,10 @@ public class GetHTTPStream extends AbstractSessionFactoryProcessor {
         lastModifiedRef.set(UNINITIALIZED_LAST_MODIFIED_VALUE);
     }
 
+    @OnUnscheduled
     @OnStopped
     public void onStopped() {
-    	streaming = false;
+    	readyToStream = false;
         final File httpCache = new File(HTTP_CACHE_FILE_PREFIX + getIdentifier());
         try (FileOutputStream fos = new FileOutputStream(httpCache)) {
             final Properties props = new Properties();
@@ -358,9 +361,9 @@ public class GetHTTPStream extends AbstractSessionFactoryProcessor {
     @Override
     public void onTrigger(final ProcessContext context, final ProcessSessionFactory sessionFactory) throws ProcessException {
 
-    	streaming = true;
-
         final ProcessorLog logger = getLogger();
+
+        readyToStream = true;
 
         final ProcessSession session = sessionFactory.createSession();
         final FlowFile incomingFlowFile = session.get();
@@ -486,7 +489,6 @@ public class GetHTTPStream extends AbstractSessionFactoryProcessor {
             final HttpClient client = clientBuilder.build();
 
             try {
-                final StopWatch stopWatch = new StopWatch(true);
                 final HttpResponse response = client.execute(get, httpContext);
                 final int statusCode = response.getStatusLine().getStatusCode();
                 if (statusCode == NOT_MODIFIED) {
@@ -514,7 +516,7 @@ public class GetHTTPStream extends AbstractSessionFactoryProcessor {
             	BufferedReader bufferedReader = new BufferedReader(inputStreamReader);
 
             	String line;
-            	while( streaming && (line = bufferedReader.readLine()) != null ) {
+            	while( readyToStream && (line = bufferedReader.readLine()) != null ) {
             		FlowFile flowFile = session.create();
             		final String lineToWrite = line;
             		flowFile = session.write(flowFile, new OutputStreamCallback() {
