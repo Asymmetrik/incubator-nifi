@@ -47,44 +47,46 @@ import java.util.Set;
 import java.util.TimeZone;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicReference;
-import java.util.concurrent.locks.ReentrantReadWriteLock;
-import java.util.concurrent.locks.ReentrantReadWriteLock.ReadLock;
-import java.util.concurrent.locks.ReentrantReadWriteLock.WriteLock;
 import java.util.regex.Pattern;
 
 import javax.net.ssl.SSLContext;
 
+import org.apache.commons.io.IOUtils;
 import org.apache.http.HttpHost;
 import org.apache.http.HttpResponse;
 import org.apache.http.auth.AuthScope;
 import org.apache.http.auth.UsernamePasswordCredentials;
+import org.apache.http.client.AuthCache;
 import org.apache.http.client.CredentialsProvider;
 import org.apache.http.client.HttpClient;
 import org.apache.http.client.config.RequestConfig;
 import org.apache.http.client.methods.HttpGet;
+import org.apache.http.client.protocol.HttpClientContext;
 import org.apache.http.config.Registry;
 import org.apache.http.config.RegistryBuilder;
 import org.apache.http.conn.HttpClientConnectionManager;
 import org.apache.http.conn.socket.ConnectionSocketFactory;
 import org.apache.http.conn.socket.PlainConnectionSocketFactory;
 import org.apache.http.conn.ssl.SSLConnectionSocketFactory;
-import org.apache.http.conn.ssl.SSLContexts;
 import org.apache.http.conn.ssl.TrustSelfSignedStrategy;
+import org.apache.http.impl.auth.BasicScheme;
+import org.apache.http.impl.client.BasicAuthCache;
 import org.apache.http.impl.client.BasicCredentialsProvider;
 import org.apache.http.impl.client.HttpClientBuilder;
+import org.apache.http.impl.client.HttpClients;
 import org.apache.http.impl.conn.BasicHttpClientConnectionManager;
+import org.apache.http.ssl.SSLContextBuilder;
+import org.apache.http.ssl.SSLContexts;
 import org.apache.nifi.annotation.behavior.WritesAttribute;
 import org.apache.nifi.annotation.behavior.WritesAttributes;
 import org.apache.nifi.annotation.documentation.CapabilityDescription;
 import org.apache.nifi.annotation.documentation.Tags;
 import org.apache.nifi.annotation.lifecycle.OnRemoved;
-import org.apache.nifi.annotation.lifecycle.OnScheduled;
 import org.apache.nifi.annotation.lifecycle.OnStopped;
 import org.apache.nifi.components.PropertyDescriptor;
 import org.apache.nifi.components.ValidationContext;
 import org.apache.nifi.components.ValidationResult;
 import org.apache.nifi.flowfile.FlowFile;
-import org.apache.nifi.flowfile.attributes.CoreAttributes;
 import org.apache.nifi.logging.ProcessorLog;
 import org.apache.nifi.processor.AbstractSessionFactoryProcessor;
 import org.apache.nifi.processor.ProcessContext;
@@ -221,11 +223,6 @@ public class GetHTTPStream extends AbstractSessionFactoryProcessor {
     private Set<Relationship> relationships;
     private List<PropertyDescriptor> properties;
 
-    private volatile long timeToPersist = 0;
-    private final ReentrantReadWriteLock lock = new ReentrantReadWriteLock();
-    private final ReadLock readLock = lock.readLock();
-    private final WriteLock writeLock = lock.writeLock();
-
     /**
      * State variable for this processor indicating whether the
      * user has declared that it should be stopped. Set to false
@@ -282,11 +279,6 @@ public class GetHTTPStream extends AbstractSessionFactoryProcessor {
         lastModifiedRef.set(UNINITIALIZED_LAST_MODIFIED_VALUE);
     }
 
-    @OnScheduled
-    public void onScheduled(final ProcessContext context) {
-    	streaming = true;
-    }
-
     @OnStopped
     public void onStopped() {
     	streaming = false;
@@ -334,23 +326,40 @@ public class GetHTTPStream extends AbstractSessionFactoryProcessor {
 
     private SSLContext createSSLContext(final SSLContextService service)
             throws KeyStoreException, IOException, NoSuchAlgorithmException, CertificateException, KeyManagementException, UnrecoverableKeyException {
-        final KeyStore truststore = KeyStore.getInstance(service.getTrustStoreType());
-        try (final InputStream in = new FileInputStream(new File(service.getTrustStoreFile()))) {
-            truststore.load(in, service.getTrustStorePassword().toCharArray());
-        }
 
-        final KeyStore keystore = KeyStore.getInstance(service.getKeyStoreType());
-        try (final InputStream in = new FileInputStream(new File(service.getKeyStoreFile()))) {
-            keystore.load(in, service.getKeyStorePassword().toCharArray());
-        }
+    	final SSLContextBuilder sslContextBuilder = SSLContexts.custom();
 
-        final SSLContext sslContext = SSLContexts.custom().loadTrustMaterial(truststore, new TrustSelfSignedStrategy()).loadKeyMaterial(keystore, service.getKeyStorePassword().toCharArray()).build();
+    	/*
+    	 * One of Keystore or Truststore must be configured.
+    	 * Otherwise, the SSL Context Service is invalid
+    	 */
+
+    	if( service.isTrustStoreConfigured() ) {
+	        final KeyStore truststore = KeyStore.getInstance(service.getTrustStoreType());
+	        try (final InputStream in = new FileInputStream(new File(service.getTrustStoreFile()))) {
+	            truststore.load(in, service.getTrustStorePassword().toCharArray());
+	        }
+	        sslContextBuilder.loadTrustMaterial(truststore, new TrustSelfSignedStrategy());
+    	}
+
+    	if( service.isKeyStoreConfigured()) {
+	        final KeyStore keystore = KeyStore.getInstance(service.getKeyStoreType());
+	        try (final InputStream in = new FileInputStream(new File(service.getKeyStoreFile()))) {
+	            keystore.load(in, service.getKeyStorePassword().toCharArray());
+	        }
+	        sslContextBuilder.loadKeyMaterial(keystore, service.getKeyStorePassword().toCharArray());
+    	}
+
+        final SSLContext sslContext = sslContextBuilder.build();
 
         return sslContext;
     }
 
     @Override
     public void onTrigger(final ProcessContext context, final ProcessSessionFactory sessionFactory) throws ProcessException {
+
+    	streaming = true;
+
         final ProcessorLog logger = getLogger();
 
         final ProcessSession session = sessionFactory.createSession();
@@ -386,7 +395,7 @@ public class GetHTTPStream extends AbstractSessionFactoryProcessor {
                 throw new ProcessException(e);
             }
 
-            final SSLConnectionSocketFactory sslsf = new SSLConnectionSocketFactory(sslContext, new String[]{"TLSv1"}, null, SSLConnectionSocketFactory.BROWSER_COMPATIBLE_HOSTNAME_VERIFIER);
+            final SSLConnectionSocketFactory sslsf = new SSLConnectionSocketFactory(sslContext, new String[]{"TLSv1"}, null, SSLConnectionSocketFactory.getDefaultHostnameVerifier());
 
             // Also include a plain socket factory for regular http connections (especially proxies)
             final Registry<ConnectionSocketFactory> socketFactoryRegistry =
@@ -408,7 +417,8 @@ public class GetHTTPStream extends AbstractSessionFactoryProcessor {
             requestConfigBuilder.setRedirectsEnabled(context.getProperty(FOLLOW_REDIRECTS).asBoolean());
 
             // build the http client
-            final HttpClientBuilder clientBuilder = HttpClientBuilder.create();
+            final HttpClientBuilder clientBuilder = HttpClients.custom();
+
             clientBuilder.setConnectionManager(conMan);
 
             // include the user agent
@@ -421,31 +431,7 @@ public class GetHTTPStream extends AbstractSessionFactoryProcessor {
             if (sslContextService != null) {
                 clientBuilder.setSslcontext(sslContextService.createSSLContext(ClientAuth.REQUIRED));
             }
-
-            final String username = context.getProperty(USERNAME).getValue();
-            final String password = context.getProperty(PASSWORD).getValue();
-
-            // set the credentials if appropriate
-            if (username != null) {
-                final CredentialsProvider credentialsProvider = new BasicCredentialsProvider();
-                if (password == null) {
-                    credentialsProvider.setCredentials(AuthScope.ANY, new UsernamePasswordCredentials(username));
-                } else {
-                    credentialsProvider.setCredentials(AuthScope.ANY, new UsernamePasswordCredentials(username, password));
-                }
-                clientBuilder.setDefaultCredentialsProvider(credentialsProvider);
-            }
-
-            // Set the proxy if specified
-            if (context.getProperty(PROXY_HOST).isSet() && context.getProperty(PROXY_PORT).isSet()) {
-                final String host = context.getProperty(PROXY_HOST).getValue();
-                final int port = context.getProperty(PROXY_PORT).asInteger();
-                clientBuilder.setProxy(new HttpHost(host, port));
-            }
-
-            // create the http client
-            final HttpClient client = clientBuilder.build();
-
+            
             // create request
             final HttpGet get = new HttpGet(url);
             get.setConfig(requestConfigBuilder.build());
@@ -458,9 +444,50 @@ public class GetHTTPStream extends AbstractSessionFactoryProcessor {
                 get.addHeader(HEADER_ACCEPT, accept);
             }
 
+            boolean hasProxy = context.getProperty(PROXY_HOST).isSet() && context.getProperty(PROXY_PORT).isSet();
+
+            final String username = context.getProperty(USERNAME).getValue();
+            final String password = context.getProperty(PASSWORD).getValue();
+
+            HttpClientContext httpContext = HttpClientContext.create();
+            // set the credentials if appropriate
+            if (username != null) {
+                final CredentialsProvider credentialsProvider = new BasicCredentialsProvider();
+                UsernamePasswordCredentials usernamePasswordCredentials;
+                if (password == null) {
+                	usernamePasswordCredentials = new UsernamePasswordCredentials(username);
+                } else {
+                	usernamePasswordCredentials = new UsernamePasswordCredentials(username, password);
+                }
+                credentialsProvider.setCredentials(AuthScope.ANY, usernamePasswordCredentials);
+                clientBuilder.setDefaultCredentialsProvider(credentialsProvider);
+
+                // Create AuthCache instance
+                AuthCache authCache = new BasicAuthCache();
+                // Generate BASIC scheme object and add it to the local auth cache
+                BasicScheme basicAuth = new BasicScheme();
+                authCache.put(HttpHost.create(source), basicAuth);
+
+                httpContext.setCredentialsProvider(credentialsProvider);
+                httpContext.setAuthCache(authCache);
+                requestConfigBuilder.setAuthenticationEnabled(true);
+
+                get.addHeader( BasicScheme.authenticate(usernamePasswordCredentials, "US-ASCII", hasProxy) );
+            }
+
+            // Set the proxy if specified
+            if (hasProxy) {
+                final String host = context.getProperty(PROXY_HOST).getValue();
+                final int port = context.getProperty(PROXY_PORT).asInteger();
+                clientBuilder.setProxy(new HttpHost(host, port));
+            }
+
+            // create the http client
+            final HttpClient client = clientBuilder.build();
+
             try {
                 final StopWatch stopWatch = new StopWatch(true);
-                final HttpResponse response = client.execute(get);
+                final HttpResponse response = client.execute(get, httpContext);
                 final int statusCode = response.getStatusLine().getStatusCode();
                 if (statusCode == NOT_MODIFIED) {
                     logger.info("content not retrieved because server returned HTTP Status Code {}: Not Modified", new Object[]{NOT_MODIFIED});
@@ -472,7 +499,10 @@ public class GetHTTPStream extends AbstractSessionFactoryProcessor {
                 final String statusExplanation = response.getStatusLine().getReasonPhrase();
 
                 if (statusCode >= 300) {
-                    logger.error("received status code {}:{} from {}", new Object[]{statusCode, statusExplanation, url});
+                	if(logger.isErrorEnabled()) {
+                		InputStream responseContent = response.getEntity().getContent();
+                		logger.error("received status code {}:{} from {} with response {}", new Object[]{statusCode, statusExplanation, url, IOUtils.toString(responseContent)});
+                	}
                     // doing a commit in case there were flow files in the input queue
                     session.commit();
                     return;
