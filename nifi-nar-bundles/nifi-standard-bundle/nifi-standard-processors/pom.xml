@@ -188,7 +188,11 @@ language governing permissions and limitations under the License. -->
             <groupId>org.codehaus.jackson</groupId>
             <artifactId>jackson-mapper-asl</artifactId>
         </dependency>
-
+        <dependency>
+            <groupId>com.datasift.client</groupId>
+            <artifactId>datasift-java</artifactId>
+            <version>3.2.6</version>
+        </dependency>
         <dependency>
             <groupId>org.apache.derby</groupId>
             <artifactId>derby</artifactId>

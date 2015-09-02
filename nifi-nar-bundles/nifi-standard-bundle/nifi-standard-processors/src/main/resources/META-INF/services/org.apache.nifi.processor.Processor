@@ -29,6 +29,7 @@ org.apache.nifi.processors.standard.ExecuteStreamCommand
 org.apache.nifi.processors.standard.ExecuteProcess
 org.apache.nifi.processors.standard.ExtractText
 org.apache.nifi.processors.standard.GenerateFlowFile
+org.apache.nifi.processors.standard.GetDataSift
 org.apache.nifi.processors.standard.GetFile
 org.apache.nifi.processors.standard.GetFTP
 org.apache.nifi.processors.standard.GetHTTP
