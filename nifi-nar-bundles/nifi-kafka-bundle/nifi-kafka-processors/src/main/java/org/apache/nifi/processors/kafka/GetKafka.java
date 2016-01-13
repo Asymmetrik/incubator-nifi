@@ -153,7 +153,7 @@ public class GetKafka extends AbstractProcessor {
             .description("A Group ID is used to identify consumers that are within the same consumer group")
             .required(true)
             .addValidator(StandardValidators.NON_EMPTY_VALIDATOR)
-            .expressionLanguageSupported(false)
+            .expressionLanguageSupported(true)
             .build();
 
     public static final PropertyDescriptor AUTO_OFFSET_RESET = new PropertyDescriptor.Builder()
