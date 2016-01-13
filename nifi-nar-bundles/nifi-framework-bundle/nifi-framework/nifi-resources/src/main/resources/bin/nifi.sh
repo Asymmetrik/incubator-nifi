@@ -96,24 +96,24 @@ unlimitFD() {
 locateJava() {
     # Setup the Java Virtual Machine
     if $cygwin ; then
-        [ -n "${JAVA}" ] && JAVA=$(cygpath --unix "${JAVA}")
-        [ -n "${JAVA_HOME}" ] && JAVA_HOME=$(cygpath --unix "${JAVA_HOME}")
+        [ -n "$JAVA" ] && JAVA=$(cygpath --unix "$JAVA")
+        [ -n "$JAVA_HOME" ] && JAVA_HOME=$(cygpath --unix "$JAVA_HOME")
     fi
 
-    if [ "x${JAVA}" = "x" ] && [ -r /etc/gentoo-release ] ; then
+    if [ "x$JAVA" = "x" ] && [ -r /etc/gentoo-release ] ; then
         JAVA_HOME=$(java-config --jre-home)
     fi
-    if [ "x${JAVA}" = "x" ]; then
-        if [ "x${JAVA_HOME}" != "x" ]; then
-            if [ ! -d "${JAVA_HOME}" ]; then
-                die "JAVA_HOME is not valid: ${JAVA_HOME}"
+    if [ "x$JAVA" = "x" ]; then
+        if [ "x$JAVA_HOME" != "x" ]; then
+            if [ ! -d "$JAVA_HOME" ]; then
+                die "JAVA_HOME is not valid: $JAVA_HOME"
             fi
-            JAVA="${JAVA_HOME}/bin/java"
+            JAVA="$JAVA_HOME/bin/java"
         else
             warn "JAVA_HOME not set; results may vary"
             JAVA=$(type java)
-            JAVA=$(expr "${JAVA}" : '.* \(/.*\)$')
-            if [ "x${JAVA}" = "x" ]; then
+            JAVA=$(expr "$JAVA" : '.* \(/.*\)$')
+            if [ "x$JAVA" = "x" ]; then
                 die "java command not found"
             fi
         fi
@@ -176,7 +176,7 @@ run() {
     fi
 
     echo
-    echo "Java home: ${JAVA_HOME}"
+    echo "Java home: $JAVA_HOME"
     echo "NiFi home: ${NIFI_HOME}"
     echo
     echo "Bootstrap Config File: ${BOOTSTRAP_CONF}"
@@ -185,9 +185,9 @@ run() {
     # run 'start' in the background because the process will continue to run, monitoring NiFi.
     # all other commands will terminate quickly so want to just wait for them
     if [ "$1" = "start" ]; then
-        (cd "${NIFI_HOME}" && ${sudo_cmd_prefix} "${JAVA}" -cp "${NIFI_HOME}"/conf/:"${NIFI_HOME}"/lib/bootstrap/* -Xms12m -Xmx24m -Dorg.apache.nifi.bootstrap.config.file="${BOOTSTRAP_CONF}" org.apache.nifi.bootstrap.RunNiFi $@ &)
+        (cd "${NIFI_HOME}" && ${sudo_cmd_prefix} "$JAVA" -cp "${NIFI_HOME}"/conf/:"${NIFI_HOME}"/lib/bootstrap/* -Xms12m -Xmx24m -Dorg.apache.nifi.bootstrap.config.file="${BOOTSTRAP_CONF}" org.apache.nifi.bootstrap.RunNiFi $@ &)
     else
-        (cd "${NIFI_HOME}" && ${sudo_cmd_prefix} "${JAVA}" -cp "${NIFI_HOME}"/conf/:"${NIFI_HOME}"/lib/bootstrap/* -Xms12m -Xmx24m -Dorg.apache.nifi.bootstrap.config.file="${BOOTSTRAP_CONF}" org.apache.nifi.bootstrap.RunNiFi $@)
+        (cd "${NIFI_HOME}" && ${sudo_cmd_prefix} "$JAVA" -cp "${NIFI_HOME}"/conf/:"${NIFI_HOME}"/lib/bootstrap/* -Xms12m -Xmx24m -Dorg.apache.nifi.bootstrap.config.file="${BOOTSTRAP_CONF}" org.apache.nifi.bootstrap.RunNiFi $@)
     fi
 
     # Wait just a bit (3 secs) to wait for the logging to finish and then echo a new-line.
