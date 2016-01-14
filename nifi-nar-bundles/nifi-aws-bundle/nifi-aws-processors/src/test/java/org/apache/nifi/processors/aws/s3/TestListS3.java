@@ -6,14 +6,11 @@ import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertTrue;
 
 import java.io.IOException;
-import java.text.SimpleDateFormat;
 import java.util.Collection;
-import java.util.Date;
 import java.util.HashSet;
 import java.util.List;
 
 import org.apache.commons.lang3.StringUtils;
-import org.apache.commons.lang3.time.DateUtils;
 import org.apache.nifi.components.ValidationResult;
 import org.apache.nifi.flowfile.attributes.CoreAttributes;
 import org.apache.nifi.processor.ProcessContext;
@@ -25,18 +22,16 @@ import org.joda.time.DateTime;
 import org.joda.time.DateTimeZone;
 import org.joda.time.format.DateTimeFormat;
 import org.joda.time.format.DateTimeFormatter;
-import org.joda.time.format.ISODateTimeFormat;
 import org.junit.Ignore;
 import org.junit.Test;
 
 import com.amazonaws.regions.Regions;
 
-//@Ignore("For local testing only - interacts with S3 so the credentials file must be configured and all necessary buckets created")
+@Ignore("For local testing only - interacts with S3 so the credentials file must be configured and all necessary buckets created")
 public class TestListS3 {
 
     private static final String CREDENTIALS_FILE = System.getProperty("user.home") + "/aws-credentials.properties";
     private static final String BUCKET = "wildfire-data";
-//    private static final String PREFIX = "sandbox/twitter/" + new SimpleDateFormat("yyyy/MM/dd").format(new Date());
     private static final String BASE_PREFIX = "sandbox/twitter/";
     private static final String REGION = Regions.US_EAST_1.getName();
     
@@ -136,7 +131,7 @@ public class TestListS3 {
     }
     
     @Test
-    public void testDefaultSorting() throws IOException {
+    public void testAlphabeticalOrder() throws IOException {
         TestRunner runner = buildTestRunner();
         runner.setProperty(ListS3.MAX_OBJECTS, "3");
 
@@ -150,10 +145,10 @@ public class TestListS3 {
     }
     
     @Test
-    public void testReverseSorting() throws IOException {
+    public void testReverseAlphabeticalOrder() throws IOException {
         TestRunner runner = buildTestRunner();
         runner.setProperty(ListS3.MAX_OBJECTS, "3");
-        runner.setProperty(ListS3.REVERSE_SORT, "true");
+        runner.setProperty(ListS3.ORDER, ListS3.ORDER_REVERSE_ALPHABETICAL.getValue());
 
         runner.enqueue(new byte[0]);
         runner.run(1);
@@ -165,10 +160,10 @@ public class TestListS3 {
     }
     
     @Test
-    public void testChronologicalSorting() throws IOException {
+    public void testChronologicalOrder() throws IOException {
         TestRunner runner = buildTestRunner();
         runner.setProperty(ListS3.MAX_OBJECTS, "3");
-        runner.setProperty(ListS3.CHRONOLOGICAL_ORDER, "true");
+        runner.setProperty(ListS3.ORDER, ListS3.ORDER_CHRONOLOGICAL.getValue());
 
         runner.enqueue(new byte[0]);
         runner.run(1);
@@ -180,11 +175,10 @@ public class TestListS3 {
     }
     
     @Test
-    public void testReverseChronologicalSorting() throws IOException {
+    public void testReverseChronologicalOrder() throws IOException {
         TestRunner runner = buildTestRunner();
         runner.setProperty(ListS3.MAX_OBJECTS, "3");
-        runner.setProperty(ListS3.CHRONOLOGICAL_ORDER, "true");
-        runner.setProperty(ListS3.REVERSE_SORT, "true");
+        runner.setProperty(ListS3.ORDER, ListS3.ORDER_REVERSE_CHRONOLOGICAL.getValue());
 
         runner.enqueue(new byte[0]);
         runner.run(1);
@@ -247,8 +241,7 @@ public class TestListS3 {
 
         TestRunner runner = buildTestRunner();
         runner.setProperty(ListS3.PREFIXES, StringUtils.join(prefixes, '\n'));
-        runner.setProperty(ListS3.CHRONOLOGICAL_ORDER, "true");
-        runner.setProperty(ListS3.REVERSE_SORT, "true");
+        runner.setProperty(ListS3.ORDER, ListS3.ORDER_REVERSE_CHRONOLOGICAL);
         
         runner.enqueue(new byte[0]);
         runner.run(1);
