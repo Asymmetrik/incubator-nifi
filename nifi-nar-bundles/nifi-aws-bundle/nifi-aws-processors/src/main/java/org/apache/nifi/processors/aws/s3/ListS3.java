@@ -22,6 +22,7 @@ import org.apache.nifi.annotation.documentation.CapabilityDescription;
 import org.apache.nifi.annotation.documentation.SeeAlso;
 import org.apache.nifi.annotation.documentation.Tags;
 import org.apache.nifi.annotation.lifecycle.OnScheduled;
+import org.apache.nifi.components.AllowableValue;
 import org.apache.nifi.components.PropertyDescriptor;
 import org.apache.nifi.components.ValidationContext;
 import org.apache.nifi.components.ValidationResult;
@@ -53,6 +54,10 @@ import com.amazonaws.services.s3.model.S3ObjectSummary;
     @WritesAttribute(attribute = "s3.storageClass", description = "Object storage class"),    
 })
 public class ListS3 extends AbstractS3Processor {
+    static final AllowableValue ORDER_ALPHABETICAL = new AllowableValue("alphabetical");
+    static final AllowableValue ORDER_CHRONOLOGICAL = new AllowableValue("chronological");
+    static final AllowableValue ORDER_REVERSE_ALPHABETICAL = new AllowableValue("reverse alphabetical");
+    static final AllowableValue ORDER_REVERSE_CHRONOLOGICAL = new AllowableValue("reverse chronological");
     
     public static final PropertyDescriptor PREFIXES = new PropertyDescriptor.Builder()
         .name("Object Key Prefixes")
@@ -80,19 +85,12 @@ public class ListS3 extends AbstractS3Processor {
         .required(false)
         .addValidator(StandardValidators.createTimePeriodValidator(100, TimeUnit.MILLISECONDS, Long.MAX_VALUE, TimeUnit.NANOSECONDS))
         .build();
-    public static final PropertyDescriptor CHRONOLOGICAL_ORDER = new PropertyDescriptor.Builder()
+    public static final PropertyDescriptor ORDER = new PropertyDescriptor.Builder()
         .name("Chronological Order")
-        .description("Return objects within each prefix in chronological order; if false objects are returned in lexicographic (alphabetical) order. When multiple prefixes are used, all objects for the first prefix are returned before objects for the next prefix.")
-        .required(false)
-        .addValidator(StandardValidators.BOOLEAN_VALIDATOR)
-        .defaultValue("false")
-        .build();
-    public static final PropertyDescriptor REVERSE_SORT = new PropertyDescriptor.Builder()
-        .name("Reverse Sort")
-        .description("Reverse sort the listing of objects within each prefix.")
-        .required(false)
-        .addValidator(StandardValidators.BOOLEAN_VALIDATOR)
-        .defaultValue("false")
+        .description("Return objects within each prefix in the specified order. When multiple prefixes are used, all objects for the first prefix are ordered before objects for the next prefix.")
+        .required(true)
+        .defaultValue(ORDER_ALPHABETICAL.getValue())
+        .allowableValues(ORDER_ALPHABETICAL, ORDER_CHRONOLOGICAL, ORDER_REVERSE_ALPHABETICAL, ORDER_REVERSE_CHRONOLOGICAL)
         .build();
     public static final PropertyDescriptor POLLING_INTERVAL = new PropertyDescriptor.Builder()
         .name("Polling Interval")
@@ -108,8 +106,7 @@ public class ListS3 extends AbstractS3Processor {
     private long minAge = 0L, maxAge = 0L;
     private String bucket;
     private String[] prefixes;
-    private boolean chronologicalOrder;
-    private boolean reverseSort;
+    private String order;
     
     private final AtomicLong lastRunTime = new AtomicLong(0L);
     
@@ -127,8 +124,7 @@ public class ListS3 extends AbstractS3Processor {
         props.add(MAX_OBJECTS);
         props.add(MIN_AGE);
         props.add(MAX_AGE);
-        props.add(CHRONOLOGICAL_ORDER);
-        props.add(REVERSE_SORT);
+        props.add(ORDER);
         return Collections.unmodifiableList(props);
     }
     
@@ -173,8 +169,7 @@ public class ListS3 extends AbstractS3Processor {
         final Long maxAgeProp = context.getProperty(MAX_AGE).asTimePeriod(TimeUnit.MILLISECONDS);
         maxAge = (maxAgeProp == null) ? Long.MAX_VALUE : maxAgeProp;
         
-        chronologicalOrder = context.getProperty(CHRONOLOGICAL_ORDER).asBoolean();
-        reverseSort = context.getProperty(REVERSE_SORT).asBoolean();
+        order = context.getProperty(ORDER).getValue();
     }
 
     @Override
@@ -252,7 +247,8 @@ public class ListS3 extends AbstractS3Processor {
             filterListing(listing, objectList);
         }
         
-        if (chronologicalOrder) {
+        // results are in alphabetical order by default - reorder if needed
+        if (order.equalsIgnoreCase(ORDER_CHRONOLOGICAL.getValue()) || order.equalsIgnoreCase(ORDER_REVERSE_CHRONOLOGICAL.getValue())) {
             Collections.sort(objectList, new Comparator<S3ObjectSummary>() {
                 @Override
                 public int compare(final S3ObjectSummary o1, final S3ObjectSummary o2) {
@@ -260,7 +256,7 @@ public class ListS3 extends AbstractS3Processor {
                 }
             });
         }
-        if (reverseSort) {
+        if (order.equalsIgnoreCase(ORDER_REVERSE_ALPHABETICAL.getValue()) || order.equalsIgnoreCase(ORDER_REVERSE_CHRONOLOGICAL.getValue())) {
             Collections.reverse(objectList);
         }
         
