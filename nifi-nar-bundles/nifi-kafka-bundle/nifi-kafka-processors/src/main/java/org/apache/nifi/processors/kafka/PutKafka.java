@@ -129,7 +129,7 @@ public class PutKafka extends AbstractSessionFactoryProcessor {
         .name("Known Brokers")
         .description("A comma-separated list of known Kafka Brokers in the format <host>:<port>")
         .required(true)
-        .addValidator(StandardValidators.NON_EMPTY_VALIDATOR)
+        .addValidator(StandardValidators.createRegexMatchingValidator(Pattern.compile(BROKER_REGEX)))
         .expressionLanguageSupported(true)
         .build();
     public static final PropertyDescriptor TOPIC = new PropertyDescriptor.Builder()

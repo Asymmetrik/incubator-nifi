@@ -102,7 +102,6 @@ public class TestServer {
 
         // set host and port
         https.setPort(0);
-
         // Severely taxed environments may have significant delays when executing.
         https.setIdleTimeout(30000L);
 
