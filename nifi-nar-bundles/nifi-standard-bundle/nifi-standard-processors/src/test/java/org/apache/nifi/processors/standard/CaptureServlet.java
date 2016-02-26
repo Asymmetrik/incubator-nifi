@@ -17,6 +17,7 @@
 package org.apache.nifi.processors.standard;
 
 import java.io.IOException;
+import java.util.Enumeration;
 
 import javax.servlet.ServletException;
 import javax.servlet.http.HttpServlet;
@@ -34,13 +35,20 @@ public class CaptureServlet extends HttpServlet {
 
     private volatile byte[] lastPost;
 
+    private Enumeration<String> headerNames;
+
     public byte[] getLastPost() {
         return lastPost;
+    }
+
+    public Enumeration<String> getLastHeaderNames() {
+        return headerNames;
     }
 
     @Override
     protected void doPost(final HttpServletRequest request, final HttpServletResponse response) throws ServletException, IOException {
         final ByteArrayOutputStream baos = new ByteArrayOutputStream();
+        this.headerNames = request.getHeaderNames();
         try{
             StreamUtils.copy(request.getInputStream(), baos);
             this.lastPost = baos.toByteArray();
