@@ -21,9 +21,12 @@ import static org.junit.Assert.assertTrue;
 
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
+import java.util.ArrayList;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
 
+import org.apache.nifi.components.PropertyDescriptor;
 import org.apache.nifi.ssl.SSLContextService;
 import org.apache.nifi.ssl.StandardSSLContextService;
 import org.apache.nifi.util.FlowFileUnpackagerV3;
@@ -84,6 +87,35 @@ public class TestPostHTTP {
         runner.run();
 
         runner.assertAllFlowFilesTransferred(PostHTTP.REL_SUCCESS, 1);
+    }
+
+    @Test
+    public void testDynamicProperty() throws Exception {
+        final Map<String, String> sslProps = new HashMap<>();
+        sslProps.put(TestServer.NEED_CLIENT_AUTH, "false");
+        sslProps.put(StandardSSLContextService.KEYSTORE.getName(), "src/test/resources/localhost-ks.jks");
+        sslProps.put(StandardSSLContextService.KEYSTORE_PASSWORD.getName(), "localtest");
+        sslProps.put(StandardSSLContextService.KEYSTORE_TYPE.getName(), "JKS");
+        setup(sslProps);
+
+        final SSLContextService sslContextService = new StandardSSLContextService();
+        runner.addControllerService("ssl-context", sslContextService);
+        runner.setProperty(sslContextService, StandardSSLContextService.TRUSTSTORE, "src/test/resources/localhost-ts.jks");
+        runner.setProperty(sslContextService, StandardSSLContextService.TRUSTSTORE_PASSWORD, "localtest");
+        runner.setProperty(sslContextService, StandardSSLContextService.TRUSTSTORE_TYPE, "JKS");
+        runner.enableControllerService(sslContextService);
+
+        runner.setProperty(PostHTTP.URL, server.getSecureUrl());
+        runner.setProperty(PostHTTP.SSL_CONTEXT_SERVICE, "ssl-context");
+        runner.setProperty("Authorization", "Basic 1234567890");
+
+        runner.enqueue("Hello world".getBytes());
+        runner.run();
+
+        runner.assertAllFlowFilesTransferred(PostHTTP.REL_SUCCESS, 1);
+
+        ArrayList<String> headerNames = Collections.list(servlet.getLastHeaderNames());
+        assertTrue(headerNames.contains("Authorization"));
     }
 
     @Test

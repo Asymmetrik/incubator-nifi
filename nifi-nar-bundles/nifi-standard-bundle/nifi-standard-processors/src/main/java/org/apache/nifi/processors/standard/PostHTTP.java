@@ -50,6 +50,7 @@ import javax.security.cert.X509Certificate;
 import javax.servlet.http.HttpServletResponse;
 
 import org.apache.commons.io.IOUtils;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.http.Header;
 import org.apache.http.HttpException;
 import org.apache.http.HttpHost;
@@ -94,6 +95,7 @@ import org.apache.nifi.annotation.lifecycle.OnStopped;
 import org.apache.nifi.components.PropertyDescriptor;
 import org.apache.nifi.components.ValidationContext;
 import org.apache.nifi.components.ValidationResult;
+import org.apache.nifi.expression.AttributeExpression;
 import org.apache.nifi.flowfile.FlowFile;
 import org.apache.nifi.flowfile.attributes.CoreAttributes;
 import org.apache.nifi.logging.ProcessorLog;
@@ -265,6 +267,7 @@ public class PostHTTP extends AbstractProcessor {
     private final AtomicReference<DestinationAccepts> acceptsRef = new AtomicReference<>();
     private final AtomicReference<StreamThrottler> throttlerRef = new AtomicReference<>();
     private final ConcurrentMap<String, Config> configMap = new ConcurrentHashMap<>();
+    private volatile Set<String> dynamicPropertyNames = new HashSet<>();
 
     @Override
     protected void init(final ProcessorInitializationContext context) {
@@ -300,6 +303,30 @@ public class PostHTTP extends AbstractProcessor {
     @Override
     protected List<PropertyDescriptor> getSupportedPropertyDescriptors() {
         return properties;
+    }
+
+    @Override
+    protected PropertyDescriptor getSupportedDynamicPropertyDescriptor(String propertyDescriptorName) {
+        return new PropertyDescriptor.Builder()
+                .required(false)
+                .name(propertyDescriptorName)
+                .addValidator(StandardValidators.createAttributeExpressionLanguageValidator(AttributeExpression.ResultType.STRING, true))
+                .dynamic(true)
+                .expressionLanguageSupported(true)
+                .build();
+    }
+
+    @Override
+    public void onPropertyModified(final PropertyDescriptor descriptor, final String oldValue, final String newValue) {
+        if (descriptor.isDynamic()) {
+            final Set<String> newDynamicPropertyNames = new HashSet<>(dynamicPropertyNames);
+            if (newValue == null) {
+                newDynamicPropertyNames.remove(descriptor.getName());
+            } else if (oldValue == null) {    // new property
+                newDynamicPropertyNames.add(descriptor.getName());
+            }
+            this.dynamicPropertyNames = Collections.unmodifiableSet(newDynamicPropertyNames);
+        }
     }
 
     @Override
@@ -657,6 +684,11 @@ public class PostHTTP extends AbstractProcessor {
                     post.setHeader(entry.getKey(), entry.getValue());
                 }
             }
+        }
+
+        for (String headerKey : dynamicPropertyNames) {
+            String headerValue = context.getProperty(headerKey).evaluateAttributeExpressions(toSend.get(0)).getValue();
+            post.setHeader(headerKey, headerValue);
         }
 
         post.setHeader(CONTENT_TYPE, contentType);
