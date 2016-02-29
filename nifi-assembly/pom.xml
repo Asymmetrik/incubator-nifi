@@ -281,7 +281,7 @@ language governing permissions and limitations under the License. -->
 
     <properties>
         <!--Wrapper Properties -->
-        <nifi.jvm.heap.mb>512</nifi.jvm.heap.mb>
+        <nifi.jvm.heap.mb>1024</nifi.jvm.heap.mb>
         <nifi.jvm.permgen.mb>128</nifi.jvm.permgen.mb>
         <nifi.run.as />
         <!-- nifi.properties: core properties -->
