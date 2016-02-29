@@ -38,15 +38,10 @@ public class CaptureServlet extends HttpServlet {
     private volatile byte[] lastPost;
     private volatile Map<String, String> lastPostHeaders;
 
-    private Enumeration<String> headerNames;
-
     public byte[] getLastPost() {
         return lastPost;
     }
 
-    public Enumeration<String> getLastHeaderNames() {
-        return headerNames;
-    }
     public Map<String, String> getLastPostHeaders() {
         return lastPostHeaders;
     }
@@ -54,7 +49,6 @@ public class CaptureServlet extends HttpServlet {
     @Override
     protected void doPost(final HttpServletRequest request, final HttpServletResponse response) throws ServletException, IOException {
         final ByteArrayOutputStream baos = new ByteArrayOutputStream();
-        this.headerNames = request.getHeaderNames();
 
         // Capture all the headers for reference.  Intentionally choosing to not special handling for headers with multiple values for clarity
         final Enumeration<String> headerNames = request.getHeaderNames();

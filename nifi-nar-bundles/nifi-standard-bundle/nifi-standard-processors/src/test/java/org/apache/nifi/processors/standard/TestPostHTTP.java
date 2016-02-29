@@ -110,6 +110,7 @@ public class TestPostHTTP {
 
         runner.setProperty(PostHTTP.URL, server.getSecureUrl());
         runner.setProperty(PostHTTP.SSL_CONTEXT_SERVICE, "ssl-context");
+        runner.setProperty(PostHTTP.CHUNKED_ENCODING, "false");
         runner.setProperty("Authorization", "Basic 1234567890");
 
         runner.enqueue("Hello world".getBytes());
@@ -117,8 +118,8 @@ public class TestPostHTTP {
 
         runner.assertAllFlowFilesTransferred(PostHTTP.REL_SUCCESS, 1);
 
-        ArrayList<String> headerNames = Collections.list(servlet.getLastHeaderNames());
-        assertTrue(headerNames.contains("Authorization"));
+        Map<String, String> lastPostHeaders = servlet.getLastPostHeaders();
+        assertTrue(lastPostHeaders.containsKey("Authorization"));
     }
 
     @Test
