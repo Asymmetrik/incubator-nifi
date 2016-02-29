@@ -49,7 +49,6 @@ public class TestInvokeHttpSSL extends TestInvokeHttpCommon {
 
         // Allow time for the server to start
         Thread.sleep(500);
-
         // this is the base url with the random port
         url = server.getSecureUrl();
     }

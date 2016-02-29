@@ -39,13 +39,18 @@ import org.apache.nifi.connectable.Connection;
 import org.apache.nifi.controller.queue.DropFlowFileState;
 import org.apache.nifi.controller.queue.DropFlowFileStatus;
 import org.apache.nifi.controller.queue.FlowFileQueue;
+import org.apache.nifi.controller.queue.ListFlowFileState;
+import org.apache.nifi.controller.queue.ListFlowFileStatus;
 import org.apache.nifi.controller.queue.QueueSize;
 import org.apache.nifi.controller.repository.FlowFileRecord;
 import org.apache.nifi.controller.repository.FlowFileRepository;
 import org.apache.nifi.controller.repository.FlowFileSwapManager;
 import org.apache.nifi.controller.repository.SwapManagerInitializationContext;
+import org.apache.nifi.controller.repository.SwapSummary;
 import org.apache.nifi.controller.repository.claim.ContentClaim;
+import org.apache.nifi.controller.repository.claim.ResourceClaim;
 import org.apache.nifi.controller.repository.claim.ResourceClaimManager;
+import org.apache.nifi.controller.swap.StandardSwapSummary;
 import org.apache.nifi.flowfile.FlowFile;
 import org.apache.nifi.flowfile.FlowFilePrioritizer;
 import org.apache.nifi.flowfile.attributes.CoreAttributes;
@@ -55,6 +60,7 @@ import org.apache.nifi.provenance.ProvenanceEventRepository;
 import org.apache.nifi.provenance.ProvenanceEventType;
 import org.apache.nifi.provenance.StandardProvenanceEventRecord;
 import org.junit.Before;
+import org.junit.BeforeClass;
 import org.junit.Test;
 import org.mockito.Mockito;
 import org.mockito.invocation.InvocationOnMock;
@@ -65,6 +71,11 @@ public class TestStandardFlowFileQueue {
     private StandardFlowFileQueue queue = null;
 
     private List<ProvenanceEventRecord> provRecords = new ArrayList<>();
+
+    @BeforeClass
+    public static void setupLogging() {
+        System.setProperty("org.slf4j.simpleLogger.log.org.apache.nifi", "DEBUG");
+    }
 
     @Before
     @SuppressWarnings("unchecked")
@@ -94,7 +105,7 @@ public class TestStandardFlowFileQueue {
             }
         }).when(provRepo).registerEvents(Mockito.any(Iterable.class));
 
-        queue = new StandardFlowFileQueue("id", connection, flowFileRepo, provRepo, claimManager, scheduler, swapManager, null, 10000);
+        queue = new StandardFlowFileQueue("id", connection, flowFileRepo, provRepo, claimManager, scheduler, swapManager, null, 10000, null);
         TestFlowFile.idGenerator.set(0L);
     }
 
@@ -388,6 +399,47 @@ public class TestStandardFlowFileQueue {
         assertEquals(20, swapManager.swapInCalledCount);
     }
 
+
+    @Test(timeout = 5000)
+    public void testListFlowFilesOnlyActiveQueue() throws InterruptedException {
+        for (int i = 0; i < 9999; i++) {
+            queue.put(new TestFlowFile());
+        }
+
+        final ListFlowFileStatus status = queue.listFlowFiles(UUID.randomUUID().toString(), 10000);
+        assertNotNull(status);
+        assertEquals(9999, status.getQueueSize().getObjectCount());
+
+        while (status.getState() != ListFlowFileState.COMPLETE) {
+            Thread.sleep(100);
+        }
+
+        assertEquals(9999, status.getFlowFileSummaries().size());
+        assertEquals(100, status.getCompletionPercentage());
+        assertNull(status.getFailureReason());
+    }
+
+
+    @Test(timeout = 5000)
+    public void testListFlowFilesResultsLimited() throws InterruptedException {
+        for (int i = 0; i < 30050; i++) {
+            queue.put(new TestFlowFile());
+        }
+
+        final ListFlowFileStatus status = queue.listFlowFiles(UUID.randomUUID().toString(), 100);
+        assertNotNull(status);
+        assertEquals(30050, status.getQueueSize().getObjectCount());
+
+        while (status.getState() != ListFlowFileState.COMPLETE) {
+            Thread.sleep(100);
+        }
+
+        assertEquals(100, status.getFlowFileSummaries().size());
+        assertEquals(100, status.getCompletionPercentage());
+        assertNull(status.getFailureReason());
+    }
+
+
     private class TestSwapManager implements FlowFileSwapManager {
         private final Map<String, List<FlowFileRecord>> swappedOut = new HashMap<>();
         int swapOutCalledCount = 0;
@@ -423,37 +475,30 @@ public class TestStandardFlowFileQueue {
         }
 
         @Override
-        public QueueSize getSwapSize(String swapLocation) throws IOException {
+        @SuppressWarnings("deprecation")
+        public SwapSummary getSwapSummary(String swapLocation) throws IOException {
             final List<FlowFileRecord> flowFiles = swappedOut.get(swapLocation);
             if (flowFiles == null) {
-                return new QueueSize(0, 0L);
+                return StandardSwapSummary.EMPTY_SUMMARY;
             }
 
             int count = 0;
             long size = 0L;
+            Long max = null;
+            final List<ResourceClaim> resourceClaims = new ArrayList<>();
             for (final FlowFileRecord flowFile : flowFiles) {
                 count++;
                 size += flowFile.getSize();
-            }
-
-            return new QueueSize(count, size);
-        }
-
-        @Override
-        public Long getMaxRecordId(String swapLocation) throws IOException {
-            final List<FlowFileRecord> flowFiles = swappedOut.get(swapLocation);
-            if (flowFiles == null) {
-                return null;
-            }
-
-            Long max = null;
-            for (final FlowFileRecord flowFile : flowFiles) {
                 if (max == null || flowFile.getId() > max) {
                     max = flowFile.getId();
                 }
+
+                if (flowFile.getContentClaim() != null) {
+                    resourceClaims.add(flowFile.getContentClaim().getResourceClaim());
+                }
             }
 
-            return max;
+            return new StandardSwapSummary(new QueueSize(count, size), max, resourceClaims);
         }
 
         @Override
@@ -484,10 +529,14 @@ public class TestStandardFlowFileQueue {
             this.size = size;
 
             if (!attributes.containsKey(CoreAttributes.UUID.key())) {
-                attributes.put(CoreAttributes.UUID.key(), UUID.randomUUID().toString());
+                attributes.put(CoreAttributes.UUID.key(), createFakeUUID());
             }
         }
 
+        private  String createFakeUUID(){
+            final String s=Long.toHexString(id);
+            return new StringBuffer("00000000-0000-0000-0000000000000000".substring(0,(35-s.length()))+s).insert(23, '-').toString();
+        }
 
         @Override
         public long getId() {
@@ -535,6 +584,7 @@ public class TestStandardFlowFileQueue {
         }
 
         @Override
+        @SuppressWarnings("deprecation")
         public int compareTo(final FlowFile o) {
             return Long.compare(id, o.getId());
         }
