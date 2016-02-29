@@ -16,6 +16,7 @@
  */
 package org.apache.nifi.controller.queue;
 
+import java.io.IOException;
 import java.util.Collection;
 import java.util.List;
 import java.util.Queue;
@@ -23,6 +24,7 @@ import java.util.Set;
 import java.util.concurrent.TimeUnit;
 
 import org.apache.nifi.controller.repository.FlowFileRecord;
+import org.apache.nifi.controller.repository.SwapSummary;
 import org.apache.nifi.flowfile.FlowFilePrioritizer;
 import org.apache.nifi.processor.FlowFileFilter;
 
@@ -39,16 +41,14 @@ public interface FlowFileQueue {
     List<FlowFilePrioritizer> getPriorities();
 
     /**
-     * Reads any Swap Files that belong to this queue and increments counts so that the size
-     * of the queue will reflect the size of all FlowFiles regardless of whether or not they are
-     * swapped out. This will be called only during NiFi startup as an initialization step. This
-     * method is then responsible for returning the largest ID of any FlowFile that is swapped
+     * Reads any Swap Files that belong to this queue and returns a summary of what is swapped out.
+     * This will be called only during NiFi startup as an initialization step. This
+     * method is then responsible for returning a FlowFileSummary of the FlowFiles that are swapped
      * out, or <code>null</code> if no FlowFiles are swapped out for this queue.
      *
-     * @return the largest ID of any FlowFile that is swapped out for this queue, or <code>null</code> if
-     *         no FlowFiles are swapped out for this queue.
+     * @return a SwapSummary that describes the FlowFiles that exist in the queue but are swapped out.
      */
-    Long recoverSwappedFlowFiles();
+    SwapSummary recoverSwappedFlowFiles();
 
     /**
      * Destroys any Swap Files that exist for this queue without updating the FlowFile Repository
@@ -180,6 +180,7 @@ public interface FlowFileQueue {
      * passed to the {@link #getDropFlowFileStatus(String)} and {@link #cancelDropFlowFileStatus(String)}
      * methods in order to obtain the status later or cancel a request
      *
+     * @param requestIdentifier the identifier of the Drop FlowFile Request
      * @param requestor the entity that is requesting that the FlowFiles be dropped; this will be
      *            included in the Provenance Events that are generated.
      *
@@ -207,4 +208,68 @@ public interface FlowFileQueue {
      *         request status exists with that identifier
      */
     DropFlowFileStatus cancelDropFlowFileRequest(String requestIdentifier);
+
+    /**
+     * <p>
+     * Initiates a request to obtain a listing of FlowFiles in this queue. This method returns a
+     * ListFlowFileStatus that can be used to obtain information about the FlowFiles that exist
+     * within the queue. Additionally, the ListFlowFileStatus provides a request identifier that
+     * can then be passed to the {@link #getListFlowFileStatus(String)}. The listing of FlowFiles
+     * will be returned ordered by the position of the FlowFile in the queue.
+     * </p>
+     *
+     * <p>
+     * Note that if maxResults is larger than the size of the "active queue" (i.e., the un-swapped queued,
+     * FlowFiles that are swapped out will not be returned.)
+     * </p>
+     *
+     * @param requestIdentifier the identifier of the List FlowFile Request
+     * @param maxResults the maximum number of FlowFileSummary objects to add to the ListFlowFileStatus
+     *
+     * @return the status for the request
+     *
+     * @throws IllegalStateException if either the source or the destination of the connection to which this queue belongs
+     *             is currently running.
+     */
+    ListFlowFileStatus listFlowFiles(String requestIdentifier, int maxResults);
+
+    /**
+     * Returns the current status of a List FlowFile Request that was initiated via the {@link #listFlowFiles(String)}
+     * method that has the given identifier
+     *
+     * @param requestIdentifier the identifier of the Drop FlowFile Request
+     * @return the current status of the List FlowFile Request with the given identifier or <code>null</code> if no
+     *         request status exists with that identifier
+     */
+    ListFlowFileStatus getListFlowFileStatus(String requestIdentifier);
+
+    /**
+     * Cancels the request to list FlowFiles that has the given identifier. After this method is called, the request
+     * will no longer be known by this queue, so subsequent calls to {@link #getListFlowFileStatus(String)} or
+     * {@link #cancelListFlowFileRequest(String)} will return <code>null</code>
+     *
+     * @param requestIdentifier the identifier of the Drop FlowFile Request
+     * @return the current status of the List FlowFile Request with the given identifier or <code>null</code> if no
+     *         request status exists with that identifier
+     */
+    ListFlowFileStatus cancelListFlowFileRequest(String requestIdentifier);
+
+    /**
+     * Returns the FlowFile with the given UUID or <code>null</code> if no FlowFile can be found in this queue
+     * with the given UUID
+     *
+     * @param flowFileUuid the UUID of the FlowFile to retrieve
+     * @return the FlowFile with the given UUID or <code>null</code> if no FlowFile can be found in this queue
+     *         with the given UUID
+     *
+     * @throws IOException if unable to read FlowFiles that are stored on some external device
+     */
+    FlowFileRecord getFlowFile(String flowFileUuid) throws IOException;
+
+    /**
+     * Ensures that a listing can be performed on the queue
+     *
+     * @throws IllegalStateException if the queue is not in a state in which a listing can be performed
+     */
+    void verifyCanList() throws IllegalStateException;
 }

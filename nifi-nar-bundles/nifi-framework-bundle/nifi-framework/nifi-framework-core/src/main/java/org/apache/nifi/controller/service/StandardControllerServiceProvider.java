@@ -38,6 +38,8 @@ import java.util.concurrent.Executors;
 import org.apache.nifi.annotation.lifecycle.OnAdded;
 import org.apache.nifi.annotation.lifecycle.OnRemoved;
 import org.apache.nifi.components.PropertyDescriptor;
+import org.apache.nifi.components.state.StateManager;
+import org.apache.nifi.components.state.StateManagerProvider;
 import org.apache.nifi.controller.ConfigurationContext;
 import org.apache.nifi.controller.ConfiguredComponent;
 import org.apache.nifi.controller.ControllerService;
@@ -46,8 +48,8 @@ import org.apache.nifi.controller.ProcessorNode;
 import org.apache.nifi.controller.ReportingTaskNode;
 import org.apache.nifi.controller.ScheduledState;
 import org.apache.nifi.controller.ValidationContextFactory;
-import org.apache.nifi.controller.exception.ControllerServiceInstantiationException;
 import org.apache.nifi.controller.exception.ComponentLifeCycleException;
+import org.apache.nifi.controller.exception.ControllerServiceInstantiationException;
 import org.apache.nifi.events.BulletinFactory;
 import org.apache.nifi.logging.ComponentLog;
 import org.apache.nifi.nar.ExtensionManager;
@@ -69,6 +71,7 @@ public class StandardControllerServiceProvider implements ControllerServiceProvi
     private final ConcurrentMap<String, ControllerServiceNode> controllerServices;
     private static final Set<Method> validDisabledMethods;
     private final BulletinRepository bulletinRepo;
+    private final StateManagerProvider stateManagerProvider;
 
     static {
         // methods that are okay to be called when the service is disabled.
@@ -82,12 +85,13 @@ public class StandardControllerServiceProvider implements ControllerServiceProvi
         validDisabledMethods = Collections.unmodifiableSet(validMethods);
     }
 
-    public StandardControllerServiceProvider(final ProcessScheduler scheduler, final BulletinRepository bulletinRepo) {
+    public StandardControllerServiceProvider(final ProcessScheduler scheduler, final BulletinRepository bulletinRepo, final StateManagerProvider stateManagerProvider) {
         // the following 2 maps must be updated atomically, but we do not lock around them because they are modified
         // only in the createControllerService method, and both are modified before the method returns
         this.controllerServices = new ConcurrentHashMap<>();
         this.processScheduler = scheduler;
         this.bulletinRepo = bulletinRepo;
+        this.stateManagerProvider = stateManagerProvider;
     }
 
     private Class<?>[] getInterfaces(final Class<?> cls) {
@@ -108,6 +112,10 @@ public class StandardControllerServiceProvider implements ControllerServiceProvi
         if (superClass != null) {
             populateInterfaces(superClass, interfacesDefinedThusFar);
         }
+    }
+
+    private StateManager getStateManager(final String componentId) {
+        return stateManagerProvider.getStateManager(componentId);
     }
 
     @Override
@@ -171,7 +179,7 @@ public class StandardControllerServiceProvider implements ControllerServiceProvi
             logger.info("Created Controller Service of type {} with identifier {}", type, id);
 
             final ComponentLog serviceLogger = new SimpleProcessLogger(id, originalService);
-            originalService.initialize(new StandardControllerServiceInitializationContext(id, serviceLogger, this));
+            originalService.initialize(new StandardControllerServiceInitializationContext(id, serviceLogger, this, getStateManager(id)));
 
             final ValidationContextFactory validationContextFactory = new StandardValidationContextFactory(this);
 
@@ -203,12 +211,11 @@ public class StandardControllerServiceProvider implements ControllerServiceProvi
         // Get a list of all Controller Services that need to be disabled, in the order that they need to be
         // disabled.
         final List<ControllerServiceNode> toDisable = findRecursiveReferences(serviceNode, ControllerServiceNode.class);
+
         final Set<ControllerServiceNode> serviceSet = new HashSet<>(toDisable);
 
         for (final ControllerServiceNode nodeToDisable : toDisable) {
-            final ControllerServiceState state = nodeToDisable.getState();
-
-            if (state != ControllerServiceState.DISABLED && state != ControllerServiceState.DISABLING) {
+            if (nodeToDisable.isActive()) {
                 nodeToDisable.verifyCanDisable(serviceSet);
             }
         }
@@ -319,14 +326,6 @@ public class StandardControllerServiceProvider implements ControllerServiceProvi
             logger.info("Will enable {} Controller Services", servicesToEnable.size());
         }
 
-        // Mark all services that are configured to be enabled as 'ENABLING'. This allows Processors, reporting tasks
-        // to be valid so that they can be scheduled.
-        for (final List<ControllerServiceNode> branch : branches) {
-            for (final ControllerServiceNode nodeToEnable : branch) {
-                nodeToEnable.setState(ControllerServiceState.ENABLING);
-            }
-        }
-
         final Set<ControllerServiceNode> enabledNodes = Collections.synchronizedSet(new HashSet<ControllerServiceNode>());
         final ExecutorService executor = Executors.newFixedThreadPool(Math.min(10, branches.size()));
         for (final List<ControllerServiceNode> branch : branches) {
@@ -422,6 +421,7 @@ public class StandardControllerServiceProvider implements ControllerServiceProvi
 
     @Override
     public void disableControllerService(final ControllerServiceNode serviceNode) {
+        serviceNode.verifyCanDisable();
         processScheduler.disableControllerService(serviceNode);
     }
 
@@ -499,6 +499,8 @@ public class StandardControllerServiceProvider implements ControllerServiceProvi
         }
 
         controllerServices.remove(serviceNode.getIdentifier());
+
+        stateManagerProvider.onComponentRemoved(serviceNode.getIdentifier());
     }
 
     @Override
@@ -545,23 +547,20 @@ public class StandardControllerServiceProvider implements ControllerServiceProvi
     }
 
     private void enableReferencingServices(final ControllerServiceNode serviceNode, final List<ControllerServiceNode> recursiveReferences) {
-        if (serviceNode.getState() != ControllerServiceState.ENABLED && serviceNode.getState() != ControllerServiceState.ENABLING) {
+        if (!serviceNode.isActive()) {
             serviceNode.verifyCanEnable(new HashSet<>(recursiveReferences));
         }
 
         final Set<ControllerServiceNode> ifEnabled = new HashSet<>();
-        final List<ControllerServiceNode> toEnable = findRecursiveReferences(serviceNode, ControllerServiceNode.class);
-        for (final ControllerServiceNode nodeToEnable : toEnable) {
-            final ControllerServiceState state = nodeToEnable.getState();
-            if (state != ControllerServiceState.ENABLED && state != ControllerServiceState.ENABLING) {
+        for (final ControllerServiceNode nodeToEnable : recursiveReferences) {
+            if (!nodeToEnable.isActive()) {
                 nodeToEnable.verifyCanEnable(ifEnabled);
                 ifEnabled.add(nodeToEnable);
             }
         }
 
-        for (final ControllerServiceNode nodeToEnable : toEnable) {
-            final ControllerServiceState state = nodeToEnable.getState();
-            if (state != ControllerServiceState.ENABLED && state != ControllerServiceState.ENABLING) {
+        for (final ControllerServiceNode nodeToEnable : recursiveReferences) {
+            if (!nodeToEnable.isActive()) {
                 enableControllerService(nodeToEnable);
             }
         }
@@ -606,9 +605,7 @@ public class StandardControllerServiceProvider implements ControllerServiceProvi
         final Set<ControllerServiceNode> serviceSet = new HashSet<>(toDisable);
 
         for (final ControllerServiceNode nodeToDisable : toDisable) {
-            final ControllerServiceState state = nodeToDisable.getState();
-
-            if (state != ControllerServiceState.DISABLED && state != ControllerServiceState.DISABLING) {
+            if (nodeToDisable.isActive()) {
                 nodeToDisable.verifyCanDisable(serviceSet);
             }
         }

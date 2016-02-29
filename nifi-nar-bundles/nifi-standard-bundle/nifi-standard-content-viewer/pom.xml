@@ -17,11 +17,15 @@
     <parent>
         <groupId>org.apache.nifi</groupId>
         <artifactId>nifi-standard-bundle</artifactId>
-        <version>0.4.1-A-SNAPSHOT</version>
+        <version>0.5.1</version>
     </parent>
     <groupId>org.apache.nifi</groupId>
     <artifactId>nifi-standard-content-viewer</artifactId>
     <packaging>war</packaging>
+    <properties>
+        <maven.javadoc.skip>true</maven.javadoc.skip>
+        <source.skip>true</source.skip>
+    </properties>
     <dependencies>
         <dependency>
             <groupId>org.apache.commons</groupId>
@@ -42,10 +46,6 @@
             <groupId>commons-io</groupId>
             <artifactId>commons-io</artifactId>
             <scope>provided</scope>
-        </dependency>
-        <dependency>
-            <groupId>com.fasterxml.jackson.core</groupId>
-            <artifactId>jackson-core</artifactId>
         </dependency>
         <dependency>
             <groupId>com.fasterxml.jackson.core</groupId>

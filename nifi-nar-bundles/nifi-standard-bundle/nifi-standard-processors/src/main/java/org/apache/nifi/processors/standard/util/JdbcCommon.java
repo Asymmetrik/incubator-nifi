@@ -127,9 +127,12 @@ public class JdbcCommon {
     public static Schema createSchema(final ResultSet rs) throws SQLException {
         final ResultSetMetaData meta = rs.getMetaData();
         final int nrOfColumns = meta.getColumnCount();
-        String tableName = meta.getTableName(1);
-        if (StringUtils.isBlank(tableName)) {
-            tableName = "NiFi_ExecuteSQL_Record";
+        String tableName = "NiFi_ExecuteSQL_Record";
+        if(nrOfColumns > 0) {
+            String tableNameFromMeta = meta.getTableName(1);
+            if (!StringUtils.isBlank(tableName)) {
+                tableName = tableNameFromMeta;
+            }
         }
 
         final FieldAssembler<Schema> builder = SchemaBuilder.record(tableName).namespace("any.data").fields();
@@ -154,6 +157,13 @@ public class JdbcCommon {
                     break;
 
                 case INTEGER:
+                    if (meta.isSigned(i)) {
+                        builder.name(meta.getColumnName(i)).type().unionOf().nullBuilder().endNull().and().intType().endUnion().noDefault();
+                    } else {
+                        builder.name(meta.getColumnName(i)).type().unionOf().nullBuilder().endNull().and().longType().endUnion().noDefault();
+                    }
+                    break;
+
                 case SMALLINT:
                 case TINYINT:
                     builder.name(meta.getColumnName(i)).type().unionOf().nullBuilder().endNull().and().intType().endUnion().noDefault();

@@ -17,11 +17,15 @@
     <parent>
         <groupId>org.apache.nifi</groupId>
         <artifactId>nifi-nar-bundles</artifactId>
-        <version>0.4.1-A-SNAPSHOT</version>
+        <version>0.5.1</version>
     </parent>
     <artifactId>nifi-jetty-bundle</artifactId>
     <packaging>nar</packaging>
     <description>NiFi: Jetty Bundle</description>
+    <properties>
+        <maven.javadoc.skip>true</maven.javadoc.skip>
+        <source.skip>true</source.skip>
+    </properties>
     <dependencies>
         <dependency>
             <groupId>org.eclipse.jetty</groupId>

@@ -70,7 +70,7 @@ public class TestServer {
     private void createConnector() {
         final ServerConnector http = new ServerConnector(jetty);
         http.setPort(0);
-        // Severely taxed environments may have significant delays when executing
+        // Severely taxed environments may have significant delays when executing.
         http.setIdleTimeout(30000L);
         jetty.addConnector(http);
     }
@@ -102,7 +102,6 @@ public class TestServer {
 
         // set host and port
         https.setPort(0);
-
         // Severely taxed environments may have significant delays when executing.
         https.setIdleTimeout(30000L);
 

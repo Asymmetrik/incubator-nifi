@@ -211,7 +211,7 @@ public class GetKafka extends AbstractProcessor {
 
         final Properties props = new Properties();
         props.setProperty("zookeeper.connect", context.getProperty(ZOOKEEPER_CONNECTION_STRING).getValue());
-		props.setProperty("group.id", context.getProperty(GROUP_ID).evaluateAttributeExpressions().getValue());
+        props.setProperty("group.id", context.getProperty(GROUP_ID).evaluateAttributeExpressions().getValue());
         props.setProperty("client.id", context.getProperty(CLIENT_NAME).getValue());
         props.setProperty("auto.commit.interval.ms", String.valueOf(context.getProperty(ZOOKEEPER_COMMIT_DELAY).asTimePeriod(TimeUnit.MILLISECONDS)));
         props.setProperty("auto.offset.reset", context.getProperty(AUTO_OFFSET_RESET).getValue());

@@ -39,18 +39,25 @@ import org.apache.nifi.connectable.Connection;
 import org.apache.nifi.controller.queue.DropFlowFileState;
 import org.apache.nifi.controller.queue.DropFlowFileStatus;
 import org.apache.nifi.controller.queue.FlowFileQueue;
+import org.apache.nifi.controller.queue.FlowFileSummary;
+import org.apache.nifi.controller.queue.ListFlowFileRequest;
+import org.apache.nifi.controller.queue.ListFlowFileState;
+import org.apache.nifi.controller.queue.ListFlowFileStatus;
 import org.apache.nifi.controller.queue.QueueSize;
 import org.apache.nifi.controller.repository.FlowFileRecord;
 import org.apache.nifi.controller.repository.FlowFileRepository;
 import org.apache.nifi.controller.repository.FlowFileSwapManager;
 import org.apache.nifi.controller.repository.RepositoryRecord;
 import org.apache.nifi.controller.repository.RepositoryRecordType;
+import org.apache.nifi.controller.repository.SwapSummary;
 import org.apache.nifi.controller.repository.claim.ContentClaim;
 import org.apache.nifi.controller.repository.claim.ResourceClaim;
 import org.apache.nifi.controller.repository.claim.ResourceClaimManager;
+import org.apache.nifi.controller.swap.StandardSwapSummary;
 import org.apache.nifi.events.EventReporter;
 import org.apache.nifi.flowfile.FlowFile;
 import org.apache.nifi.flowfile.FlowFilePrioritizer;
+import org.apache.nifi.flowfile.attributes.CoreAttributes;
 import org.apache.nifi.processor.DataUnit;
 import org.apache.nifi.processor.FlowFileFilter;
 import org.apache.nifi.processor.FlowFileFilter.FlowFileFilterResult;
@@ -82,7 +89,7 @@ public final class StandardFlowFileQueue implements FlowFileQueue {
     // guarded by lock
     private ArrayList<FlowFileRecord> swapQueue = null;
 
-    private final AtomicReference<FlowFileQueueSize> size = new AtomicReference<>(new FlowFileQueueSize(0, 0L, 0, 0L, 0, 0L));
+    private final AtomicReference<FlowFileQueueSize> size = new AtomicReference<>(new FlowFileQueueSize(0, 0L, 0, 0L, 0, 0, 0L));
 
     private boolean swapMode = false;
 
@@ -96,19 +103,23 @@ public final class StandardFlowFileQueue implements FlowFileQueue {
     private final int swapThreshold;
     private final FlowFileSwapManager swapManager;
     private final List<String> swapLocations = new ArrayList<>();
-    @SuppressWarnings("unused")
     private final TimedLock readLock;
     private final TimedLock writeLock;
     private final String identifier;
     private final FlowFileRepository flowFileRepository;
     private final ProvenanceEventRepository provRepository;
     private final ResourceClaimManager resourceClaimManager;
+    private final Heartbeater heartbeater;
+
+    private final ConcurrentMap<String, DropFlowFileRequest> dropRequestMap = new ConcurrentHashMap<>();
+    private final ConcurrentMap<String, ListFlowFileRequest> listRequestMap = new ConcurrentHashMap<>();
 
     // SCHEDULER CANNOT BE NOTIFIED OF EVENTS WITH THE WRITE LOCK HELD! DOING SO WILL RESULT IN A DEADLOCK!
     private final ProcessScheduler scheduler;
 
     public StandardFlowFileQueue(final String identifier, final Connection connection, final FlowFileRepository flowFileRepo, final ProvenanceEventRepository provRepo,
-        final ResourceClaimManager resourceClaimManager, final ProcessScheduler scheduler, final FlowFileSwapManager swapManager, final EventReporter eventReporter, final int swapThreshold) {
+        final ResourceClaimManager resourceClaimManager, final ProcessScheduler scheduler, final FlowFileSwapManager swapManager, final EventReporter eventReporter, final int swapThreshold,
+        final Heartbeater heartbeater) {
         activeQueue = new PriorityQueue<>(20, new Prioritizer(new ArrayList<FlowFilePrioritizer>()));
         priorities = new ArrayList<>();
         swapQueue = new ArrayList<>();
@@ -122,6 +133,7 @@ public final class StandardFlowFileQueue implements FlowFileQueue {
         this.swapThreshold = swapThreshold;
         this.scheduler = scheduler;
         this.connection = connection;
+        this.heartbeater = heartbeater;
 
         readLock = new TimedLock(this.lock.readLock(), identifier + " Read Lock", 100);
         writeLock = new TimedLock(this.lock.writeLock(), identifier + " Write Lock", 100);
@@ -263,7 +275,7 @@ public final class StandardFlowFileQueue implements FlowFileQueue {
         try {
             if (swapMode || activeQueue.size() >= swapThreshold) {
                 swapQueue.add(file);
-                incrementSwapQueueSize(1, file.getSize());
+                incrementSwapQueueSize(1, file.getSize(), 0);
                 swapMode = true;
                 writeSwapFilesIfNecessary();
             } else {
@@ -291,7 +303,7 @@ public final class StandardFlowFileQueue implements FlowFileQueue {
         try {
             if (swapMode || activeQueue.size() >= swapThreshold - numFiles) {
                 swapQueue.addAll(files);
-                incrementSwapQueueSize(numFiles, bytes);
+                incrementSwapQueueSize(numFiles, bytes, 0);
                 swapMode = true;
                 writeSwapFilesIfNecessary();
             } else {
@@ -450,7 +462,7 @@ public final class StandardFlowFileQueue implements FlowFileQueue {
                 for (final FlowFileRecord flowFile : swappedIn) {
                     swapSize += flowFile.getSize();
                 }
-                incrementSwapQueueSize(-swappedIn.size(), -swapSize);
+                incrementSwapQueueSize(-swappedIn.size(), -swapSize, -1);
                 incrementActiveQueueSize(swappedIn.size(), swapSize);
                 activeQueue.addAll(swappedIn);
                 return;
@@ -496,7 +508,7 @@ public final class StandardFlowFileQueue implements FlowFileQueue {
 
         if (recordsMigrated > 0) {
             incrementActiveQueueSize(recordsMigrated, bytesMigrated);
-            incrementSwapQueueSize(-recordsMigrated, -bytesMigrated);
+            incrementSwapQueueSize(-recordsMigrated, -bytesMigrated, 0);
         }
 
         if (size.get().swappedCount == 0) {
@@ -587,7 +599,9 @@ public final class StandardFlowFileQueue implements FlowFileQueue {
             final long addedSwapBytes = updatedSwapQueueBytes - originalSwapQueueBytes;
 
             final FlowFileQueueSize newSize = new FlowFileQueueSize(activeQueue.size(), activeQueueBytes,
-                originalSize.swappedCount + addedSwapRecords + flowFilesSwappedOut, originalSize.swappedBytes + addedSwapBytes + bytesSwappedOut,
+                originalSize.swappedCount + addedSwapRecords + flowFilesSwappedOut,
+                originalSize.swappedBytes + addedSwapBytes + bytesSwappedOut,
+                originalSize.swapFiles + numSwapFiles,
                 originalSize.unacknowledgedCount, originalSize.unacknowledgedBytes);
             updated = size.compareAndSet(originalSize, newSize);
         }
@@ -775,10 +789,11 @@ public final class StandardFlowFileQueue implements FlowFileQueue {
     }
 
     @Override
-    public Long recoverSwappedFlowFiles() {
+    public SwapSummary recoverSwappedFlowFiles() {
         int swapFlowFileCount = 0;
         long swapByteCount = 0L;
         Long maxId = null;
+        List<ResourceClaim> resourceClaims = new ArrayList<>();
 
         writeLock.lock();
         try {
@@ -797,8 +812,9 @@ public final class StandardFlowFileQueue implements FlowFileQueue {
 
             for (final String swapLocation : swapLocations) {
                 try {
-                    final QueueSize queueSize = swapManager.getSwapSize(swapLocation);
-                    final Long maxSwapRecordId = swapManager.getMaxRecordId(swapLocation);
+                    final SwapSummary summary = swapManager.getSwapSummary(swapLocation);
+                    final QueueSize queueSize = summary.getQueueSize();
+                    final Long maxSwapRecordId = summary.getMaxFlowFileId();
                     if (maxSwapRecordId != null) {
                         if (maxId == null || maxSwapRecordId > maxId) {
                             maxId = maxSwapRecordId;
@@ -807,6 +823,7 @@ public final class StandardFlowFileQueue implements FlowFileQueue {
 
                     swapFlowFileCount += queueSize.getObjectCount();
                     swapByteCount += queueSize.getByteCount();
+                    resourceClaims.addAll(summary.getResourceClaims());
                 } catch (final IOException ioe) {
                     logger.error("Failed to recover FlowFiles from Swap File {}; the file appears to be corrupt", swapLocation, ioe.toString());
                     logger.error("", ioe);
@@ -817,13 +834,13 @@ public final class StandardFlowFileQueue implements FlowFileQueue {
                 }
             }
 
-            incrementSwapQueueSize(swapFlowFileCount, swapByteCount);
+            incrementSwapQueueSize(swapFlowFileCount, swapByteCount, swapLocations.size());
             this.swapLocations.addAll(swapLocations);
         } finally {
             writeLock.unlock("Recover Swap Files");
         }
 
-        return maxId;
+        return new StandardSwapSummary(new QueueSize(swapFlowFileCount, swapByteCount), maxId, resourceClaims);
     }
 
 
@@ -832,7 +849,172 @@ public final class StandardFlowFileQueue implements FlowFileQueue {
         return "FlowFileQueue[id=" + identifier + "]";
     }
 
-    private final ConcurrentMap<String, DropFlowFileRequest> dropRequestMap = new ConcurrentHashMap<>();
+
+    @Override
+    public ListFlowFileStatus listFlowFiles(final String requestIdentifier, final int maxResults) {
+        // purge any old requests from the map just to keep it clean. But if there are very few requests, which is usually the case, then don't bother
+        if (listRequestMap.size() > 10) {
+            final List<String> toDrop = new ArrayList<>();
+            for (final Map.Entry<String, ListFlowFileRequest> entry : listRequestMap.entrySet()) {
+                final ListFlowFileRequest request = entry.getValue();
+                final boolean completed = request.getState() == ListFlowFileState.COMPLETE || request.getState() == ListFlowFileState.FAILURE;
+
+                if (completed && System.currentTimeMillis() - request.getLastUpdated() > TimeUnit.MINUTES.toMillis(5L)) {
+                    toDrop.add(entry.getKey());
+                }
+            }
+
+            for (final String requestId : toDrop) {
+                listRequestMap.remove(requestId);
+            }
+        }
+
+        // numSteps = 1 for each swap location + 1 for active queue + 1 for swap queue.
+        final ListFlowFileRequest listRequest = new ListFlowFileRequest(requestIdentifier, maxResults, size());
+
+        final Thread t = new Thread(new Runnable() {
+            @Override
+            public void run() {
+                int position = 0;
+                int resultCount = 0;
+                final List<FlowFileSummary> summaries = new ArrayList<>();
+
+                // Create an ArrayList that contains all of the contents of the active queue.
+                // We do this so that we don't have to hold the lock any longer than absolutely necessary.
+                // We cannot simply pull the first 'maxResults' records from the queue, however, because the
+                // Iterator provided by PriorityQueue does not return records in order. So we would have to either
+                // use a writeLock and 'pop' the first 'maxResults' records off the queue or use a read lock and
+                // do a shallow copy of the queue. The shallow copy is generally quicker because it doesn't have to do
+                // the sorting to put the records back. So even though this has an expensive of Java Heap to create the
+                // extra collection, we are making this trade-off to avoid locking the queue any longer than required.
+                final List<FlowFileRecord> allFlowFiles;
+                final Prioritizer prioritizer;
+                readLock.lock();
+                try {
+                    logger.debug("{} Acquired lock to perform listing of FlowFiles", StandardFlowFileQueue.this);
+                    allFlowFiles = new ArrayList<>(activeQueue);
+                    prioritizer = new Prioritizer(StandardFlowFileQueue.this.priorities);
+                } finally {
+                    readLock.unlock("List FlowFiles");
+                }
+
+                listRequest.setState(ListFlowFileState.CALCULATING_LIST);
+
+                // sort the FlowFileRecords so that we have the list in the same order as on the queue.
+                Collections.sort(allFlowFiles, prioritizer);
+
+                for (final FlowFileRecord flowFile : allFlowFiles) {
+                    summaries.add(summarize(flowFile, ++position));
+                    if (summaries.size() >= maxResults) {
+                        break;
+                    }
+                }
+
+                logger.debug("{} Finished listing FlowFiles for active queue with a total of {} results", StandardFlowFileQueue.this, resultCount);
+                listRequest.setFlowFileSummaries(summaries);
+                listRequest.setState(ListFlowFileState.COMPLETE);
+            }
+        }, "List FlowFiles for Connection " + getIdentifier());
+        t.setDaemon(true);
+        t.start();
+
+        listRequestMap.put(requestIdentifier, listRequest);
+        return listRequest;
+    }
+
+    private FlowFileSummary summarize(final FlowFile flowFile, final int position) {
+        // extract all of the information that we care about into new variables rather than just
+        // wrapping the FlowFile object with a FlowFileSummary object. We do this because we want to
+        // be able to hold many FlowFileSummary objects in memory and if we just wrap the FlowFile object,
+        // we will end up holding the entire FlowFile (including all Attributes) in the Java heap as well,
+        // which can be problematic if we expect them to be swapped out.
+        final String uuid = flowFile.getAttribute(CoreAttributes.UUID.key());
+        final String filename = flowFile.getAttribute(CoreAttributes.FILENAME.key());
+        final long size = flowFile.getSize();
+        final Long lastQueuedTime = flowFile.getLastQueueDate();
+        final long lineageStart = flowFile.getLineageStartDate();
+        final boolean penalized = flowFile.isPenalized();
+
+        return new FlowFileSummary() {
+            @Override
+            public String getUuid() {
+                return uuid;
+            }
+
+            @Override
+            public String getFilename() {
+                return filename;
+            }
+
+            @Override
+            public int getPosition() {
+                return position;
+            }
+
+            @Override
+            public long getSize() {
+                return size;
+            }
+
+            @Override
+            public long getLastQueuedTime() {
+                return lastQueuedTime == null ? 0L : lastQueuedTime;
+            }
+
+            @Override
+            public long getLineageStartDate() {
+                return lineageStart;
+            }
+
+            @Override
+            public boolean isPenalized() {
+                return penalized;
+            }
+        };
+    }
+
+
+    @Override
+    public ListFlowFileStatus getListFlowFileStatus(final String requestIdentifier) {
+        return listRequestMap.get(requestIdentifier);
+    }
+
+    @Override
+    public ListFlowFileStatus cancelListFlowFileRequest(final String requestIdentifier) {
+        logger.info("Canceling ListFlowFile Request with ID {}", requestIdentifier);
+        final ListFlowFileRequest request = listRequestMap.remove(requestIdentifier);
+        if (request != null) {
+            request.cancel();
+        }
+
+        return request;
+    }
+
+    @Override
+    public FlowFileRecord getFlowFile(final String flowFileUuid) throws IOException {
+        if (flowFileUuid == null) {
+            return null;
+        }
+
+        readLock.lock();
+        try {
+            // read through all of the FlowFiles in the queue, looking for the FlowFile with the given ID
+            for (final FlowFileRecord flowFile : activeQueue) {
+                if (flowFileUuid.equals(flowFile.getAttribute(CoreAttributes.UUID.key()))) {
+                    return flowFile;
+                }
+            }
+        } finally {
+            readLock.unlock("getFlowFile");
+        }
+
+        return null;
+    }
+
+
+    @Override
+    public void verifyCanList() throws IllegalStateException {
+    }
 
     @Override
     public DropFlowFileStatus dropFlowFiles(final String requestIdentifier, final String requestor) {
@@ -899,16 +1081,15 @@ public final class StandardFlowFileQueue implements FlowFileQueue {
                         dropRequest.setCurrentSize(getQueueSize());
                         dropRequest.setDroppedSize(dropRequest.getDroppedSize().add(droppedSize));
 
+                        final QueueSize swapSize = size.get().swapQueueSize();
+                        logger.debug("For DropFlowFileRequest {}, Swap Queue has {} elements, Swapped Record Count = {}, Swapped Content Size = {}",
+                            requestIdentifier, swapQueue.size(), swapSize.getObjectCount(), swapSize.getByteCount());
+                        if (dropRequest.getState() == DropFlowFileState.CANCELED) {
+                            logger.info("Cancel requested for DropFlowFileRequest {}", requestIdentifier);
+                            return;
+                        }
+
                         try {
-                            final QueueSize swapSize = size.get().swapQueueSize();
-
-                            logger.debug("For DropFlowFileRequest {}, Swap Queue has {} elements, Swapped Record Count = {}, Swapped Content Size = {}",
-                                requestIdentifier, swapQueue.size(), swapSize.getObjectCount(), swapSize.getByteCount());
-                            if (dropRequest.getState() == DropFlowFileState.CANCELED) {
-                                logger.info("Cancel requested for DropFlowFileRequest {}", requestIdentifier);
-                                return;
-                            }
-
                             droppedSize = drop(swapQueue, requestor);
                         } catch (final IOException ioe) {
                             logger.error("Failed to drop the FlowFiles from queue {} due to {}", StandardFlowFileQueue.this.getIdentifier(), ioe.toString());
@@ -922,7 +1103,7 @@ public final class StandardFlowFileQueue implements FlowFileQueue {
                         dropRequest.setCurrentSize(getQueueSize());
                         dropRequest.setDroppedSize(dropRequest.getDroppedSize().add(droppedSize));
                         swapMode = false;
-                        incrementSwapQueueSize(-droppedSize.getObjectCount(), -droppedSize.getByteCount());
+                        incrementSwapQueueSize(-droppedSize.getObjectCount(), -droppedSize.getByteCount(), 0);
                         logger.debug("For DropFlowFileRequest {}, dropped {} from Swap Queue", requestIdentifier, droppedSize);
 
                         final int swapFileCount = swapLocations.size();
@@ -953,7 +1134,7 @@ public final class StandardFlowFileQueue implements FlowFileQueue {
                             }
 
                             dropRequest.setDroppedSize(dropRequest.getDroppedSize().add(droppedSize));
-                            incrementSwapQueueSize(-droppedSize.getObjectCount(), -droppedSize.getByteCount());
+                            incrementSwapQueueSize(-droppedSize.getObjectCount(), -droppedSize.getByteCount(), -1);
 
                             dropRequest.setCurrentSize(getQueueSize());
                             swapLocationItr.remove();
@@ -964,6 +1145,9 @@ public final class StandardFlowFileQueue implements FlowFileQueue {
                         logger.info("Successfully dropped {} FlowFiles ({} bytes) from Connection with ID {} on behalf of {}",
                             dropRequest.getDroppedSize().getObjectCount(), dropRequest.getDroppedSize().getByteCount(), StandardFlowFileQueue.this.getIdentifier(), requestor);
                         dropRequest.setState(DropFlowFileState.COMPLETE);
+                        if (heartbeater != null) {
+                            heartbeater.heartbeat();
+                        }
                     } catch (final Exception e) {
                         logger.error("Failed to drop FlowFiles from Connection with ID {} due to {}", StandardFlowFileQueue.this.getIdentifier(), e.toString());
                         logger.error("", e);
@@ -1129,7 +1313,7 @@ public final class StandardFlowFileQueue implements FlowFileQueue {
         while (!updated) {
             final FlowFileQueueSize original = size.get();
             final FlowFileQueueSize newSize = new FlowFileQueueSize(original.activeQueueCount + count, original.activeQueueBytes + bytes,
-                original.swappedCount, original.swappedBytes, original.unacknowledgedCount, original.unacknowledgedBytes);
+                original.swappedCount, original.swappedBytes, original.swapFiles, original.unacknowledgedCount, original.unacknowledgedBytes);
             updated = size.compareAndSet(original, newSize);
 
             if (updated) {
@@ -1138,12 +1322,12 @@ public final class StandardFlowFileQueue implements FlowFileQueue {
         }
     }
 
-    private void incrementSwapQueueSize(final int count, final long bytes) {
+    private void incrementSwapQueueSize(final int count, final long bytes, final int fileCount) {
         boolean updated = false;
         while (!updated) {
             final FlowFileQueueSize original = size.get();
             final FlowFileQueueSize newSize = new FlowFileQueueSize(original.activeQueueCount, original.activeQueueBytes,
-                original.swappedCount + count, original.swappedBytes + bytes, original.unacknowledgedCount, original.unacknowledgedBytes);
+                original.swappedCount + count, original.swappedBytes + bytes, original.swapFiles + fileCount, original.unacknowledgedCount, original.unacknowledgedBytes);
             updated = size.compareAndSet(original, newSize);
 
             if (updated) {
@@ -1157,7 +1341,7 @@ public final class StandardFlowFileQueue implements FlowFileQueue {
         while (!updated) {
             final FlowFileQueueSize original = size.get();
             final FlowFileQueueSize newSize = new FlowFileQueueSize(original.activeQueueCount, original.activeQueueBytes,
-                original.swappedCount, original.swappedBytes, original.unacknowledgedCount + count, original.unacknowledgedBytes + bytes);
+                original.swappedCount, original.swappedBytes, original.swapFiles, original.unacknowledgedCount + count, original.unacknowledgedBytes + bytes);
             updated = size.compareAndSet(original, newSize);
 
             if (updated) {
@@ -1181,15 +1365,17 @@ public final class StandardFlowFileQueue implements FlowFileQueue {
         private final long activeQueueBytes;
         private final int swappedCount;
         private final long swappedBytes;
+        private final int swapFiles;
         private final int unacknowledgedCount;
         private final long unacknowledgedBytes;
 
-        public FlowFileQueueSize(final int activeQueueCount, final long activeQueueBytes, final int swappedCount, final long swappedBytes,
+        public FlowFileQueueSize(final int activeQueueCount, final long activeQueueBytes, final int swappedCount, final long swappedBytes, final int swapFileCount,
             final int unacknowledgedCount, final long unacknowledgedBytes) {
             this.activeQueueCount = activeQueueCount;
             this.activeQueueBytes = activeQueueBytes;
             this.swappedCount = swappedCount;
             this.swappedBytes = swappedBytes;
+            this.swapFiles = swapFileCount;
             this.unacknowledgedCount = unacknowledgedCount;
             this.unacknowledgedBytes = unacknowledgedBytes;
         }
@@ -1218,7 +1404,7 @@ public final class StandardFlowFileQueue implements FlowFileQueue {
         public String toString() {
             return "FlowFile Queue Size[ ActiveQueue=[" + activeQueueCount + ", " + activeQueueBytes +
                 " Bytes], Swap Queue=[" + swappedCount + ", " + swappedBytes +
-                " Bytes], Unacknowledged=[" + unacknowledgedCount + ", " + unacknowledgedBytes + " Bytes] ]";
+                " Bytes], Swap Files=[" + swapFiles + "], Unacknowledged=[" + unacknowledgedCount + ", " + unacknowledgedBytes + " Bytes] ]";
         }
     }
 

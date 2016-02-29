@@ -73,9 +73,10 @@ import org.apache.nifi.processor.exception.ProcessException;
 import org.apache.nifi.processor.io.InputStreamCallback;
 import org.apache.nifi.processor.io.OutputStreamCallback;
 import org.apache.nifi.processor.util.StandardValidators;
-import org.apache.nifi.processors.standard.util.Bin;
-import org.apache.nifi.processors.standard.util.BinManager;
-import org.apache.nifi.processors.standard.util.FlowFileSessionWrapper;
+import org.apache.nifi.processor.util.bin.Bin;
+import org.apache.nifi.processor.util.bin.BinFiles;
+import org.apache.nifi.processor.util.bin.BinManager;
+import org.apache.nifi.processor.util.FlowFileSessionWrapper;
 import org.apache.nifi.stream.io.BufferedInputStream;
 import org.apache.nifi.stream.io.BufferedOutputStream;
 import org.apache.nifi.stream.io.NonCloseableOutputStream;
@@ -237,6 +238,7 @@ public class MergeContent extends BinFiles {
             .description("If specified, like FlowFiles will be binned together, where 'like FlowFiles' means FlowFiles that have the same value for "
                     + "this Attribute. If not specified, FlowFiles are bundled by the order in which they are pulled from the queue.")
             .required(false)
+            .expressionLanguageSupported(true)
             .addValidator(StandardValidators.ATTRIBUTE_KEY_VALIDATOR)
             .defaultValue(null)
             .build();
@@ -375,7 +377,8 @@ public class MergeContent extends BinFiles {
 
     @Override
     protected String getGroupId(final ProcessContext context, final FlowFile flowFile) {
-        final String correlationAttributeName = context.getProperty(CORRELATION_ATTRIBUTE_NAME).getValue();
+        final String correlationAttributeName = context.getProperty(CORRELATION_ATTRIBUTE_NAME)
+                .evaluateAttributeExpressions(flowFile).getValue();
         String groupId = correlationAttributeName == null ? null : flowFile.getAttribute(correlationAttributeName);
 
         // when MERGE_STRATEGY is Defragment and correlationAttributeName is null then bin by fragment.identifier
