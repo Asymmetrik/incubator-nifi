@@ -19,12 +19,12 @@
     <parent>
         <groupId>org.apache.nifi</groupId>
         <artifactId>nifi-nar-bundles</artifactId>
-        <version>0.4.1-A-SNAPSHOT</version>
+        <version>0.4.1-A</version>
     </parent>
 
     <groupId>org.apache.nifi</groupId>
     <artifactId>nifi-avro-bundle</artifactId>
-    <version>0.4.1-A-SNAPSHOT</version>
+    <version>0.4.1-A</version>
     <packaging>pom</packaging>
 
     <modules>
