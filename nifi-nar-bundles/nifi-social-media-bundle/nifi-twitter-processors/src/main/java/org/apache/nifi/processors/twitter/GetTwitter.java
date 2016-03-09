@@ -99,7 +99,6 @@ public class GetTwitter extends AbstractProcessor {
             .name("Consumer Secret")
             .description("The Consumer Secret provided by Twitter")
             .required(true)
-            .sensitive(true)
             .addValidator(StandardValidators.NON_EMPTY_VALIDATOR)
             .expressionLanguageSupported(true)
             .build();
@@ -114,7 +113,6 @@ public class GetTwitter extends AbstractProcessor {
             .name("Access Token Secret")
             .description("The Access Token Secret provided by Twitter")
             .required(true)
-            .sensitive(true)
             .addValidator(StandardValidators.NON_EMPTY_VALIDATOR)
             .expressionLanguageSupported(true)
             .build();
