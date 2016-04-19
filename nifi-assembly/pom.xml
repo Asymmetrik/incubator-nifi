@@ -14,7 +14,7 @@ language governing permissions and limitations under the License. -->
     <parent>
         <groupId>org.apache.nifi</groupId>
         <artifactId>nifi</artifactId>
-        <version>0.5.1</version>
+        <version>0.6.1</version>
     </parent>
     <artifactId>nifi-assembly</artifactId>
     <packaging>pom</packaging>
@@ -155,8 +155,6 @@ language governing permissions and limitations under the License. -->
         <dependency>
             <groupId>org.apache.nifi</groupId>
             <artifactId>nifi-kafka-nar</artifactId>
-            <!-- use old kafka-nar to support Kafka 0.8.x -->
-            <version>0.4.1-A</version>
             <type>nar</type>
         </dependency>
         <dependency>
@@ -182,6 +180,11 @@ language governing permissions and limitations under the License. -->
         <dependency>
             <groupId>org.apache.nifi</groupId>
             <artifactId>nifi-ldap-iaa-providers-nar</artifactId>
+            <type>nar</type>
+        </dependency>
+        <dependency>
+            <groupId>org.apache.nifi</groupId>
+            <artifactId>nifi-kerberos-iaa-providers-nar</artifactId>
             <type>nar</type>
         </dependency>
         <dependency>
@@ -277,6 +280,31 @@ language governing permissions and limitations under the License. -->
         <dependency>
             <groupId>org.apache.nifi</groupId>
             <artifactId>nifi-amqp-nar</artifactId>
+	        <type>nar</type>
+	    </dependency>
+	    <dependency>
+	        <groupId>org.apache.nifi</groupId>
+	        <artifactId>nifi-splunk-nar</artifactId>
+            <type>nar</type>
+        </dependency>
+        <dependency>
+            <groupId>org.apache.nifi</groupId>
+            <artifactId>nifi-jms-cf-service-nar</artifactId>
+            <type>nar</type>
+        </dependency>
+        <dependency>
+            <groupId>org.apache.nifi</groupId>
+            <artifactId>nifi-jms-processors-nar</artifactId>
+            <type>nar</type>
+        </dependency>
+        <dependency>
+            <groupId>org.apache.nifi</groupId>
+            <artifactId>nifi-cassandra-nar</artifactId>
+            <type>nar</type>
+        </dependency>
+        <dependency>
+            <groupId>org.apache.nifi</groupId>
+            <artifactId>nifi-spring-nar</artifactId>
             <type>nar</type>
         </dependency>
     </dependencies>
@@ -430,6 +458,9 @@ language governing permissions and limitations under the License. -->
 
         <!-- nifi.properties: kerberos properties -->
         <nifi.kerberos.krb5.file> </nifi.kerberos.krb5.file>
+        <nifi.kerberos.service.principal />
+        <nifi.kerberos.keytab.location />
+        <nifi.kerberos.authentication.expiration>12 hours</nifi.kerberos.authentication.expiration>
     </properties>
     <profiles>
         <profile>
