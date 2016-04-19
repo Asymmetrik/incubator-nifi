@@ -74,7 +74,7 @@ language governing permissions and limitations under the License. -->
         <connection>scm:git:git://git.apache.org/nifi.git</connection>
         <developerConnection>scm:git:https://git-wip-us.apache.org/repos/asf/nifi.git</developerConnection>
         <url>https://git-wip-us.apache.org/repos/asf?p=nifi.git</url>
-        <tag>nifi-0.6.1-RC1</tag>
+        <tag>nifi-0.6.1-RC2</tag>
     </scm>
     <issueManagement>
         <system>JIRA</system>
