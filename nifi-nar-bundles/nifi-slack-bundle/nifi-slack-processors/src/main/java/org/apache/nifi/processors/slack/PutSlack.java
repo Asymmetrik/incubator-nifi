@@ -60,7 +60,6 @@ public class PutSlack extends AbstractProcessor {
             .required(true)
             .addValidator(StandardValidators.NON_EMPTY_VALIDATOR)
             .addValidator(StandardValidators.URL_VALIDATOR)
-            .sensitive(true)
             .build();
 
     public static final PropertyDescriptor WEBHOOK_TEXT = new PropertyDescriptor
