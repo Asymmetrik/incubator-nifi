@@ -118,6 +118,7 @@ HTML_ENCODE : 'htmlEncode';
 HTML_DECODE : 'htmlDecode';
 NOT : 'not';
 COUNT : 'count';
+RANDOM : 'random';
 
 // 1 arg functions
 SUBSTRING_AFTER	: 'substringAfter';
@@ -153,14 +154,19 @@ OR : 'or';
 AND : 'and';
 JOIN : 'join';
 TO_LITERAL : 'literal';
+JSON_PATH : 'jsonPath';
 
 // 2 arg functions
 SUBSTRING	: 'substring';
 REPLACE	: 'replace';
+REPLACE_FIRST	: 'replaceFirst';
 REPLACE_ALL : 'replaceAll';
 
 // 4 arg functions
 GET_DELIMITED_FIELD	: 'getDelimitedField';
+
+// unlimited arg functions
+IN : 'in';
 
 // STRINGS
 STRING_LITERAL

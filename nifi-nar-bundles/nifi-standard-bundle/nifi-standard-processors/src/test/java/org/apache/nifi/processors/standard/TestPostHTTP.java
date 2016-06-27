@@ -293,7 +293,7 @@ public class TestPostHTTP {
 
         final String suppliedMimeType = "text/plain";
         attrs.put(CoreAttributes.MIME_TYPE.key(), suppliedMimeType);
-        runner.enqueue("Camping is in tents.".getBytes(), attrs);
+        runner.enqueue("Camping is great!".getBytes(), attrs);
         runner.setProperty(PostHTTP.CHUNKED_ENCODING, "false");
 
         runner.run(1);
@@ -301,7 +301,7 @@ public class TestPostHTTP {
 
         Map<String, String> lastPostHeaders = servlet.getLastPostHeaders();
         Assert.assertEquals(suppliedMimeType, lastPostHeaders.get(PostHTTP.CONTENT_TYPE_HEADER));
-        Assert.assertEquals("20",lastPostHeaders.get("Content-Length"));
+        Assert.assertEquals("17",lastPostHeaders.get("Content-Length"));
     }
 
     @Test
@@ -312,7 +312,7 @@ public class TestPostHTTP {
 
         final Map<String, String> attrs = new HashMap<>();
         attrs.put(CoreAttributes.MIME_TYPE.key(), "");
-        runner.enqueue("The wilderness downtown.".getBytes(), attrs);
+        runner.enqueue("The wilderness.".getBytes(), attrs);
 
         runner.run(1);
         runner.assertAllFlowFilesTransferred(PostHTTP.REL_SUCCESS);
@@ -332,7 +332,7 @@ public class TestPostHTTP {
 
         final Map<String, String> attrs = new HashMap<>();
         attrs.put(CoreAttributes.MIME_TYPE.key(), "text/csv");
-        runner.enqueue("Try this trick and spin it.".getBytes(), attrs);
+        runner.enqueue("Sending with content type property.".getBytes(), attrs);
 
         runner.run(1);
         runner.assertAllFlowFilesTransferred(PostHTTP.REL_SUCCESS);
@@ -353,7 +353,7 @@ public class TestPostHTTP {
         final Map<String, String> attrs = new HashMap<>();
         attrs.put(CoreAttributes.MIME_TYPE.key(), "text/plain");
 
-        runner.enqueue(StringUtils.repeat("This is the song that never ends. It goes on and on my friend.", 100).getBytes(), attrs);
+        runner.enqueue(StringUtils.repeat("Lines of sample text.", 100).getBytes(), attrs);
 
         runner.run(1);
         runner.assertAllFlowFilesTransferred(PostHTTP.REL_SUCCESS);
@@ -378,7 +378,7 @@ public class TestPostHTTP {
         final Map<String, String> attrs = new HashMap<>();
         attrs.put(CoreAttributes.MIME_TYPE.key(), "text/plain");
 
-        runner.enqueue(StringUtils.repeat("This is the song that never ends. It goes on and on my friend.", 100).getBytes(), attrs);
+        runner.enqueue(StringUtils.repeat("Lines of sample text.", 100).getBytes(), attrs);
 
         runner.run(1);
         runner.assertAllFlowFilesTransferred(PostHTTP.REL_SUCCESS);
@@ -387,7 +387,7 @@ public class TestPostHTTP {
         Assert.assertEquals(suppliedMimeType, lastPostHeaders.get(PostHTTP.CONTENT_TYPE_HEADER));
         // Ensure that the request was not sent with a 'Content-Encoding' header
         Assert.assertNull(lastPostHeaders.get(PostHTTP.CONTENT_ENCODING_HEADER));
-        Assert.assertEquals("6200",lastPostHeaders.get("Content-Length"));
+        Assert.assertEquals("2100",lastPostHeaders.get("Content-Length"));
     }
 
     @Test
@@ -403,7 +403,7 @@ public class TestPostHTTP {
         final Map<String, String> attrs = new HashMap<>();
         attrs.put(CoreAttributes.MIME_TYPE.key(), "text/plain");
 
-        runner.enqueue(StringUtils.repeat("This is the song that never ends. It goes on and on my friend.", 100).getBytes(), attrs);
+        runner.enqueue(StringUtils.repeat("Lines of sample text.", 100).getBytes(), attrs);
 
         runner.run(1);
         runner.assertAllFlowFilesTransferred(PostHTTP.REL_SUCCESS);
@@ -426,17 +426,44 @@ public class TestPostHTTP {
         final Map<String, String> attrs = new HashMap<>();
         attrs.put(CoreAttributes.MIME_TYPE.key(), "text/plain");
 
-        runner.enqueue(StringUtils.repeat("This is the song that never ends. It goes on and on my friend.", 100).getBytes(), attrs);
+        runner.enqueue(StringUtils.repeat("Lines of sample text.", 100).getBytes(), attrs);
 
         runner.run(1);
         runner.assertAllFlowFilesTransferred(PostHTTP.REL_SUCCESS);
 
         byte[] postValue = servlet.getLastPost();
-        Assert.assertArrayEquals(StringUtils.repeat("This is the song that never ends. It goes on and on my friend.", 100).getBytes(),postValue);
+        Assert.assertArrayEquals(StringUtils.repeat("Lines of sample text.", 100).getBytes(),postValue);
 
         Map<String, String> lastPostHeaders = servlet.getLastPostHeaders();
         Assert.assertEquals(suppliedMimeType, lastPostHeaders.get(PostHTTP.CONTENT_TYPE_HEADER));
         Assert.assertNull(lastPostHeaders.get("Content-Length"));
         Assert.assertEquals("chunked",lastPostHeaders.get("Transfer-Encoding"));
+    }
+
+    @Test
+    public void testSendWithThrottler() throws Exception {
+        setup(null);
+
+        final String suppliedMimeType = "text/plain";
+        runner.setProperty(PostHTTP.URL, server.getUrl());
+        runner.setProperty(PostHTTP.CONTENT_TYPE, suppliedMimeType);
+        runner.setProperty(PostHTTP.CHUNKED_ENCODING, "false");
+        runner.setProperty(PostHTTP.MAX_DATA_RATE, "10kb");
+
+        final Map<String, String> attrs = new HashMap<>();
+        attrs.put(CoreAttributes.MIME_TYPE.key(), "text/plain");
+
+        runner.enqueue(StringUtils.repeat("This is a line of sample text. Here is another.", 100).getBytes(), attrs);
+
+        boolean stopOnFinish = true;
+        runner.run(1, stopOnFinish);
+        runner.assertAllFlowFilesTransferred(PostHTTP.REL_SUCCESS);
+
+        byte[] postValue = servlet.getLastPost();
+        Assert.assertArrayEquals(StringUtils.repeat("This is a line of sample text. Here is another.", 100).getBytes(),postValue);
+
+        Map<String, String> lastPostHeaders = servlet.getLastPostHeaders();
+        Assert.assertEquals(suppliedMimeType, lastPostHeaders.get(PostHTTP.CONTENT_TYPE_HEADER));
+        Assert.assertEquals("4700",lastPostHeaders.get("Content-Length"));
     }
 }

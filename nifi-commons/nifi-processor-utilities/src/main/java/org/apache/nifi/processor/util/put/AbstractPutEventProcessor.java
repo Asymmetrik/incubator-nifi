@@ -31,6 +31,7 @@ import org.apache.nifi.processor.util.put.sender.ChannelSender;
 import org.apache.nifi.processor.util.put.sender.DatagramChannelSender;
 import org.apache.nifi.processor.util.put.sender.SSLSocketChannelSender;
 import org.apache.nifi.processor.util.put.sender.SocketChannelSender;
+import org.apache.nifi.ssl.SSLContextService;
 
 import javax.net.ssl.SSLContext;
 import java.io.IOException;
@@ -71,20 +72,6 @@ public abstract class AbstractPutEventProcessor extends AbstractSessionFactoryPr
             .defaultValue("1 MB")
             .required(true)
             .build();
-    public static final PropertyDescriptor CHARSET = new PropertyDescriptor.Builder()
-            .name("Character Set")
-            .description("Specifies the character set of the data being sent.")
-            .required(true)
-            .defaultValue("UTF-8")
-            .addValidator(StandardValidators.CHARACTER_SET_VALIDATOR)
-            .build();
-    public static final PropertyDescriptor TIMEOUT = new PropertyDescriptor.Builder()
-            .name("Timeout")
-            .description("The timeout for connecting to and communicating with the destination. Does not apply to UDP")
-            .required(false)
-            .defaultValue("10 seconds")
-            .addValidator(StandardValidators.TIME_PERIOD_VALIDATOR)
-            .build();
     public static final PropertyDescriptor IDLE_EXPIRATION = new PropertyDescriptor
             .Builder().name("Idle Connection Expiration")
             .description("The amount of time a connection should be held open without being used before closing the connection.")
@@ -119,6 +106,46 @@ public abstract class AbstractPutEventProcessor extends AbstractSessionFactoryPr
             .addValidator(StandardValidators.NON_EMPTY_VALIDATOR)
             .expressionLanguageSupported(true)
             .build();
+    public static final PropertyDescriptor CHARSET = new PropertyDescriptor.Builder()
+            .name("Character Set")
+            .description("Specifies the character set of the data being sent.")
+            .required(true)
+            .defaultValue("UTF-8")
+            .addValidator(StandardValidators.CHARACTER_SET_VALIDATOR)
+            .build();
+    public static final PropertyDescriptor TIMEOUT = new PropertyDescriptor.Builder()
+            .name("Timeout")
+            .description("The timeout for connecting to and communicating with the destination. Does not apply to UDP")
+            .required(false)
+            .defaultValue("10 seconds")
+            .addValidator(StandardValidators.TIME_PERIOD_VALIDATOR)
+            .build();
+    public static final PropertyDescriptor OUTGOING_MESSAGE_DELIMITER = new PropertyDescriptor.Builder()
+            .name("Outgoing Message Delimiter")
+            .description("Specifies the delimiter to use when sending messages out over the same TCP stream. The delimiter is appended to each FlowFile message "
+                    + "that is transmitted over the stream so that the receiver can determine when one message ends and the next message begins. Users should "
+                    + "ensure that the FlowFile content does not contain the delimiter character to avoid errors. In order to use a new line character you can "
+                    + "enter '\\n'. For a tab character use '\\t'. Finally for a carriage return use '\\r'.")
+            .required(true)
+            .addValidator(StandardValidators.NON_EMPTY_VALIDATOR)
+            .defaultValue("\\n")
+            .expressionLanguageSupported(true)
+            .build();
+    public static final PropertyDescriptor CONNECTION_PER_FLOWFILE = new PropertyDescriptor.Builder()
+            .name("Connection Per FlowFile")
+            .description("Specifies whether to send each FlowFile's content on an individual connection.")
+            .required(true)
+            .defaultValue("false")
+            .allowableValues("true", "false")
+            .build();
+
+    public static final PropertyDescriptor SSL_CONTEXT_SERVICE = new PropertyDescriptor.Builder()
+            .name("SSL Context Service")
+            .description("The Controller Service to use in order to obtain an SSL Context. If this property is set, " +
+                    "messages will be sent over a secure connection.")
+            .required(false)
+            .identifiesControllerService(SSLContextService.class)
+            .build();
 
     public static final Relationship REL_SUCCESS = new Relationship.Builder()
             .name("success")
@@ -144,8 +171,6 @@ public abstract class AbstractPutEventProcessor extends AbstractSessionFactoryPr
         descriptors.add(HOSTNAME);
         descriptors.add(PORT);
         descriptors.add(MAX_SOCKET_SEND_BUFFER_SIZE);
-        descriptors.add(CHARSET);
-        descriptors.add(TIMEOUT);
         descriptors.add(IDLE_EXPIRATION);
         descriptors.addAll(getAdditionalProperties());
         this.descriptors = Collections.unmodifiableList(descriptors);
@@ -286,6 +311,61 @@ public abstract class AbstractPutEventProcessor extends AbstractSessionFactoryPr
         sender.setTimeout(timeout);
         sender.open();
         return sender;
+    }
+
+    /**
+     * Helper method to acquire an available ChannelSender from the pool. If the pool is empty then the a new sender is created.
+     *
+     * @param context
+     *            - the current process context.
+     *
+     * @param session
+     *            - the current process session.
+     * @param flowFile
+     *            - the FlowFile being processed in this session.
+     *
+     * @return ChannelSender - the sender that has been acquired or null if no sender is available and a new sender cannot be created.
+     */
+    protected ChannelSender acquireSender(final ProcessContext context, final ProcessSession session, final FlowFile flowFile) {
+        ChannelSender sender = senderPool.poll();
+        if (sender == null) {
+            try {
+                getLogger().debug("No available connections, creating a new one...");
+                sender = createSender(context);
+            } catch (IOException e) {
+                getLogger().error("No available connections, and unable to create a new one, transferring {} to failure",
+                        new Object[]{flowFile}, e);
+                session.transfer(flowFile, REL_FAILURE);
+                session.commit();
+                context.yield();
+                sender = null;
+            }
+        }
+
+        return sender;
+    }
+
+
+    /**
+     * Helper method to relinquish the ChannelSender back to the pool. If the sender is disconnected or the pool is full
+     * then the sender is closed and discarded.
+     *
+     * @param sender the sender to return or close
+     */
+    protected void relinquishSender(final ChannelSender sender) {
+        if (sender != null) {
+            // if the connection is still open then then try to return the sender to the pool.
+            if (sender.isConnected()) {
+                boolean returned = senderPool.offer(sender);
+                // if the pool is full then close the sender.
+                if (!returned) {
+                    sender.close();
+                }
+            } else {
+                // probably already closed here, but quietly close anyway to be safe.
+                sender.close();
+            }
+        }
     }
 
     /**
@@ -473,4 +553,21 @@ public abstract class AbstractPutEventProcessor extends AbstractSessionFactoryPr
         }
     }
 
+    /**
+     * Gets the current value of the "Outgoing Message Delimiter" property and parses the special characters.
+     *
+     * @param context
+     *            - the current process context.
+     * @param flowFile
+     *            - the FlowFile being processed.
+     *
+     * @return String containing the Delimiter value.
+     */
+    protected String getOutgoingMessageDelimiter(final ProcessContext context, final FlowFile flowFile) {
+        String delimiter = context.getProperty(OUTGOING_MESSAGE_DELIMITER).evaluateAttributeExpressions(flowFile).getValue();
+        if (delimiter != null) {
+            delimiter = delimiter.replace("\\n", "\n").replace("\\r", "\r").replace("\\t", "\t");
+        }
+        return delimiter;
+    }
 }
