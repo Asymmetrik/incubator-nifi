@@ -672,7 +672,7 @@ public class PersistentProvenanceRepository implements ProvenanceEventRepository
                 final int numDirty = dirtyWriterCount.get();
                 if (numDirty >= recordWriters.length) {
                     throw new IllegalStateException("Cannot update repository because all partitions are unusable at this time. Writing to the repository would cause corruption. "
-                        + "This most often happens as a result of the repository running out of disk space or the JMV running out of memory.");
+                        + "This most often happens as a result of the repository running out of disk space or the JVM running out of memory.");
                 }
 
                 final long idx = writerIndex.getAndIncrement();
@@ -1786,11 +1786,9 @@ public class PersistentProvenanceRepository implements ProvenanceEventRepository
     private Map<String, String> truncateAttributes(final Map<String, String> original) {
         final Map<String, String> truncatedAttrs = new HashMap<>();
         for (final Map.Entry<String, String> entry : original.entrySet()) {
-            if (entry.getValue().length() > maxAttributeChars) {
-                truncatedAttrs.put(entry.getKey(), entry.getValue().substring(0, maxAttributeChars));
-            } else {
-                truncatedAttrs.put(entry.getKey(), entry.getValue());
-            }
+            String value = entry.getValue() != null && entry.getValue().length() > this.maxAttributeChars
+                    ? entry.getValue().substring(0, this.maxAttributeChars) : entry.getValue();
+            truncatedAttrs.put(entry.getKey(), value);
         }
         return truncatedAttrs;
     }

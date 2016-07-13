@@ -36,6 +36,8 @@ import org.apache.nifi.components.state.StateProvider;
 import org.apache.nifi.components.state.StateProviderInitializationContext;
 import org.apache.nifi.components.state.exception.StateTooLargeException;
 import org.apache.nifi.controller.state.providers.AbstractTestStateProvider;
+import org.apache.nifi.registry.VariableRegistry;
+import org.apache.nifi.registry.VariableRegistryUtils;
 import org.apache.zookeeper.KeeperException;
 import org.apache.zookeeper.KeeperException.Code;
 import org.apache.zookeeper.ZooDefs.Perms;
@@ -50,6 +52,7 @@ public class TestZooKeeperStateProvider extends AbstractTestStateProvider {
 
     private StateProvider provider;
     private TestingServer zkServer;
+    private VariableRegistry variableRegistry;
 
     private static final Map<PropertyDescriptor, String> defaultProperties = new HashMap<>();
 
@@ -68,6 +71,7 @@ public class TestZooKeeperStateProvider extends AbstractTestStateProvider {
         final Map<PropertyDescriptor, String> properties = new HashMap<>(defaultProperties);
         properties.put(ZooKeeperStateProvider.CONNECTION_STRING, zkServer.getConnectString());
         this.provider = createProvider(properties);
+        variableRegistry = VariableRegistryUtils.createVariableRegistry();
     }
 
     private void initializeProvider(final ZooKeeperStateProvider provider, final Map<PropertyDescriptor, String> properties) throws IOException {
@@ -81,7 +85,7 @@ public class TestZooKeeperStateProvider extends AbstractTestStateProvider {
             public Map<PropertyDescriptor, PropertyValue> getProperties() {
                 final Map<PropertyDescriptor, PropertyValue> propValueMap = new HashMap<>();
                 for (final Map.Entry<PropertyDescriptor, String> entry : properties.entrySet()) {
-                    propValueMap.put(entry.getKey(), new StandardPropertyValue(entry.getValue(), null));
+                    propValueMap.put(entry.getKey(), new StandardPropertyValue(entry.getValue(), null, variableRegistry));
                 }
                 return propValueMap;
             }
@@ -89,7 +93,7 @@ public class TestZooKeeperStateProvider extends AbstractTestStateProvider {
             @Override
             public PropertyValue getProperty(final PropertyDescriptor property) {
                 final String prop = properties.get(property);
-                return new StandardPropertyValue(prop, null);
+                return new StandardPropertyValue(prop, null, variableRegistry);
             }
 
             @Override
@@ -205,7 +209,7 @@ public class TestZooKeeperStateProvider extends AbstractTestStateProvider {
     }
 
     @Test
-    public void testStateTooLargeExceptionThrown() {
+    public void testStateTooLargeExceptionThrown() throws InterruptedException {
         final Map<String, String> state = new HashMap<>();
         final StringBuilder sb = new StringBuilder();
 
@@ -219,13 +223,23 @@ public class TestZooKeeperStateProvider extends AbstractTestStateProvider {
             state.put("numbers." + i, sb.toString());
         }
 
-        try {
-            getProvider().setState(state, componentId);
-            Assert.fail("Expected StateTooLargeException");
-        } catch (final StateTooLargeException stle) {
-            // expected behavior.
-        } catch (final Exception e) {
-            Assert.fail("Expected StateTooLargeException but " + e.getClass() + " was thrown", e);
+        while (true) {
+            try {
+                getProvider().setState(state, componentId);
+                Assert.fail("Expected StateTooLargeException");
+            } catch (final StateTooLargeException stle) {
+                // expected behavior.
+                break;
+            } catch (final IOException ioe) {
+                // If we attempt to interact with the server too quickly, we will get a
+                // ZooKeeper ConnectionLoss Exception, which the provider wraps in an IOException.
+                // We will wait 1 second in this case and try again. The test will timeout if this
+                // does not succeeed within 20 seconds.
+                Thread.sleep(1000L);
+            } catch (final Exception e) {
+                e.printStackTrace();
+                Assert.fail("Expected StateTooLargeException but " + e.getClass() + " was thrown", e);
+            }
         }
 
         try {

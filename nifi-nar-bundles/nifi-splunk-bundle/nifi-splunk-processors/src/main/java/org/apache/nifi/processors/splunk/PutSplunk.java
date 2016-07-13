@@ -60,19 +60,13 @@ import java.util.concurrent.TimeUnit;
         "the FlowFile will be sent directly to Splunk as if it were a single message.")
 public class PutSplunk extends AbstractPutEventProcessor {
 
-    public static final PropertyDescriptor SSL_CONTEXT_SERVICE = new PropertyDescriptor.Builder()
-            .name("SSL Context Service")
-            .description("The Controller Service to use in order to obtain an SSL Context. If this property is set, " +
-                    "messages will be sent over a secure connection.")
-            .required(false)
-            .identifiesControllerService(SSLContextService.class)
-            .build();
-
     public static final char NEW_LINE_CHAR = '\n';
 
     @Override
     protected List<PropertyDescriptor> getAdditionalProperties() {
         return Arrays.asList(
+                TIMEOUT,
+                CHARSET,
                 PROTOCOL,
                 MESSAGE_DELIMITER,
                 SSL_CONTEXT_SERVICE
@@ -151,19 +145,10 @@ public class PutSplunk extends AbstractPutEventProcessor {
 
         // get a sender from the pool, or create a new one if the pool is empty
         // if we can't create a new connection then route flow files to failure and yield
-        ChannelSender sender = senderPool.poll();
+        // acquireSender will handle the routing to failure and yielding
+        ChannelSender sender = acquireSender(context, session, flowFile);
         if (sender == null) {
-            try {
-                getLogger().debug("No available connections, creating a new one...");
-                sender = createSender(context);
-            } catch (IOException e) {
-                getLogger().error("No available connections, and unable to create a new one, transferring {} to failure",
-                        new Object[]{flowFile}, e);
-                session.transfer(flowFile, REL_FAILURE);
-                session.commit();
-                context.yield();
-                return;
-            }
+            return;
         }
 
         try {
@@ -180,17 +165,7 @@ public class PutSplunk extends AbstractPutEventProcessor {
             }
 
         } finally {
-            // if the connection is still open and no IO errors happened then try to return, if pool is full then close
-            if (sender.isConnected()) {
-                boolean returned = senderPool.offer(sender);
-                if (!returned) {
-                    sender.close();
-                }
-            } else {
-                // probably already closed here, but quietly close anyway to be safe
-                sender.close();
-            }
-
+            relinquishSender(sender);
         }
     }
 

@@ -20,9 +20,12 @@ import static org.junit.Assert.assertArrayEquals;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertTrue;
+import static org.junit.Assert.fail;
 
 import java.io.File;
+import java.lang.reflect.Field;
 import java.util.List;
+import java.util.concurrent.ExecutorService;
 
 import org.apache.nifi.processor.ProcessContext;
 import org.apache.nifi.processors.standard.util.ArgumentUtils;
@@ -95,6 +98,28 @@ public class TestExecuteProcess {
             System.out.println(flowFile);
             System.out.println(new String(flowFile.toByteArray()));
         }
+    }
+
+    @Test
+    public void validateProcessInterruptOnStop() throws Exception {
+        final TestRunner runner = TestRunners.newTestRunner(ExecuteProcess.class);
+        runner.setProperty(ExecuteProcess.COMMAND, "ping");
+        runner.setProperty(ExecuteProcess.COMMAND_ARGUMENTS, "nifi.apache.org");
+        runner.setProperty(ExecuteProcess.BATCH_DURATION, "500 millis");
+
+        runner.run();
+        Thread.sleep(500);
+        ExecuteProcess processor = (ExecuteProcess) runner.getProcessor();
+        try {
+            Field executorF = ExecuteProcess.class.getDeclaredField("executor");
+            executorF.setAccessible(true);
+            ExecutorService executor = (ExecutorService) executorF.get(processor);
+            assertTrue(executor.isShutdown());
+            assertTrue(executor.isTerminated());
+        } catch (Exception e) {
+            fail();
+        }
+
     }
 
     // @Test

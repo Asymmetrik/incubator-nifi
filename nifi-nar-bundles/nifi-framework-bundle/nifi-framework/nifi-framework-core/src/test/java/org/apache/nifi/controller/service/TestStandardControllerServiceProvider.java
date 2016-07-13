@@ -17,16 +17,17 @@
 package org.apache.nifi.controller.service;
 
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertTrue;
 
 import java.beans.PropertyDescriptor;
+import java.util.Arrays;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
-
 import org.apache.nifi.components.state.StateManager;
 import org.apache.nifi.components.state.StateManagerProvider;
 import org.apache.nifi.controller.Heartbeater;
@@ -38,9 +39,12 @@ import org.apache.nifi.controller.scheduling.StandardProcessScheduler;
 import org.apache.nifi.controller.service.mock.DummyProcessor;
 import org.apache.nifi.controller.service.mock.ServiceA;
 import org.apache.nifi.controller.service.mock.ServiceB;
+import org.apache.nifi.controller.service.mock.ServiceC;
 import org.apache.nifi.groups.ProcessGroup;
 import org.apache.nifi.groups.StandardProcessGroup;
 import org.apache.nifi.processor.StandardValidationContextFactory;
+import org.apache.nifi.registry.VariableRegistry;
+import org.apache.nifi.registry.VariableRegistryUtils;
 import org.junit.Assert;
 import org.junit.BeforeClass;
 import org.junit.Test;
@@ -70,6 +74,8 @@ public class TestStandardControllerServiceProvider {
         }
     };
 
+    private static VariableRegistry variableRegistry = VariableRegistryUtils.createVariableRegistry();
+
     @BeforeClass
     public static void setNiFiProps() {
         System.setProperty("nifi.properties.file.path", "src/test/resources/nifi.properties");
@@ -77,13 +83,13 @@ public class TestStandardControllerServiceProvider {
 
     private StandardProcessScheduler createScheduler() {
         final Heartbeater heartbeater = Mockito.mock(Heartbeater.class);
-        return new StandardProcessScheduler(heartbeater, null, null, stateManagerProvider);
+        return new StandardProcessScheduler(heartbeater, null, null, stateManagerProvider, variableRegistry);
     }
 
     @Test
     public void testDisableControllerService() {
         final ProcessScheduler scheduler = createScheduler();
-        final StandardControllerServiceProvider provider = new StandardControllerServiceProvider(scheduler, null, stateManagerProvider);
+        final StandardControllerServiceProvider provider = new StandardControllerServiceProvider(scheduler, null, stateManagerProvider, variableRegistry);
 
         final ControllerServiceNode serviceNode = provider.createControllerService(ServiceB.class.getName(), "B", false);
         provider.enableControllerService(serviceNode);
@@ -93,7 +99,7 @@ public class TestStandardControllerServiceProvider {
     @Test(timeout=10000)
     public void testEnableDisableWithReference() {
         final ProcessScheduler scheduler = createScheduler();
-        final StandardControllerServiceProvider provider = new StandardControllerServiceProvider(scheduler, null, stateManagerProvider);
+        final StandardControllerServiceProvider provider = new StandardControllerServiceProvider(scheduler, null, stateManagerProvider, variableRegistry);
 
         final ControllerServiceNode serviceNodeB = provider.createControllerService(ServiceB.class.getName(), "B", false);
         final ControllerServiceNode serviceNodeA = provider.createControllerService(ServiceA.class.getName(), "A", false);
@@ -146,7 +152,7 @@ public class TestStandardControllerServiceProvider {
     }
 
     public void testEnableReferencingServicesGraph(ProcessScheduler scheduler) {
-        final StandardControllerServiceProvider provider = new StandardControllerServiceProvider(scheduler, null, stateManagerProvider);
+        final StandardControllerServiceProvider provider = new StandardControllerServiceProvider(scheduler, null, stateManagerProvider, variableRegistry);
 
         // build a graph of controller services with dependencies as such:
         //
@@ -189,7 +195,7 @@ public class TestStandardControllerServiceProvider {
 
     @Test
     public void testOrderingOfServices() {
-        final StandardControllerServiceProvider provider = new StandardControllerServiceProvider(null, null, stateManagerProvider);
+        final StandardControllerServiceProvider provider = new StandardControllerServiceProvider(null, null, stateManagerProvider, variableRegistry);
         final ControllerServiceNode serviceNode1 = provider.createControllerService(ServiceA.class.getName(), "1", false);
         final ControllerServiceNode serviceNode2 = provider.createControllerService(ServiceB.class.getName(), "2", false);
 
@@ -333,9 +339,9 @@ public class TestStandardControllerServiceProvider {
 
     private ProcessorNode createProcessor(final StandardProcessScheduler scheduler, final ControllerServiceProvider serviceProvider) {
         final ProcessorNode procNode = new StandardProcessorNode(new DummyProcessor(), UUID.randomUUID().toString(),
-                new StandardValidationContextFactory(serviceProvider), scheduler, serviceProvider);
+                new StandardValidationContextFactory(serviceProvider, null), scheduler, serviceProvider);
 
-        final ProcessGroup group = new StandardProcessGroup(UUID.randomUUID().toString(), serviceProvider, scheduler, null, null, null);
+        final ProcessGroup group = new StandardProcessGroup(UUID.randomUUID().toString(), serviceProvider, scheduler, null, null, null, variableRegistry);
         group.addProcessor(procNode);
         procNode.setProcessGroup(group);
 
@@ -345,7 +351,7 @@ public class TestStandardControllerServiceProvider {
     @Test
     public void testEnableReferencingComponents() {
         final StandardProcessScheduler scheduler = createScheduler();
-        final StandardControllerServiceProvider provider = new StandardControllerServiceProvider(null, null, stateManagerProvider);
+        final StandardControllerServiceProvider provider = new StandardControllerServiceProvider(null, null, stateManagerProvider, variableRegistry);
         final ControllerServiceNode serviceNode = provider.createControllerService(ServiceA.class.getName(), "1", false);
 
         final ProcessorNode procNode = createProcessor(scheduler, provider);
@@ -358,5 +364,106 @@ public class TestStandardControllerServiceProvider {
         // procNode.setScheduledState(ScheduledState.RUNNING);
         provider.unscheduleReferencingComponents(serviceNode);
         assertEquals(ScheduledState.STOPPED, procNode.getScheduledState());
+    }
+
+    @Test
+    public void validateEnableServices() {
+        StandardProcessScheduler scheduler = createScheduler();
+        StandardControllerServiceProvider provider = new StandardControllerServiceProvider(scheduler, null, stateManagerProvider, null);
+
+        ControllerServiceNode A = provider.createControllerService(ServiceA.class.getName(), "A", false);
+        ControllerServiceNode B = provider.createControllerService(ServiceA.class.getName(), "B", false);
+        ControllerServiceNode C = provider.createControllerService(ServiceA.class.getName(), "C", false);
+        ControllerServiceNode D = provider.createControllerService(ServiceB.class.getName(), "D", false);
+        ControllerServiceNode E = provider.createControllerService(ServiceA.class.getName(), "E", false);
+
+        A.setProperty(ServiceA.OTHER_SERVICE.getName(), "B");
+        B.setProperty(ServiceA.OTHER_SERVICE.getName(), "D");
+        C.setProperty(ServiceA.OTHER_SERVICE.getName(), "B");
+        C.setProperty(ServiceA.OTHER_SERVICE_2.getName(), "D");
+        E.setProperty(ServiceA.OTHER_SERVICE.getName(), "A");
+
+        provider.enableControllerServices(Arrays.asList(new ControllerServiceNode[] { A, B, C, D, E }));
+
+        assertTrue(A.isActive());
+        assertTrue(B.isActive());
+        assertTrue(C.isActive());
+        assertTrue(D.isActive());
+        assertTrue(E.isActive());
+    }
+
+    /**
+     * This test is similar to the above, but different combination of service
+     * dependencies
+     *
+     */
+    @Test
+    public void validateEnableServices2() {
+        StandardProcessScheduler scheduler = createScheduler();
+        StandardControllerServiceProvider provider = new StandardControllerServiceProvider(scheduler, null,
+                stateManagerProvider, null);
+
+        ControllerServiceNode A = provider.createControllerService(ServiceC.class.getName(), "A", false);
+        ControllerServiceNode B = provider.createControllerService(ServiceA.class.getName(), "B", false);
+        ControllerServiceNode C = provider.createControllerService(ServiceB.class.getName(), "C", false);
+        ControllerServiceNode D = provider.createControllerService(ServiceA.class.getName(), "D", false);
+        ControllerServiceNode F = provider.createControllerService(ServiceA.class.getName(), "F", false);
+
+        A.setProperty(ServiceC.REQ_SERVICE_1.getName(), "B");
+        A.setProperty(ServiceC.REQ_SERVICE_2.getName(), "D");
+        B.setProperty(ServiceA.OTHER_SERVICE.getName(), "C");
+
+        F.setProperty(ServiceA.OTHER_SERVICE.getName(), "D");
+        D.setProperty(ServiceA.OTHER_SERVICE.getName(), "C");
+
+        provider.enableControllerServices(Arrays.asList(new ControllerServiceNode[] { C, F, A, B, D }));
+
+        assertTrue(A.isActive());
+        assertTrue(B.isActive());
+        assertTrue(C.isActive());
+        assertTrue(D.isActive());
+        assertTrue(F.isActive());
+    }
+
+    @Test
+    public void validateEnableServicesWithDisabledMissingService() {
+        StandardProcessScheduler scheduler = createScheduler();
+        StandardControllerServiceProvider provider = new StandardControllerServiceProvider(scheduler, null, stateManagerProvider, null);
+
+        ControllerServiceNode serviceNode1 = provider.createControllerService(ServiceA.class.getName(), "1", false);
+        ControllerServiceNode serviceNode2 = provider.createControllerService(ServiceA.class.getName(), "2", false);
+        ControllerServiceNode serviceNode3 = provider.createControllerService(ServiceA.class.getName(), "3", false);
+        ControllerServiceNode serviceNode4 = provider.createControllerService(ServiceB.class.getName(), "4", false);
+        ControllerServiceNode serviceNode5 = provider.createControllerService(ServiceA.class.getName(), "5", false);
+        ControllerServiceNode serviceNode6 = provider.createControllerService(ServiceB.class.getName(), "6", false);
+        ControllerServiceNode serviceNode7 = provider.createControllerService(ServiceC.class.getName(), "7", false);
+
+        serviceNode1.setProperty(ServiceA.OTHER_SERVICE.getName(), "2");
+        serviceNode2.setProperty(ServiceA.OTHER_SERVICE.getName(), "4");
+        serviceNode3.setProperty(ServiceA.OTHER_SERVICE.getName(), "2");
+        serviceNode3.setProperty(ServiceA.OTHER_SERVICE_2.getName(), "4");
+        serviceNode5.setProperty(ServiceA.OTHER_SERVICE.getName(), "6");
+        serviceNode7.setProperty(ServiceC.REQ_SERVICE_1.getName(), "2");
+        serviceNode7.setProperty(ServiceC.REQ_SERVICE_2.getName(), "3");
+
+        provider.enableControllerServices(Arrays.asList(
+                new ControllerServiceNode[] { serviceNode1, serviceNode2, serviceNode3, serviceNode4, serviceNode5, serviceNode7}));
+        assertFalse(serviceNode1.isActive());
+        assertFalse(serviceNode2.isActive());
+        assertFalse(serviceNode3.isActive());
+        assertFalse(serviceNode4.isActive());
+        assertFalse(serviceNode5.isActive());
+        assertFalse(serviceNode6.isActive());
+
+        provider.enableControllerService(serviceNode6);
+        provider.enableControllerServices(Arrays.asList(
+                new ControllerServiceNode[] { serviceNode1, serviceNode2, serviceNode3, serviceNode4, serviceNode5 }));
+
+        assertTrue(serviceNode1.isActive());
+        assertTrue(serviceNode2.isActive());
+        assertTrue(serviceNode3.isActive());
+        assertTrue(serviceNode4.isActive());
+        assertTrue(serviceNode5.isActive());
+        assertTrue(serviceNode6.isActive());
     }
 }

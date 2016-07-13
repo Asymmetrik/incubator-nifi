@@ -17,18 +17,17 @@
 package org.apache.nifi.processors.slack;
 
 import org.apache.nifi.annotation.behavior.InputRequirement;
+import org.apache.nifi.annotation.documentation.CapabilityDescription;
+import org.apache.nifi.annotation.documentation.Tags;
 import org.apache.nifi.components.PropertyDescriptor;
 import org.apache.nifi.components.ValidationContext;
 import org.apache.nifi.components.ValidationResult;
 import org.apache.nifi.components.Validator;
 import org.apache.nifi.flowfile.FlowFile;
-import org.apache.nifi.annotation.documentation.CapabilityDescription;
-import org.apache.nifi.annotation.documentation.Tags;
 import org.apache.nifi.processor.AbstractProcessor;
 import org.apache.nifi.processor.ProcessContext;
 import org.apache.nifi.processor.ProcessSession;
 import org.apache.nifi.processor.Relationship;
-import org.apache.nifi.processor.exception.ProcessException;
 import org.apache.nifi.processor.util.StandardValidators;
 import org.apache.nifi.stream.io.DataOutputStream;
 
@@ -76,11 +75,11 @@ public class PutSlack extends AbstractProcessor {
             .Builder()
             .name("channel")
             .displayName("Channel")
-            .description("A public channel using #channel or direct message using @username")
+            .description("A public channel using #channel or direct message using @username. If not specified, " +
+                    "the default webhook channel as specified in Slack's Incoming Webhooks web interface is used.")
             .required(false)
             .expressionLanguageSupported(true)
             .addValidator(StandardValidators.NON_EMPTY_VALIDATOR)
-            .addValidator(new ChannelValidator())
             .build();
 
     public static final PropertyDescriptor USERNAME = new PropertyDescriptor
@@ -140,49 +139,68 @@ public class PutSlack extends AbstractProcessor {
         return descriptors;
     }
 
+    // Validate the channel (or username for a direct message)
+    private String validateChannel(String channel) {
+        if ((channel.startsWith("#") || channel.startsWith("@")) && channel.length() > 1) {
+            return null;
+        }
+        return "Channel must begin with '#' or '@'";
+    }
+
     @Override
-    public void onTrigger(final ProcessContext context, final ProcessSession session) throws ProcessException {
+    public void onTrigger(final ProcessContext context, final ProcessSession session) {
         FlowFile flowFile = session.get();
         if ( flowFile == null ) {
             return;
         }
 
-        try {
-            JsonObjectBuilder builder = Json.createObjectBuilder();
-            String text = context.getProperty(WEBHOOK_TEXT).evaluateAttributeExpressions(flowFile).getValue();
-            if (text != null && !text.isEmpty()) {
-                builder.add("text", text);
-            } else {
-                // Slack requires the 'text' attribute
-                throw new ProcessException("FlowFile should have non-empty " + WEBHOOK_TEXT.getName());
-            }
+        JsonObjectBuilder builder = Json.createObjectBuilder();
+        String text = context.getProperty(WEBHOOK_TEXT).evaluateAttributeExpressions(flowFile).getValue();
+        if (text != null && !text.isEmpty()) {
+            builder.add("text", text);
+        } else {
+            // Slack requires the 'text' attribute
+            getLogger().error("FlowFile should have non-empty " + WEBHOOK_TEXT.getName());
+            flowFile = session.penalize(flowFile);
+            session.transfer(flowFile, REL_FAILURE);
+            return;
+        }
 
-            String channel = context.getProperty(CHANNEL).evaluateAttributeExpressions(flowFile).getValue();
-            if (channel != null && !channel.isEmpty()) {
+        String channel = context.getProperty(CHANNEL).evaluateAttributeExpressions(flowFile).getValue();
+        if (channel != null && !channel.isEmpty()) {
+            String error = validateChannel(channel);
+            if (error == null) {
                 builder.add("channel", channel);
+            } else {
+                getLogger().error("Invalid channel '{}': {}", new Object[]{channel, error});
+                flowFile = session.penalize(flowFile);
+                session.transfer(flowFile, REL_FAILURE);
+                return;
             }
+        }
 
-            String username = context.getProperty(USERNAME).evaluateAttributeExpressions(flowFile).getValue();
-            if (username != null && !username.isEmpty()) {
-                builder.add("username", username);
-            }
+        String username = context.getProperty(USERNAME).evaluateAttributeExpressions(flowFile).getValue();
+        if (username != null && !username.isEmpty()) {
+            builder.add("username", username);
+        }
 
-            String iconUrl = context.getProperty(ICON_URL).evaluateAttributeExpressions(flowFile).getValue();
-            if (iconUrl != null && !iconUrl.isEmpty()) {
-                builder.add("icon_url", iconUrl);
-            }
+        String iconUrl = context.getProperty(ICON_URL).evaluateAttributeExpressions(flowFile).getValue();
+        if (iconUrl != null && !iconUrl.isEmpty()) {
+            builder.add("icon_url", iconUrl);
+        }
 
-            String iconEmoji = context.getProperty(ICON_EMOJI).evaluateAttributeExpressions(flowFile).getValue();
-            if (iconEmoji != null && !iconEmoji.isEmpty()) {
-                builder.add("icon_emoji", iconEmoji);
-            }
+        String iconEmoji = context.getProperty(ICON_EMOJI).evaluateAttributeExpressions(flowFile).getValue();
+        if (iconEmoji != null && !iconEmoji.isEmpty()) {
+            builder.add("icon_emoji", iconEmoji);
+        }
 
-            JsonObject jsonObject = builder.build();
-            StringWriter stringWriter = new StringWriter();
-            JsonWriter jsonWriter = Json.createWriter(stringWriter);
-            jsonWriter.writeObject(jsonObject);
-            jsonWriter.close();
+        JsonObject jsonObject = builder.build();
+        StringWriter stringWriter = new StringWriter();
+        JsonWriter jsonWriter = Json.createWriter(stringWriter);
+        jsonWriter.writeObject(jsonObject);
+        jsonWriter.close();
 
+        try {
             URL url = new URL(context.getProperty(WEBHOOK_URL).getValue());
             HttpURLConnection conn = (HttpURLConnection) url.openConnection();
             conn.setRequestMethod("POST");
@@ -196,6 +214,7 @@ public class PutSlack extends AbstractProcessor {
             if (responseCode >= 200 && responseCode < 300) {
                 getLogger().info("Successfully posted message to Slack");
                 session.transfer(flowFile, REL_SUCCESS);
+                session.getProvenanceReporter().send(flowFile, context.getProperty(WEBHOOK_URL).getValue());
             } else {
                 getLogger().error("Failed to post message to Slack with response code {}", new Object[]{responseCode});
                 flowFile = session.penalize(flowFile);
@@ -219,19 +238,6 @@ public class PutSlack extends AbstractProcessor {
 
             return new ValidationResult.Builder().input(input).subject(subject).valid(false)
                     .explanation("Must begin and end with a colon")
-                    .build();
-        }
-    }
-
-    private static class ChannelValidator implements Validator {
-        @Override
-        public ValidationResult validate(final String subject, final String input, final ValidationContext context) {
-            if ((input.startsWith("#") || input.startsWith("@")) && input.length() > 1) {
-                return new ValidationResult.Builder().subject(subject).input(input).valid(true).build();
-            }
-
-            return new ValidationResult.Builder().input(input).subject(subject).valid(false)
-                    .explanation("Must begin with '#' or '@'")
                     .build();
         }
     }
