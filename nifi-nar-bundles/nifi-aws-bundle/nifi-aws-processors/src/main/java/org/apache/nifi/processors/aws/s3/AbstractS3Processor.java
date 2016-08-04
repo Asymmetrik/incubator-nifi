@@ -82,6 +82,15 @@ public abstract class AbstractS3Processor extends AbstractAWSCredentialsProvider
             .description("A comma-separated list of Amazon User ID's or E-mail addresses that specifies who should have permissions to change the Access Control List for an object")
             .defaultValue("${s3.permissions.writeacl.users}")
             .build();
+    public static final PropertyDescriptor CANNED_ACL = new PropertyDescriptor.Builder()
+            .name("Canned ACL")
+            .required(false)
+            .expressionLanguageSupported(true)
+            .addValidator(StandardValidators.NON_EMPTY_VALIDATOR)
+            .description("Amazon Canned ACL for an object, e.g: BucketOwnerFullControl,BucketOwnerRead,LogDeliveryWrite,AuthenticatedRead,PublicReadWrite,PublicRead,Private; " +
+                    "see http://docs.aws.amazon.com/AmazonS3/latest/dev/acl-overview.html#canned-acl")
+            .defaultValue("${s3.permissions.cannedacl}")
+            .build();
     public static final PropertyDescriptor OWNER = new PropertyDescriptor.Builder()
             .name("Owner")
             .required(false)
