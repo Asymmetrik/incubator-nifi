@@ -688,7 +688,7 @@ public class PutS3Object extends AbstractS3Processor {
     }
 
     private final Lock s3BucketLock = new ReentrantLock();
-    private final AtomicLong lastS3AgeOff = new AtomicLong(0L);
+    private final AtomicLong lastS3AgeOff = new AtomicLong(System.currentTimeMillis());
     private final DateFormat logFormat = new SimpleDateFormat();
 
     protected void ageoffS3Uploads(final ProcessContext context, final AmazonS3Client s3, final long now) {
@@ -729,12 +729,12 @@ public class PutS3Object extends AbstractS3Processor {
                             "for this bucket, S3 ageoff cannot occur without this permission.  Next ageoff check " +
                             "time is being advanced by interval to prevent checking on every upload **",
                             new Object[]{bucket, e.getMessage()});
-                    lastS3AgeOff.set(System.currentTimeMillis());
                 } else {
-                    getLogger().error("Error checking S3 Multipart Upload list for {}: {}",
+                    getLogger().warn("Error checking S3 Multipart Upload list for {}: {}",
                             new Object[]{bucket, e.getMessage()});
                 }
             } finally {
+                lastS3AgeOff.set(System.currentTimeMillis());
                 s3BucketLock.unlock();
             }
         }
