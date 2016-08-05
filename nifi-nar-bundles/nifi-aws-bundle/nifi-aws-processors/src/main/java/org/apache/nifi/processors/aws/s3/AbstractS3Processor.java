@@ -193,32 +193,51 @@ public abstract class AbstractS3Processor extends AbstractAWSCredentialsProvider
     }
 
     protected final AccessControlList createACL(final ProcessContext context, final FlowFile flowFile) {
-        final AccessControlList acl = new AccessControlList();
+        // lazy-initialize ACL, as it should not be used if no properties were specified
+        AccessControlList acl = null;
 
         final String ownerId = context.getProperty(OWNER).evaluateAttributeExpressions(flowFile).getValue();
         if (!StringUtils.isEmpty(ownerId)) {
             final Owner owner = new Owner();
             owner.setId(ownerId);
+            if (acl == null) {
+                acl = new AccessControlList();
+            }
             acl.setOwner(owner);
         }
 
         for (final Grantee grantee : createGrantees(context.getProperty(FULL_CONTROL_USER_LIST).evaluateAttributeExpressions(flowFile).getValue())) {
+            if (acl == null) {
+                acl = new AccessControlList();
+            }
             acl.grantPermission(grantee, Permission.FullControl);
         }
 
         for (final Grantee grantee : createGrantees(context.getProperty(READ_USER_LIST).evaluateAttributeExpressions(flowFile).getValue())) {
+            if (acl == null) {
+                acl = new AccessControlList();
+            }
             acl.grantPermission(grantee, Permission.Read);
         }
 
         for (final Grantee grantee : createGrantees(context.getProperty(WRITE_USER_LIST).evaluateAttributeExpressions(flowFile).getValue())) {
+            if (acl == null) {
+                acl = new AccessControlList();
+            }
             acl.grantPermission(grantee, Permission.Write);
         }
 
         for (final Grantee grantee : createGrantees(context.getProperty(READ_ACL_LIST).evaluateAttributeExpressions(flowFile).getValue())) {
+            if (acl == null) {
+                acl = new AccessControlList();
+            }
             acl.grantPermission(grantee, Permission.ReadAcp);
         }
 
         for (final Grantee grantee : createGrantees(context.getProperty(WRITE_ACL_LIST).evaluateAttributeExpressions(flowFile).getValue())) {
+            if (acl == null) {
+                acl = new AccessControlList();
+            }
             acl.grantPermission(grantee, Permission.WriteAcp);
         }
 
