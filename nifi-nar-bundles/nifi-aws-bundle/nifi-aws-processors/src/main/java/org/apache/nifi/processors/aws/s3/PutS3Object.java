@@ -442,10 +442,9 @@ public class PutS3Object extends AbstractS3Processor {
                             if (acl != null) {
                                 request.setAccessControlList(acl);
                             }
-                            // canned acl
-                            String cannedAcl = context.getProperty(CANNED_ACL).evaluateAttributeExpressions(ff).getValue();
-                            if (cannedAcl != null && !cannedAcl.isEmpty()) {
-                                request.withCannedAcl(CannedAccessControlList.valueOf(cannedAcl));
+                            final CannedAccessControlList cannedAcl = createCannedACL(context, ff);
+                            if (cannedAcl != null) {
+                                request.withCannedAcl(cannedAcl);
                             }
 
                             try {

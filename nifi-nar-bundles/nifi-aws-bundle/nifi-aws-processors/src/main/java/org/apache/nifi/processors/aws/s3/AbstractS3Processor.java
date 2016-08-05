@@ -34,6 +34,7 @@ import com.amazonaws.regions.Region;
 import com.amazonaws.services.s3.AmazonS3Client;
 import com.amazonaws.services.s3.S3ClientOptions;
 import com.amazonaws.services.s3.model.AccessControlList;
+import com.amazonaws.services.s3.model.CannedAccessControlList;
 import com.amazonaws.services.s3.model.CanonicalGrantee;
 import com.amazonaws.services.s3.model.EmailAddressGrantee;
 import com.amazonaws.services.s3.model.Grantee;
@@ -87,7 +88,7 @@ public abstract class AbstractS3Processor extends AbstractAWSCredentialsProvider
             .required(false)
             .expressionLanguageSupported(true)
             .addValidator(StandardValidators.NON_EMPTY_VALIDATOR)
-            .description("Amazon Canned ACL for an object, e.g: BucketOwnerFullControl,BucketOwnerRead,LogDeliveryWrite,AuthenticatedRead,PublicReadWrite,PublicRead,Private; " +
+            .description("Amazon Canned ACL for an object, one of: BucketOwnerFullControl, BucketOwnerRead, LogDeliveryWrite, AuthenticatedRead, PublicReadWrite, PublicRead, Private; " +
                     "see http://docs.aws.amazon.com/AmazonS3/latest/dev/acl-overview.html#canned-acl")
             .defaultValue("${s3.permissions.cannedacl}")
             .build();
@@ -242,5 +243,10 @@ public abstract class AbstractS3Processor extends AbstractAWSCredentialsProvider
         }
 
         return acl;
+    }
+
+    protected final CannedAccessControlList createCannedACL(final ProcessContext context, final FlowFile flowFile) {
+        final String cannedAcl = context.getProperty(CANNED_ACL).evaluateAttributeExpressions(flowFile).getValue();
+        return (!StringUtils.isEmpty(cannedAcl)) ? CannedAccessControlList.valueOf(cannedAcl) : null;
     }
 }
