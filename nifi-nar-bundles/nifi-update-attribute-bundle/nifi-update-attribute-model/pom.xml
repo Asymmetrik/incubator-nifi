@@ -18,7 +18,7 @@
     <parent>
         <groupId>org.apache.nifi</groupId>
         <artifactId>nifi-update-attribute-bundle</artifactId>
-        <version>0.7.0-20160929</version>
+        <version>0.7.0-20161006</version>
     </parent>
     <groupId>org.apache.nifi</groupId>
     <artifactId>nifi-update-attribute-model</artifactId>

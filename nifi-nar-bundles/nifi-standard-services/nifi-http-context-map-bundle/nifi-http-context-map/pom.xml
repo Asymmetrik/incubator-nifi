@@ -17,7 +17,7 @@
     <parent>
         <groupId>org.apache.nifi</groupId>
         <artifactId>nifi-http-context-map-bundle</artifactId>
-        <version>0.7.0-20160929</version>
+        <version>0.7.0-20161006</version>
     </parent>
 
     <artifactId>nifi-http-context-map</artifactId>
