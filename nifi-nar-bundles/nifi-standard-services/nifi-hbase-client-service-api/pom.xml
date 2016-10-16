@@ -19,7 +19,7 @@
     <parent>
         <groupId>org.apache.nifi</groupId>
         <artifactId>nifi-standard-services</artifactId>
-        <version>0.7.0-20161006</version>
+        <version>0.7.0-A-SNAPSHOT</version>
     </parent>
 
     <artifactId>nifi-hbase-client-service-api</artifactId>
