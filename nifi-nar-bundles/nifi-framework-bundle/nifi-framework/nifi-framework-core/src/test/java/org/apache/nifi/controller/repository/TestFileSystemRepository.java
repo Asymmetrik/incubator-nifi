@@ -257,8 +257,8 @@ public class TestFileSystemRepository {
         final Path claimPath = getPath(claim);
 
         // Create the file.
-        try (final OutputStream out = Files.newOutputStream(claimPath, StandardOpenOption.CREATE)) {
-            out.write("Hello".getBytes());
+        try (final OutputStream out = repository.write(claim)) {
+            out.write(new byte[FileSystemRepository.MAX_APPENDABLE_CLAIM_LENGTH]);
         }
 
         int count = repository.decrementClaimantCount(claim);
@@ -379,13 +379,13 @@ public class TestFileSystemRepository {
 
     @Test(expected = ContentNotFoundException.class)
     public void testSizeWithNoContent() throws IOException {
-        final ContentClaim claim = new StandardContentClaim(new StandardResourceClaim("container1", "section 1", "1", false), 0L);
+        final ContentClaim claim = new StandardContentClaim(new StandardResourceClaim(claimManager, "container1", "section 1", "1", false), 0L);
         assertEquals(0L, repository.size(claim));
     }
 
     @Test(expected = ContentNotFoundException.class)
     public void testReadWithNoContent() throws IOException {
-        final ContentClaim claim = new StandardContentClaim(new StandardResourceClaim("container1", "section 1", "1", false), 0L);
+        final ContentClaim claim = new StandardContentClaim(new StandardResourceClaim(claimManager, "container1", "section 1", "1", false), 0L);
         final InputStream in = repository.read(claim);
         in.close();
     }
@@ -427,12 +427,12 @@ public class TestFileSystemRepository {
 
         // write at least 1 MB to the output stream so that when we close the output stream
         // the repo won't keep the stream open.
-        final byte[] buff = new byte[1024 * 1024];
+        final byte[] buff = new byte[FileSystemRepository.MAX_APPENDABLE_CLAIM_LENGTH];
         out.write(buff);
         out.write(buff);
 
-        // true because claimant count is still 1.
-        assertTrue(repository.remove(claim));
+        // false because claimant count is still 1, so the resource claim was not removed
+        assertFalse(repository.remove(claim));
 
         assertEquals(0, repository.decrementClaimantCount(claim));
 
@@ -494,6 +494,55 @@ public class TestFileSystemRepository {
         }
     }
 
+
+    @Test
+    public void testWriteCannotProvideNullOutput() throws IOException {
+        FileSystemRepository repository = null;
+        try {
+            final List<Path> archivedPathsWithOpenStream = Collections.synchronizedList(new ArrayList<Path>());
+
+            // We are creating our own 'local' repository in this test so shut down the one created in the setup() method
+            shutdown();
+
+            repository = new FileSystemRepository() {
+                @Override
+                protected boolean archive(Path curPath) throws IOException {
+                    if (getOpenStreamCount() > 0) {
+                        archivedPathsWithOpenStream.add(curPath);
+                    }
+
+                    return true;
+                }
+            };
+
+            final StandardResourceClaimManager claimManager = new StandardResourceClaimManager();
+            repository.initialize(claimManager);
+            repository.purge();
+
+            final ContentClaim claim = repository.create(false);
+
+            assertEquals(1, claimManager.getClaimantCount(claim.getResourceClaim()));
+
+            int claimantCount = claimManager.decrementClaimantCount(claim.getResourceClaim());
+            assertEquals(0, claimantCount);
+            assertTrue(archivedPathsWithOpenStream.isEmpty());
+
+            OutputStream out = repository.write(claim);
+            out.close();
+            repository.decrementClaimantCount(claim);
+
+            ContentClaim claim2 = repository.create(false);
+            assertEquals(claim.getResourceClaim(), claim2.getResourceClaim());
+            out = repository.write(claim2);
+
+            final boolean archived = repository.archive(claim.getResourceClaim());
+            assertFalse(archived);
+        } finally {
+            if (repository != null) {
+                repository.shutdown();
+            }
+        }
+    }
 
     /**
      * We have encountered a situation where the File System Repo is moving files to archive and then eventually

@@ -554,6 +554,10 @@ public class PutS3Object extends AbstractS3Processor {
                                 if (acl != null) {
                                     initiateRequest.setAccessControlList(acl);
                                 }
+                                final CannedAccessControlList cannedAcl = createCannedACL(context, ff);
+                                if (cannedAcl != null) {
+                                    initiateRequest.withCannedACL(cannedAcl);
+                                }
                                 try {
                                     final InitiateMultipartUploadResult initiateResult =
                                             s3.initiateMultipartUpload(initiateRequest);

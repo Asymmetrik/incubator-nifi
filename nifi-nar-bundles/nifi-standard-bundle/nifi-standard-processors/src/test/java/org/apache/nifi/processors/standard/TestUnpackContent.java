@@ -45,17 +45,18 @@ public class TestUnpackContent {
         unpackRunner.setProperty(UnpackContent.PACKAGING_FORMAT, UnpackContent.PackageFormat.TAR_FORMAT.toString());
         autoUnpackRunner.setProperty(UnpackContent.PACKAGING_FORMAT, UnpackContent.PackageFormat.AUTO_DETECT_FORMAT.toString());
         unpackRunner.enqueue(dataPath.resolve("data.tar"));
+        unpackRunner.enqueue(dataPath.resolve("data.tar"));
         Map<String, String> attributes = new HashMap<>(1);
         Map<String, String> attributes2 = new HashMap<>(1);
         attributes.put("mime.type", UnpackContent.PackageFormat.TAR_FORMAT.getMimeType());
         attributes2.put("mime.type", UnpackContent.PackageFormat.X_TAR_FORMAT.getMimeType());
         autoUnpackRunner.enqueue(dataPath.resolve("data.tar"), attributes);
         autoUnpackRunner.enqueue(dataPath.resolve("data.tar"), attributes2);
-        unpackRunner.run();
+        unpackRunner.run(2);
         autoUnpackRunner.run(2);
 
-        unpackRunner.assertTransferCount(UnpackContent.REL_SUCCESS, 2);
-        unpackRunner.assertTransferCount(UnpackContent.REL_ORIGINAL, 1);
+        unpackRunner.assertTransferCount(UnpackContent.REL_SUCCESS, 4);
+        unpackRunner.assertTransferCount(UnpackContent.REL_ORIGINAL, 2);
         unpackRunner.assertTransferCount(UnpackContent.REL_FAILURE, 0);
 
         autoUnpackRunner.assertTransferCount(UnpackContent.REL_SUCCESS, 4);
@@ -82,17 +83,18 @@ public class TestUnpackContent {
         autoUnpackRunner.setProperty(UnpackContent.PACKAGING_FORMAT, UnpackContent.PackageFormat.AUTO_DETECT_FORMAT.toString());
         autoUnpackRunner.setProperty(UnpackContent.FILE_FILTER, "^folder/cal.txt$");
         unpackRunner.enqueue(dataPath.resolve("data.tar"));
+        unpackRunner.enqueue(dataPath.resolve("data.tar"));
         Map<String, String> attributes = new HashMap<>(1);
         Map<String, String> attributes2 = new HashMap<>(1);
         attributes.put("mime.type", "application/x-tar");
         attributes2.put("mime.type", "application/tar");
         autoUnpackRunner.enqueue(dataPath.resolve("data.tar"), attributes);
         autoUnpackRunner.enqueue(dataPath.resolve("data.tar"), attributes2);
-        unpackRunner.run();
+        unpackRunner.run(2);
         autoUnpackRunner.run(2);
 
-        unpackRunner.assertTransferCount(UnpackContent.REL_SUCCESS, 1);
-        unpackRunner.assertTransferCount(UnpackContent.REL_ORIGINAL, 1);
+        unpackRunner.assertTransferCount(UnpackContent.REL_SUCCESS, 2);
+        unpackRunner.assertTransferCount(UnpackContent.REL_ORIGINAL, 2);
         unpackRunner.assertTransferCount(UnpackContent.REL_FAILURE, 0);
 
         autoUnpackRunner.assertTransferCount(UnpackContent.REL_SUCCESS, 2);
@@ -126,18 +128,20 @@ public class TestUnpackContent {
         unpackRunner.setProperty(UnpackContent.PACKAGING_FORMAT, UnpackContent.PackageFormat.ZIP_FORMAT.toString());
         autoUnpackRunner.setProperty(UnpackContent.PACKAGING_FORMAT, UnpackContent.PackageFormat.AUTO_DETECT_FORMAT.toString());
         unpackRunner.enqueue(dataPath.resolve("data.zip"));
+        unpackRunner.enqueue(dataPath.resolve("data.zip"));
         Map<String, String> attributes = new HashMap<>(1);
         attributes.put("mime.type", "application/zip");
         autoUnpackRunner.enqueue(dataPath.resolve("data.zip"), attributes);
-        unpackRunner.run();
-        autoUnpackRunner.run();
+        autoUnpackRunner.enqueue(dataPath.resolve("data.zip"), attributes);
+        unpackRunner.run(2);
+        autoUnpackRunner.run(2);
 
-        unpackRunner.assertTransferCount(UnpackContent.REL_SUCCESS, 2);
-        unpackRunner.assertTransferCount(UnpackContent.REL_ORIGINAL, 1);
+        unpackRunner.assertTransferCount(UnpackContent.REL_SUCCESS, 4);
+        unpackRunner.assertTransferCount(UnpackContent.REL_ORIGINAL, 2);
         unpackRunner.assertTransferCount(UnpackContent.REL_FAILURE, 0);
 
-        autoUnpackRunner.assertTransferCount(UnpackContent.REL_SUCCESS, 2);
-        autoUnpackRunner.assertTransferCount(UnpackContent.REL_ORIGINAL, 1);
+        autoUnpackRunner.assertTransferCount(UnpackContent.REL_SUCCESS, 4);
+        autoUnpackRunner.assertTransferCount(UnpackContent.REL_ORIGINAL, 2);
         autoUnpackRunner.assertTransferCount(UnpackContent.REL_FAILURE, 0);
 
         final List<MockFlowFile> unpacked = unpackRunner.getFlowFilesForRelationship(UnpackContent.REL_SUCCESS);
@@ -160,18 +164,20 @@ public class TestUnpackContent {
         autoUnpackRunner.setProperty(UnpackContent.PACKAGING_FORMAT, UnpackContent.PackageFormat.AUTO_DETECT_FORMAT.toString());
         autoUnpackRunner.setProperty(UnpackContent.FILE_FILTER, "^folder/cal.txt$");
         unpackRunner.enqueue(dataPath.resolve("data.zip"));
+        unpackRunner.enqueue(dataPath.resolve("data.zip"));
         Map<String, String> attributes = new HashMap<>(1);
         attributes.put("mime.type", "application/zip");
         autoUnpackRunner.enqueue(dataPath.resolve("data.zip"), attributes);
-        unpackRunner.run();
-        autoUnpackRunner.run();
+        autoUnpackRunner.enqueue(dataPath.resolve("data.zip"), attributes);
+        unpackRunner.run(2);
+        autoUnpackRunner.run(2);
 
-        unpackRunner.assertTransferCount(UnpackContent.REL_SUCCESS, 1);
-        unpackRunner.assertTransferCount(UnpackContent.REL_ORIGINAL, 1);
+        unpackRunner.assertTransferCount(UnpackContent.REL_SUCCESS, 2);
+        unpackRunner.assertTransferCount(UnpackContent.REL_ORIGINAL, 2);
         unpackRunner.assertTransferCount(UnpackContent.REL_FAILURE, 0);
 
-        autoUnpackRunner.assertTransferCount(UnpackContent.REL_SUCCESS, 1);
-        autoUnpackRunner.assertTransferCount(UnpackContent.REL_ORIGINAL, 1);
+        autoUnpackRunner.assertTransferCount(UnpackContent.REL_SUCCESS, 2);
+        autoUnpackRunner.assertTransferCount(UnpackContent.REL_ORIGINAL, 2);
         autoUnpackRunner.assertTransferCount(UnpackContent.REL_FAILURE, 0);
 
         List<MockFlowFile> unpacked = unpackRunner.getFlowFilesForRelationship(UnpackContent.REL_SUCCESS);
@@ -199,11 +205,12 @@ public class TestUnpackContent {
         final TestRunner runner = TestRunners.newTestRunner(new UnpackContent());
         runner.setProperty(UnpackContent.PACKAGING_FORMAT, UnpackContent.PackageFormat.FLOWFILE_STREAM_FORMAT_V3.toString());
         runner.enqueue(dataPath.resolve("data.flowfilev3"));
+        runner.enqueue(dataPath.resolve("data.flowfilev3"));
 
-        runner.run();
+        runner.run(2);
 
-        runner.assertTransferCount(UnpackContent.REL_SUCCESS, 2);
-        runner.assertTransferCount(UnpackContent.REL_ORIGINAL, 1);
+        runner.assertTransferCount(UnpackContent.REL_SUCCESS, 4);
+        runner.assertTransferCount(UnpackContent.REL_ORIGINAL, 2);
         runner.assertTransferCount(UnpackContent.REL_FAILURE, 0);
 
         final List<MockFlowFile> unpacked = runner.getFlowFilesForRelationship(UnpackContent.REL_SUCCESS);
@@ -222,11 +229,12 @@ public class TestUnpackContent {
         final TestRunner runner = TestRunners.newTestRunner(new UnpackContent());
         runner.setProperty(UnpackContent.PACKAGING_FORMAT, UnpackContent.PackageFormat.FLOWFILE_STREAM_FORMAT_V2.toString());
         runner.enqueue(dataPath.resolve("data.flowfilev2"));
+        runner.enqueue(dataPath.resolve("data.flowfilev2"));
 
-        runner.run();
+        runner.run(2);
 
-        runner.assertTransferCount(UnpackContent.REL_SUCCESS, 2);
-        runner.assertTransferCount(UnpackContent.REL_ORIGINAL, 1);
+        runner.assertTransferCount(UnpackContent.REL_SUCCESS, 4);
+        runner.assertTransferCount(UnpackContent.REL_ORIGINAL, 2);
         runner.assertTransferCount(UnpackContent.REL_FAILURE, 0);
 
         final List<MockFlowFile> unpacked = runner.getFlowFilesForRelationship(UnpackContent.REL_SUCCESS);
@@ -332,5 +340,36 @@ public class TestUnpackContent {
         unpackRunner.assertTransferCount(UnpackContent.REL_SUCCESS, 0);
         unpackRunner.assertTransferCount(UnpackContent.REL_ORIGINAL, 0);
         unpackRunner.assertTransferCount(UnpackContent.REL_FAILURE, 1);
+    }
+
+    /*
+     * This test checks for thread safety problems when PackageFormat.AUTO_DETECT_FORMAT is used.
+     * It won't always fail if there is a issue with the code, but it will fail often enough to eventually be noticed.
+     * If this test fails at all, then it needs to be investigated.
+     */
+    @Test
+    public void testThreadSafetyUsingAutoDetect() throws IOException {
+        final TestRunner runner = TestRunners.newTestRunner(new UnpackContent());
+        runner.setProperty(UnpackContent.PACKAGING_FORMAT, UnpackContent.PackageFormat.AUTO_DETECT_FORMAT.toString());
+
+        Map<String, String> attrsTar = new HashMap<>(1);
+        Map<String, String> attrsFFv3 = new HashMap<>(1);
+        attrsTar.put("mime.type", UnpackContent.PackageFormat.TAR_FORMAT.getMimeType());
+        attrsFFv3.put("mime.type", UnpackContent.PackageFormat.FLOWFILE_STREAM_FORMAT_V3.getMimeType());
+
+        int numThreads = 50;
+        runner.setThreadCount(numThreads);
+
+        for (int i=0; i<numThreads; i++) {
+            if (i%2 == 0) {
+                runner.enqueue(dataPath.resolve("data.tar"), attrsTar);
+            } else {
+                runner.enqueue(dataPath.resolve("data.flowfilev3"), attrsFFv3);
+            }
+        }
+
+        runner.run(numThreads);
+
+        runner.assertTransferCount(UnpackContent.REL_SUCCESS, numThreads*2);
     }
 }

@@ -18,11 +18,15 @@ package org.apache.nifi.processors.kafka.pubsub;
 
 import java.io.IOException;
 import java.io.OutputStream;
+import java.net.InetSocketAddress;
+import java.net.Socket;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
+import java.util.Map;
 import java.util.Properties;
 import java.util.Set;
 import java.util.concurrent.TimeUnit;
@@ -46,12 +50,13 @@ import org.apache.nifi.processor.ProcessContext;
 import org.apache.nifi.processor.ProcessSession;
 import org.apache.nifi.processor.ProcessSessionFactory;
 import org.apache.nifi.processor.Relationship;
+import org.apache.nifi.processor.exception.ProcessException;
 import org.apache.nifi.processor.io.OutputStreamCallback;
 import org.apache.nifi.processor.util.StandardValidators;
 
 @InputRequirement(Requirement.INPUT_FORBIDDEN)
-@CapabilityDescription("Consumes messages from Apache Kafka")
-@Tags({ "Kafka", "Get", "Ingest", "Ingress", "Topic", "PubSub", "Consume" })
+@CapabilityDescription("Consumes messages from Apache Kafka,specifically built against the Kafka 0.9.x Consumer API. The complementary NiFi processor for sending messages is PublishKafka.")
+@Tags({ "Kafka", "Get", "Ingest", "Ingress", "Topic", "PubSub", "Consume", "0.9.x"})
 public class ConsumeKafka extends AbstractKafkaProcessor<Consumer<byte[], byte[]>> {
 
     static final AllowableValue OFFSET_EARLIEST = new AllowableValue("earliest", "earliest", "Automatically reset the offset to the earliest offset");
@@ -161,6 +166,7 @@ public class ConsumeKafka extends AbstractKafkaProcessor<Consumer<byte[], byte[]
             long start = System.nanoTime();
             FlowFile flowFile = processSession.create();
             final AtomicInteger messageCounter = new AtomicInteger();
+            final Map<String, String> kafkaAttributes = new HashMap<>();
 
             final Iterator<ConsumerRecord<byte[], byte[]>> iter = consumedRecords.iterator();
             while (iter.hasNext()){
@@ -168,12 +174,22 @@ public class ConsumeKafka extends AbstractKafkaProcessor<Consumer<byte[], byte[]
                     @Override
                     public void process(final OutputStream out) throws IOException {
                         ConsumerRecord<byte[], byte[]> consumedRecord = iter.next();
+
+                        kafkaAttributes.put("kafka.offset", String.valueOf(consumedRecord.offset()));
+                        if (consumedRecord.key() != null) {
+                            kafkaAttributes.put("kafka.key", new String(consumedRecord.key(), StandardCharsets.UTF_8));
+                        }
+                        kafkaAttributes.put("kafka.partition", String.valueOf(consumedRecord.partition()));
+                        kafkaAttributes.put("kafka.topic", consumedRecord.topic());
+
                         if (messageCounter.getAndIncrement() > 0 && ConsumeKafka.this.demarcatorBytes != null) {
                             out.write(ConsumeKafka.this.demarcatorBytes);
                         }
                         out.write(consumedRecord.value());
                     }
                 });
+
+                flowFile = processSession.putAllAttributes(flowFile, kafkaAttributes);
                 /*
                  * Release FlowFile if there are more messages in the
                  * ConsumerRecords batch and no demarcator was provided,
@@ -215,8 +231,17 @@ public class ConsumeKafka extends AbstractKafkaProcessor<Consumer<byte[], byte[]
                 : null;
         this.topic = context.getProperty(TOPIC).evaluateAttributeExpressions().getValue();
         this.brokers = context.getProperty(BOOTSTRAP_SERVERS).evaluateAttributeExpressions().getValue();
-
         Properties kafkaProperties = this.buildKafkaProperties(context);
+
+        /*
+         * Since we are using unconventional way to validate if connectivity to
+         * broker is possible we need a mechanism to be able to disable it.
+         * 'check.connection' property will serve as such mechanism
+         */
+        if (!"false".equals(kafkaProperties.get("check.connection"))) {
+            this.checkIfInitialConnectionPossible();
+        }
+
         kafkaProperties.put(ConsumerConfig.KEY_DESERIALIZER_CLASS_CONFIG, ByteArrayDeserializer.class.getName());
         kafkaProperties.put(ConsumerConfig.VALUE_DESERIALIZER_CLASS_CONFIG, ByteArrayDeserializer.class.getName());
 
@@ -225,6 +250,35 @@ public class ConsumeKafka extends AbstractKafkaProcessor<Consumer<byte[], byte[]
         return consumer;
     }
 
+    /**
+     * Checks via brute force if it is possible to establish connection to at
+     * least one broker. If not this method will throw {@link ProcessException}.
+     */
+    private void checkIfInitialConnectionPossible(){
+        String[] br = this.brokers.split(",");
+        boolean connectionPossible = false;
+        for (int i = 0; i < br.length && !connectionPossible; i++) {
+            String hostPortCombo = br[i];
+            String[] hostPort = hostPortCombo.split(":");
+            Socket client = null;
+            try {
+                client = new Socket();
+                client.connect(new InetSocketAddress(hostPort[0].trim(), Integer.parseInt(hostPort[1].trim())), 10000);
+                connectionPossible = true;
+            } catch (Exception e) {
+                this.logger.error("Connection to '" + hostPortCombo + "' is not possible", e);
+            } finally {
+                try {
+                    client.close();
+                } catch (IOException e) {
+                    // ignore
+                }
+            }
+        }
+        if (!connectionPossible){
+            throw new ProcessException("Connection to " + this.brokers + " is not possible. See logs for more details");
+        }
+    }
     /**
      * Will release flow file. Releasing of the flow file in the context of this
      * operation implies the following:

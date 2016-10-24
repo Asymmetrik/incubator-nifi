@@ -74,7 +74,7 @@ language governing permissions and limitations under the License. -->
         <connection>scm:git:git://git.apache.org/nifi.git</connection>
         <developerConnection>scm:git:https://git-wip-us.apache.org/repos/asf/nifi.git</developerConnection>
         <url>https://git-wip-us.apache.org/repos/asf?p=nifi.git</url>
-        <tag>nifi-0.7.0-RC2</tag>
+        <tag>nifi-0.7.1-RC1</tag>
     </scm>
     <issueManagement>
         <system>JIRA</system>
@@ -1302,7 +1302,7 @@ language governing permissions and limitations under the License. -->
                     <version>2.18</version>
                     <configuration>
                         <redirectTestOutputToFile>true</redirectTestOutputToFile>
-                        <argLine combine.children="append">-Xmx1G -Djava.net.preferIPv4Stack=true</argLine>
+                        <argLine combine.children="append">-Xmx2G -Djava.net.preferIPv4Stack=true</argLine>
                     </configuration>
                     <dependencies>
                         <dependency>
@@ -1584,8 +1584,7 @@ language governing permissions and limitations under the License. -->
                         <exclude>nb-configuration.xml</exclude> <!-- courtesy excludes for netbeans users -->
                         <exclude>nbactions.xml</exclude> <!-- courtesy excludes for netbeans users -->
                         <exclude>DEPENDENCIES</exclude> <!-- auto generated file by apache's maven config while building sources.zip -->
-                        <exclude>.travis.yml</exclude> <!-- Travis CI Build Descriptor File -->
-                        <exclude>appveyor.yml</exclude> <!-- AppVeyor CI Build Descriptor File -->
+                        <exclude>.github/PULL_REQUEST_TEMPLATE.md</exclude> <!-- PR Template for GitHub that does not have a mechanism of including comments -->
                     </excludes>
                 </configuration>
                 <dependencies>
