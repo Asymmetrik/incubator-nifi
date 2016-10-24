@@ -1452,6 +1452,7 @@ language governing permissions and limitations under the License. -->
                 <version>1.1.0</version>
                 <extensions>true</extensions>
             </plugin>
+            <!--
             <plugin>
                 <groupId>org.sonatype.plugins</groupId>
                 <artifactId>nexus-staging-maven-plugin</artifactId>
@@ -1463,6 +1464,7 @@ language governing permissions and limitations under the License. -->
                     <nexusUrl>https://repository.apache.org/</nexusUrl>
                 </configuration>
             </plugin>
+            -->
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-enforcer-plugin</artifactId>
@@ -1705,21 +1707,12 @@ language governing permissions and limitations under the License. -->
                         <groupId>org.apache.maven.plugins</groupId>
                         <artifactId>maven-release-plugin</artifactId>
                         <configuration>
-                            <useReleaseProfile>true</useReleaseProfile>
+                            <useReleaseProfile>false</useReleaseProfile>
                             <autoVersionSubmodules>true</autoVersionSubmodules>
                             <goals>deploy</goals>
                             <tagNameFormat>asymmetrik/@{project.artifactId}-@{project.version}</tagNameFormat>
                             <!-- skip maven-gpg-plugin -->
                             <arguments>-Dgpg.skip=true</arguments>
-                        </configuration>
-                    </plugin>
-                    <plugin>
-                        <groupId>org.sonatype.plugins</groupId>
-                        <artifactId>nexus-staging-maven-plugin</artifactId>
-                        <extensions>true</extensions>
-                        <configuration>
-                            <skipLocalStaging>true</skipLocalStaging>
-                            <skipStaging>true</skipStaging>
                         </configuration>
                     </plugin>
                 </plugins>
