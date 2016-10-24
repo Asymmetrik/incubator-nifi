@@ -76,6 +76,7 @@ public abstract class AbstractElasticsearchProcessor extends AbstractProcessor {
             .name("Cluster Name")
             .description("Name of the ES cluster (for example, elasticsearch_brew). Defaults to 'elasticsearch'")
             .required(true)
+            .expressionLanguageSupported(true)
             .addValidator(StandardValidators.NON_EMPTY_VALIDATOR)
             .defaultValue("elasticsearch")
             .build();
@@ -85,7 +86,7 @@ public abstract class AbstractElasticsearchProcessor extends AbstractProcessor {
             .description("ElasticSearch Hosts, which should be comma separated and colon for hostname/port "
                     + "host1:port,host2:port,....  For example testcluster:9300.")
             .required(true)
-            .expressionLanguageSupported(false)
+            .expressionLanguageSupported(true)
             .addValidator(HOSTNAME_PORT_VALIDATOR)
             .build();
 

@@ -82,7 +82,7 @@ public class TestFetchElasticsearch {
     @Test
     public void testFetchElasticsearchOnTrigger() throws IOException {
         runner = TestRunners.newTestRunner(new FetchElasticsearchTestProcessor(true)); // all docs are found
-        runner.setValidateExpressionUsage(true);
+        runner.setValidateExpressionUsage(false);
         runner.setProperty(AbstractElasticsearchProcessor.CLUSTER_NAME, "elasticsearch");
         runner.setProperty(AbstractElasticsearchProcessor.HOSTS, "127.0.0.1:9300");
         runner.setProperty(AbstractElasticsearchProcessor.PING_TIMEOUT, "5s");
@@ -115,7 +115,7 @@ public class TestFetchElasticsearch {
         runner.setProperty(AbstractElasticsearchProcessor.SAMPLER_INTERVAL, "5s");
         runner.setProperty(FetchElasticsearch.INDEX, "doc");
         runner.setProperty(FetchElasticsearch.TYPE, "status");
-        runner.setValidateExpressionUsage(true);
+        runner.setValidateExpressionUsage(false);
         runner.setProperty(FetchElasticsearch.DOC_ID, "${doc_id}");
 
         runner.enqueue(docExample, new HashMap<String, String>() {{
@@ -139,7 +139,7 @@ public class TestFetchElasticsearch {
         runner.setProperty(AbstractElasticsearchProcessor.SAMPLER_INTERVAL, "5s");
         runner.setProperty(FetchElasticsearch.INDEX, "doc");
         runner.setProperty(FetchElasticsearch.TYPE, "status");
-        runner.setValidateExpressionUsage(true);
+        runner.setValidateExpressionUsage(false);
         runner.setProperty(FetchElasticsearch.DOC_ID, "${doc_id}");
 
         runner.assertNotValid();
@@ -155,7 +155,7 @@ public class TestFetchElasticsearch {
         runner.setProperty(AbstractElasticsearchProcessor.SAMPLER_INTERVAL, "5s");
         runner.setProperty(FetchElasticsearch.INDEX, "doc");
         runner.setProperty(FetchElasticsearch.TYPE, "status");
-        runner.setValidateExpressionUsage(true);
+        runner.setValidateExpressionUsage(false);
         runner.setProperty(FetchElasticsearch.DOC_ID, "${doc_id}");
 
         // No Node Available exception
@@ -240,7 +240,7 @@ public class TestFetchElasticsearch {
         runner.setProperty(AbstractElasticsearchProcessor.SAMPLER_INTERVAL, "5s");
         runner.setProperty(FetchElasticsearch.INDEX, "doc");
         runner.setProperty(FetchElasticsearch.TYPE, "status");
-        runner.setValidateExpressionUsage(true);
+        runner.setValidateExpressionUsage(false);
         runner.setProperty(FetchElasticsearch.DOC_ID, "${doc_id}");
 
         // Allow time for the controller service to fully initialize
