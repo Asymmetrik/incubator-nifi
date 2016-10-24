@@ -83,6 +83,7 @@ import org.apache.http.protocol.HttpContext;
 import org.apache.http.protocol.HttpCoreContext;
 import org.apache.http.util.EntityUtils;
 import org.apache.nifi.annotation.behavior.DynamicProperty;
+import org.apache.http.util.VersionInfo;
 import org.apache.nifi.annotation.behavior.InputRequirement;
 import org.apache.nifi.annotation.behavior.InputRequirement.Requirement;
 import org.apache.nifi.annotation.behavior.SupportsBatching;
@@ -198,6 +199,7 @@ public class PostHTTP extends AbstractProcessor {
             .description("What to report as the User Agent when we connect to the remote server")
             .required(false)
             .addValidator(StandardValidators.NON_EMPTY_VALIDATOR)
+            .defaultValue(VersionInfo.getUserAgent("Apache-HttpClient", "org.apache.http.client", HttpClientBuilder.class))
             .build();
     public static final PropertyDescriptor COMPRESSION_LEVEL = new PropertyDescriptor.Builder()
             .name("Compression Level")
@@ -381,7 +383,7 @@ public class PostHTTP extends AbstractProcessor {
         configMap.clear();
 
         final StreamThrottler throttler = throttlerRef.getAndSet(null);
-        if(throttler != null) {
+        if (throttler != null) {
             try {
                 throttler.close();
             } catch (IOException e) {
@@ -420,12 +422,12 @@ public class PostHTTP extends AbstractProcessor {
             final SSLContext sslContext;
             try {
                 sslContext = createSSLContext(sslContextService);
+                getLogger().info("PostHTTP supports protocol: " + sslContext.getProtocol());
             } catch (final Exception e) {
                 throw new ProcessException(e);
             }
 
-            final SSLConnectionSocketFactory sslsf = new SSLConnectionSocketFactory(sslContext, new String[]{"TLSv1"}, null, SSLConnectionSocketFactory.BROWSER_COMPATIBLE_HOSTNAME_VERIFIER);
-
+            final SSLConnectionSocketFactory sslsf = new SSLConnectionSocketFactory(sslContext);
             // Also use a plain socket factory for regular http connections (especially proxies)
             final Registry<ConnectionSocketFactory> socketFactoryRegistry =
                     RegistryBuilder.<ConnectionSocketFactory>create()
@@ -464,6 +466,8 @@ public class PostHTTP extends AbstractProcessor {
             }
             builder = builder.loadKeyMaterial(keystore, service.getKeyStorePassword().toCharArray());
         }
+
+        builder = builder.useProtocol(service.getSslAlgorithm());
 
         final SSLContext sslContext = builder.build();
         return sslContext;
