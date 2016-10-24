@@ -190,7 +190,7 @@ public abstract class AbstractElasticsearchProcessor extends AbstractProcessor {
 
         log.debug("Creating ElasticSearch Client");
         try {
-            final String clusterName = context.getProperty(CLUSTER_NAME).getValue();
+            final String clusterName = context.getProperty(CLUSTER_NAME).evaluateAttributeExpressions().getValue();
             final String pingTimeout = context.getProperty(PING_TIMEOUT).getValue();
             final String samplerInterval = context.getProperty(SAMPLER_INTERVAL).getValue();
             final String username = context.getProperty(USERNAME).getValue();
@@ -226,7 +226,7 @@ public abstract class AbstractElasticsearchProcessor extends AbstractProcessor {
 
             TransportClient transportClient = getTransportClient(settingsBuilder, shieldUrl, username, password);
 
-            final String hosts = context.getProperty(HOSTS).getValue();
+            final String hosts = context.getProperty(HOSTS).evaluateAttributeExpressions().getValue();
             esHosts = getEsHosts(hosts);
 
             if (esHosts != null) {
