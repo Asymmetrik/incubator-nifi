@@ -1713,6 +1713,9 @@ language governing permissions and limitations under the License. -->
                             <tagNameFormat>asymmetrik/@{project.artifactId}-@{project.version}</tagNameFormat>
                             <!-- skip maven-gpg-plugin -->
                             <arguments>-Dgpg.skip=true</arguments>
+                            <releaseProfiles></releaseProfiles>
+                            <pushChanges>true</pushChanges>
+                            <localCheckout>false</localCheckout>
                         </configuration>
                     </plugin>
                 </plugins>
