@@ -58,13 +58,15 @@ public abstract class AbstractElasticsearchProcessor extends AbstractProcessor {
     private static final Validator HOSTNAME_PORT_VALIDATOR = new Validator() {
         @Override
         public ValidationResult validate(final String subject, final String input, final ValidationContext context) {
-            final List<String> esList = Arrays.asList(input.split(","));
-            for (String hostnamePort : esList) {
-                String[] addresses = hostnamePort.split(":");
-                // Protect against invalid input like http://127.0.0.1:9300 (URL scheme should not be there)
-                if (addresses.length != 2) {
-                    return new ValidationResult.Builder().subject(subject).input(input).explanation(
-                            "Must be in hostname:port form (no scheme such as http://").valid(false).build();
+            if (!input.startsWith("${")) {
+                final List<String> esList = Arrays.asList(input.split(","));
+                for (String hostnamePort : esList) {
+                    String[] addresses = hostnamePort.split(":");
+                    // Protect against invalid input like http://127.0.0.1:9300 (URL scheme should not be there)
+                    if (addresses.length != 2) {
+                        return new ValidationResult.Builder().subject(subject).input(input).explanation(
+                                "Must be in hostname:port form (no scheme such as http://").valid(false).build();
+                    }
                 }
             }
             return new ValidationResult.Builder().subject(subject).input(input).explanation(

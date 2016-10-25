@@ -80,6 +80,21 @@ public class TestFetchElasticsearch {
     }
 
     @Test
+    public void testHostnameExpressionLanguage() throws IOException {
+        runner = TestRunners.newTestRunner(new FetchElasticsearchTestProcessor(true)); // all docs are found
+        runner.setProperty(AbstractElasticsearchProcessor.CLUSTER_NAME, "elasticsearch");
+        runner.setProperty(AbstractElasticsearchProcessor.HOSTS, "${xxx}");
+        runner.setProperty(AbstractElasticsearchProcessor.PING_TIMEOUT, "5s");
+        runner.setProperty(AbstractElasticsearchProcessor.SAMPLER_INTERVAL, "5s");
+
+        runner.setProperty(FetchElasticsearch.INDEX, "doc");
+        runner.setProperty(FetchElasticsearch.TYPE, "status");
+        runner.setProperty(FetchElasticsearch.DOC_ID, "${doc_id}");
+
+        runner.assertValid();
+    }
+
+    @Test
     public void testFetchElasticsearchOnTrigger() throws IOException {
         runner = TestRunners.newTestRunner(new FetchElasticsearchTestProcessor(true)); // all docs are found
         runner.setValidateExpressionUsage(false);

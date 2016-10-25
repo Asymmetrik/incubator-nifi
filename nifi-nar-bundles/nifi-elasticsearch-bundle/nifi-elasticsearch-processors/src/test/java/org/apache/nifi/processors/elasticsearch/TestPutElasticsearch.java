@@ -75,6 +75,21 @@ public class TestPutElasticsearch {
     }
 
     @Test
+    public void testHostnameExpressionLanguage() throws IOException {
+        runner = TestRunners.newTestRunner(new PutElasticsearchTestProcessor(false)); // no failures
+        runner.setProperty(AbstractElasticsearchProcessor.CLUSTER_NAME, "elasticsearch");
+        runner.setProperty(AbstractElasticsearchProcessor.HOSTS, "${xxx}");
+        runner.setProperty(AbstractElasticsearchProcessor.PING_TIMEOUT, "5s");
+        runner.setProperty(AbstractElasticsearchProcessor.SAMPLER_INTERVAL, "5s");
+
+        runner.setProperty(PutElasticsearch.INDEX, "doc");
+        runner.setProperty(PutElasticsearch.TYPE, "status");
+        runner.setProperty(PutElasticsearch.ID_ATTRIBUTE, "doc_id");
+
+        runner.assertValid();
+    }
+
+    @Test
     public void testPutElasticSearchOnTrigger() throws IOException {
         runner = TestRunners.newTestRunner(new PutElasticsearchTestProcessor(false)); // no failures
         runner.setValidateExpressionUsage(false);
