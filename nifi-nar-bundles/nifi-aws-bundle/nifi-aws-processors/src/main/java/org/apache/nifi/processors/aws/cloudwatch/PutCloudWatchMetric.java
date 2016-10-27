@@ -4,9 +4,11 @@ import com.amazonaws.ClientConfiguration;
 import com.amazonaws.auth.AWSCredentials;
 import com.amazonaws.auth.AWSCredentialsProvider;
 import com.amazonaws.services.cloudwatch.AmazonCloudWatchClient;
+import com.amazonaws.services.cloudwatch.model.Dimension;
 import com.amazonaws.services.cloudwatch.model.MetricDatum;
 import com.amazonaws.services.cloudwatch.model.PutMetricDataRequest;
 import com.amazonaws.services.cloudwatch.model.StatisticSet;
+import org.apache.nifi.annotation.behavior.DynamicProperty;
 import org.apache.nifi.annotation.behavior.InputRequirement;
 import org.apache.nifi.annotation.behavior.InputRequirement.Requirement;
 import org.apache.nifi.annotation.behavior.SupportsBatching;
@@ -16,6 +18,7 @@ import org.apache.nifi.components.PropertyDescriptor;
 import org.apache.nifi.components.ValidationContext;
 import org.apache.nifi.components.ValidationResult;
 import org.apache.nifi.components.Validator;
+import org.apache.nifi.expression.AttributeExpression;
 import org.apache.nifi.flowfile.FlowFile;
 import org.apache.nifi.processor.ProcessContext;
 import org.apache.nifi.processor.ProcessSession;
@@ -29,6 +32,9 @@ import java.util.*;
 
 @SupportsBatching
 @InputRequirement(Requirement.INPUT_REQUIRED)
+@DynamicProperty(name = "Dimension Name", value = "Dimension Value",
+        description = "Allows dimension name/value pairs to be added to the metric",
+        supportsExpressionLanguage = true)
 @Tags({"amazon", "aws", "cloudwatch", "metrics", "put", "publish"})
 @CapabilityDescription("Publishes metrics to Amazon CloudWatch")
 public class PutCloudWatchMetric extends AbstractAWSCredentialsProviderProcessor<AmazonCloudWatchClient> {
@@ -59,7 +65,6 @@ public class PutCloudWatchMetric extends AbstractAWSCredentialsProviderProcessor
             }
         }
     };
-
 
     public static final PropertyDescriptor NAMESPACE = new PropertyDescriptor.Builder()
             .name("Namespace")
@@ -94,7 +99,6 @@ public class PutCloudWatchMetric extends AbstractAWSCredentialsProviderProcessor
             .addValidator(StandardValidators.NON_EMPTY_VALIDATOR)
             .build();
 
-
     public static final PropertyDescriptor VALUE = new PropertyDescriptor.Builder()
             .name("Value")
             .description("The value for the metric. Must be a double")
@@ -111,7 +115,6 @@ public class PutCloudWatchMetric extends AbstractAWSCredentialsProviderProcessor
             .addValidator(DOUBLE_VALIDATOR)
             .build();
 
-
     public static final PropertyDescriptor MINIMUM = new PropertyDescriptor.Builder()
             .name("Minimum")
             .description("The minimum value of the sample set. Must be a double")
@@ -119,7 +122,6 @@ public class PutCloudWatchMetric extends AbstractAWSCredentialsProviderProcessor
             .required(false)
             .addValidator(DOUBLE_VALIDATOR)
             .build();
-
 
     public static final PropertyDescriptor SAMPLECOUNT = new PropertyDescriptor.Builder()
             .name("SampleCount")
@@ -129,7 +131,6 @@ public class PutCloudWatchMetric extends AbstractAWSCredentialsProviderProcessor
             .addValidator(DOUBLE_VALIDATOR)
             .build();
 
-
     public static final PropertyDescriptor SUM = new PropertyDescriptor.Builder()
             .name("Sum")
             .description("The sum of values for the sample set. Must be a double")
@@ -138,9 +139,6 @@ public class PutCloudWatchMetric extends AbstractAWSCredentialsProviderProcessor
             .addValidator(DOUBLE_VALIDATOR)
             .build();
 
-
-    //Dimensions.member.N
-
     public static final List<PropertyDescriptor> properties =
             Collections.unmodifiableList(
                     Arrays.asList(NAMESPACE, METRIC_NAME, VALUE, MAXIMUM, MINIMUM, SAMPLECOUNT, SUM, TIMESTAMP, UNIT, REGION, ACCESS_KEY, SECRET_KEY, CREDENTIALS_FILE, AWS_CREDENTIALS_PROVIDER_SERVICE, TIMEOUT, SSL_CONTEXT_SERVICE, ENDPOINT_OVERRIDE,
@@ -148,9 +146,34 @@ public class PutCloudWatchMetric extends AbstractAWSCredentialsProviderProcessor
             );
 
 
+    private volatile Set<String> dynamicPropertyNames = new HashSet<>();
+
     @Override
     protected List<PropertyDescriptor> getSupportedPropertyDescriptors() {
         return properties;
+    }
+
+    @Override
+    protected PropertyDescriptor getSupportedDynamicPropertyDescriptor(final String propertyDescriptorName) {
+        return new PropertyDescriptor.Builder()
+                .name(propertyDescriptorName)
+                .addValidator(StandardValidators.createAttributeExpressionLanguageValidator(AttributeExpression.ResultType.STRING, true))
+                .expressionLanguageSupported(true)
+                .dynamic(true)
+                .build();
+    }
+
+    @Override
+    public void onPropertyModified(final PropertyDescriptor descriptor, final String oldValue, final String newValue) {
+        if (descriptor.isDynamic()) {
+            final Set<String> newDynamicPropertyNames = new HashSet<>(dynamicPropertyNames);
+            if (newValue == null) {           // removing a property
+                newDynamicPropertyNames.remove(descriptor.getName());
+            } else if (oldValue == null) {    // adding a new property
+                newDynamicPropertyNames.add(descriptor.getName());
+            }
+            this.dynamicPropertyNames = Collections.unmodifiableSet(newDynamicPropertyNames);
+        }
     }
 
     @Override
@@ -173,13 +196,16 @@ public class PutCloudWatchMetric extends AbstractAWSCredentialsProviderProcessor
             problems.add(new ValidationResult.Builder().subject("Metric").valid(false).explanation("Cannot set both Value or StatisticSet(Maximum, Minimum, SampleCount, Sum)").build());
         }
 
+        if (dynamicPropertyNames.size() > 10) {
+            problems.add(new ValidationResult.Builder().subject("Metric").valid(false).explanation("Cannot set more than 10 dimensions").build());
+        }
+
         return problems;
     }
 
     /**
      * Create client using aws credentials provider. This is the preferred way for creating clients
      */
-
     @Override
     protected AmazonCloudWatchClient createClient(ProcessContext processContext, AWSCredentialsProvider awsCredentialsProvider, ClientConfiguration clientConfiguration) {
         getLogger().info("Creating client using aws credentials provider");
@@ -196,7 +222,6 @@ public class PutCloudWatchMetric extends AbstractAWSCredentialsProviderProcessor
         getLogger().debug("Creating client with aws credentials");
         return new AmazonCloudWatchClient(awsCredentials, clientConfiguration);
     }
-
 
     @Override
     public void onTrigger(ProcessContext context, ProcessSession session) throws ProcessException {
@@ -224,7 +249,6 @@ public class PutCloudWatchMetric extends AbstractAWSCredentialsProviderProcessor
             dataum.setStatisticValues(statisticSet);
         }
 
-
         final String timestamp = context.getProperty(TIMESTAMP).evaluateAttributeExpressions(flowFile).getValue();
         if (timestamp != null) {
             dataum.setTimestamp(new Date(Long.parseLong(timestamp)));
@@ -233,6 +257,16 @@ public class PutCloudWatchMetric extends AbstractAWSCredentialsProviderProcessor
         final String unit = context.getProperty(UNIT).evaluateAttributeExpressions(flowFile).getValue();
         if (unit != null) {
             dataum.setUnit(unit);
+        }
+
+        // add dynamic properties as dimensions
+        if (!dynamicPropertyNames.isEmpty()) {
+            List<Dimension> dimensions = new ArrayList<>(dynamicPropertyNames.size());
+            for (String propertyName : dynamicPropertyNames) {
+                String propertyValue = context.getProperty(propertyName).evaluateAttributeExpressions(flowFile).getValue();
+                dimensions.add(new Dimension().withName(propertyName).withValue(propertyValue));
+            }
+            dataum.withDimensions(dimensions);
         }
 
         final PutMetricDataRequest metricDataRequest = new PutMetricDataRequest()
@@ -248,7 +282,5 @@ public class PutCloudWatchMetric extends AbstractAWSCredentialsProviderProcessor
             flowFile = session.penalize(flowFile);
             session.transfer(flowFile, REL_FAILURE);
         }
-
     }
-
 }
