@@ -1712,7 +1712,7 @@ language governing permissions and limitations under the License. -->
                             <goals>deploy</goals>
                             <tagNameFormat>asymmetrik/@{project.artifactId}-@{project.version}</tagNameFormat>
                             <!-- skip maven-gpg-plugin -->
-                            <arguments>-Dgpg.skip=true</arguments>
+                            <arguments>-Dgpg.skip=true -Dmaven.test.skip=true</arguments>
                             <releaseProfiles />
                             <pushChanges>true</pushChanges>
                             <localCheckout>false</localCheckout>
