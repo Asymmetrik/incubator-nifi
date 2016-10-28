@@ -26,24 +26,73 @@ language governing permissions and limitations under the License. -->
                 <configuration>
                     <finalName>nifi-${project.version}</finalName>
                     <attach>true</attach>
+                    <tarLongFileMode>posix</tarLongFileMode>
+                    <archiverConfig>
+                        <defaultDirectoryMode>0775</defaultDirectoryMode>
+                        <directoryMode>0775</directoryMode>
+                        <fileMode>0664</fileMode>
+                    </archiverConfig>
                 </configuration>
                 <executions>
                     <execution>
-                        <id>make shared resource</id>
+                        <id>make complete assembly</id>
                         <goals>
                             <goal>single</goal>
                         </goals>
                         <phase>package</phase>
                         <configuration>
-                            <archiverConfig>
-                                <defaultDirectoryMode>0775</defaultDirectoryMode>
-                                <directoryMode>0775</directoryMode>
-                                <fileMode>0664</fileMode>
-                            </archiverConfig>
                             <descriptors>
                                 <descriptor>src/main/assembly/dependencies.xml</descriptor>
                             </descriptors>
                             <tarLongFileMode>posix</tarLongFileMode>
+                        </configuration>
+                    </execution>
+                    <execution>
+                        <id>make bare container assembly</id>
+                        <goals>
+                            <goal>single</goal>
+                        </goals>
+                        <phase>package</phase>
+                        <configuration>
+                            <descriptors>
+                                <descriptor>src/main/assembly/container.xml</descriptor>
+                            </descriptors>
+                        </configuration>
+                    </execution>
+                    <execution>
+                        <id>make primary nars assembly</id>
+                        <goals>
+                            <goal>single</goal>
+                        </goals>
+                        <phase>package</phase>
+                        <configuration>
+                            <descriptors>
+                                <descriptor>src/main/assembly/nars-primary.xml</descriptor>
+                            </descriptors>
+                        </configuration>
+                    </execution>
+                    <execution>
+                        <id>make secondary nars assembly</id>
+                        <goals>
+                            <goal>single</goal>
+                        </goals>
+                        <phase>package</phase>
+                        <configuration>
+                            <descriptors>
+                                <descriptor>src/main/assembly/nars-secondary.xml</descriptor>
+                            </descriptors>
+                        </configuration>
+                    </execution>
+                    <execution>
+                        <id>make all nars assembly</id>
+                        <goals>
+                            <goal>single</goal>
+                        </goals>
+                        <phase>package</phase>
+                        <configuration>
+                            <descriptors>
+                                <descriptor>src/main/assembly/nars-all.xml</descriptor>
+                            </descriptors>
                         </configuration>
                     </execution>
                 </executions>
@@ -142,7 +191,6 @@ language governing permissions and limitations under the License. -->
             <artifactId>nifi-update-attribute-nar</artifactId>
             <type>nar</type>
         </dependency>
-<!--
         <dependency>
             <groupId>org.apache.nifi</groupId>
             <artifactId>nifi-hadoop-libraries-nar</artifactId>
@@ -153,7 +201,6 @@ language governing permissions and limitations under the License. -->
             <artifactId>nifi-hadoop-nar</artifactId>
             <type>nar</type>
         </dependency>
--->
         <dependency>
             <groupId>org.apache.nifi</groupId>
             <artifactId>nifi-kafka-nar</artifactId>
@@ -174,7 +221,6 @@ language governing permissions and limitations under the License. -->
             <artifactId>nifi-html-nar</artifactId>
             <type>nar</type>
         </dependency>
-<!--
         <dependency>
             <groupId>org.apache.nifi</groupId>
             <artifactId>nifi-kite-nar</artifactId>
@@ -200,13 +246,11 @@ language governing permissions and limitations under the License. -->
             <artifactId>nifi-dbcp-service-nar</artifactId>
             <type>nar</type>
         </dependency>
--->
         <dependency>
             <groupId>org.apache.nifi</groupId>
             <artifactId>nifi-mongodb-nar</artifactId>
             <type>nar</type>
         </dependency>
-<!--
         <dependency>
             <groupId>org.apache.nifi</groupId>
             <artifactId>nifi-solr-nar</artifactId>
@@ -232,13 +276,11 @@ language governing permissions and limitations under the License. -->
             <artifactId>nifi-geo-nar</artifactId>
             <type>nar</type>
         </dependency>
--->
         <dependency>
             <groupId>org.apache.nifi</groupId>
             <artifactId>nifi-aws-nar</artifactId>
             <type>nar</type>
         </dependency>
-<!--
         <dependency>
             <groupId>org.apache.nifi</groupId>
             <artifactId>nifi-ambari-nar</artifactId>
@@ -279,7 +321,6 @@ language governing permissions and limitations under the License. -->
             <artifactId>nifi-azure-nar</artifactId>
             <type>nar</type>
         </dependency>
--->
         <dependency>
             <groupId>org.apache.nifi</groupId>
             <artifactId>nifi-scripting-nar</artifactId>
@@ -290,7 +331,6 @@ language governing permissions and limitations under the License. -->
             <artifactId>nifi-elasticsearch-nar</artifactId>
             <type>nar</type>
         </dependency>
-<!--
         <dependency>
             <groupId>org.apache.nifi</groupId>
             <artifactId>nifi-lumberjack-nar</artifactId>
@@ -331,13 +371,11 @@ language governing permissions and limitations under the License. -->
             <artifactId>nifi-hive-nar</artifactId>
             <type>nar</type>
         </dependency>
--->
 	    <dependency>
             <groupId>org.apache.nifi</groupId>
             <artifactId>nifi-site-to-site-reporting-nar</artifactId>
             <type>nar</type>
       	</dependency>
-<!--
         <dependency>
             <groupId>org.apache.nifi</groupId>
             <artifactId>nifi-mqtt-nar</artifactId>
@@ -348,7 +386,6 @@ language governing permissions and limitations under the License. -->
             <artifactId>nifi-snmp-nar</artifactId>
             <type>nar</type>
         </dependency>
--->
         <dependency>
             <groupId>org.apache.nifi</groupId>
             <artifactId>nifi-slack-nar</artifactId>
