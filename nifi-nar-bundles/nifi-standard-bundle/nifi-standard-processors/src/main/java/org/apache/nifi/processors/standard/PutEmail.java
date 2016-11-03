@@ -101,7 +101,7 @@ public class PutEmail extends AbstractProcessor {
             .expressionLanguageSupported(true)
             .addValidator(StandardValidators.NON_EMPTY_VALIDATOR)
             .required(false)
-            .sensitive(true)
+            //.sensitive(true)
             .build();
     public static final PropertyDescriptor SMTP_AUTH = new PropertyDescriptor.Builder()
             .name("SMTP Auth")
