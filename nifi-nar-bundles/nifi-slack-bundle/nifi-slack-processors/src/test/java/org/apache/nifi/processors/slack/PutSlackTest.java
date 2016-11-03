@@ -102,6 +102,36 @@ public class PutSlackTest {
     }
 
     @Test
+    public void testInvalidDynamicProperties() {
+        testRunner.setProperty(PutSlack.WEBHOOK_URL, server.getUrl());
+        testRunner.setProperty(PutSlack.WEBHOOK_TEXT, WEBHOOK_TEST_TEXT);
+        PropertyDescriptor dynamicProp = new PropertyDescriptor.Builder()
+                .dynamic(true)
+                .name("foo")
+                .build();
+        testRunner.setProperty(dynamicProp, "{\"a\": a}");
+
+        testRunner.enqueue("{}".getBytes());
+        testRunner.run(1);
+        testRunner.assertTransferCount(PutSlack.REL_FAILURE, 1);
+    }
+
+    @Test
+    public void testValidDynamicProperties() {
+        testRunner.setProperty(PutSlack.WEBHOOK_URL, server.getUrl());
+        testRunner.setProperty(PutSlack.WEBHOOK_TEXT, WEBHOOK_TEST_TEXT);
+        PropertyDescriptor dynamicProp = new PropertyDescriptor.Builder()
+                .dynamic(true)
+                .name("foo")
+                .build();
+        testRunner.setProperty(dynamicProp, "{\"a\": \"a\"}");
+
+        testRunner.enqueue("{}".getBytes());
+        testRunner.run(1);
+        testRunner.assertTransferCount(PutSlack.REL_FAILURE, 0);
+    }
+
+    @Test
     public void testGetPropertyDescriptors() throws Exception {
         PutSlack processor = new PutSlack();
         List<PropertyDescriptor> pd = processor.getSupportedPropertyDescriptors();
