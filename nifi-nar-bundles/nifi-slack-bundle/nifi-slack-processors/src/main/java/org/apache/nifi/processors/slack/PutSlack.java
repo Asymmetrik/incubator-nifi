@@ -123,7 +123,7 @@ public class PutSlack extends AbstractProcessor {
             .description("FlowFiles are routed to failure if unable to be sent to Slack")
             .build();
 
-    private final Set<PropertyDescriptor> attachments = Collections.synchronizedSet(new HashSet<PropertyDescriptor>());
+    private final SortedSet<PropertyDescriptor> attachments = Collections.synchronizedSortedSet(new TreeSet<PropertyDescriptor>());
 
     public static final List<PropertyDescriptor> descriptors = Collections.unmodifiableList(
             Arrays.asList(WEBHOOK_URL, WEBHOOK_TEXT, CHANNEL, USERNAME, ICON_URL, ICON_EMOJI));
