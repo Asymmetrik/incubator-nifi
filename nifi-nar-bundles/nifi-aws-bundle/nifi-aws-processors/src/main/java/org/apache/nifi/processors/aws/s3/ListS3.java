@@ -56,7 +56,7 @@ import com.amazonaws.services.s3.model.VersionListing;
 
 @TriggerSerially
 @TriggerWhenEmpty
-@InputRequirement(Requirement.INPUT_FORBIDDEN)
+@InputRequirement(Requirement.INPUT_ALLOWED)
 @Tags({"Amazon", "S3", "AWS", "list"})
 @CapabilityDescription("Retrieves a listing of objects from an S3 bucket. For each object that is listed, creates a FlowFile that represents "
         + "the object so that it can be fetched in conjunction with FetchS3Object. This Processor is designed to run on Primary Node only "
@@ -186,7 +186,15 @@ public class ListS3 extends AbstractS3Processor {
         int listCount = 0;
         long maxTimestamp = 0L;
         String delimiter = context.getProperty(DELIMITER).getValue();
-        String prefix = context.getProperty(PREFIX).evaluateAttributeExpressions().getValue();
+
+        FlowFile flowFile = session.get();
+        String prefix;
+        if (flowFile == null) {
+            flowFile = session.create();
+            prefix = context.getProperty(PREFIX).evaluateAttributeExpressions().getValue();
+        } else {
+            prefix = context.getProperty(PREFIX).evaluateAttributeExpressions(flowFile).getValue();
+        }
 
         boolean useVersions = context.getProperty(USE_VERSIONS).asBoolean();
 
@@ -230,7 +238,6 @@ public class ListS3 extends AbstractS3Processor {
                 }
 
                 // Create the flowfile
-                FlowFile flowFile = session.create();
                 flowFile = session.putAllAttributes(flowFile, attributes);
                 session.transfer(flowFile, REL_SUCCESS);
 
