@@ -8,6 +8,7 @@ import com.amazonaws.services.cloudwatch.model.Dimension;
 import com.amazonaws.services.cloudwatch.model.MetricDatum;
 import com.amazonaws.services.cloudwatch.model.PutMetricDataRequest;
 import com.amazonaws.services.cloudwatch.model.StatisticSet;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.nifi.annotation.behavior.DynamicProperty;
 import org.apache.nifi.annotation.behavior.InputRequirement;
 import org.apache.nifi.annotation.behavior.InputRequirement.Requirement;
@@ -264,7 +265,9 @@ public class PutCloudWatchMetric extends AbstractAWSCredentialsProviderProcessor
             List<Dimension> dimensions = new ArrayList<>(dynamicPropertyNames.size());
             for (String propertyName : dynamicPropertyNames) {
                 String propertyValue = context.getProperty(propertyName).evaluateAttributeExpressions(flowFile).getValue();
-                dimensions.add(new Dimension().withName(propertyName).withValue(propertyValue));
+                if (StringUtils.isNotBlank(propertyValue)) {
+                    dimensions.add(new Dimension().withName(propertyName).withValue(propertyValue));
+                }
             }
             dataum.withDimensions(dimensions);
         }
