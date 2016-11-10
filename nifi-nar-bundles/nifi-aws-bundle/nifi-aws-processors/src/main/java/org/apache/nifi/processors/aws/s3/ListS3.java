@@ -187,13 +187,13 @@ public class ListS3 extends AbstractS3Processor {
         long maxTimestamp = 0L;
         String delimiter = context.getProperty(DELIMITER).getValue();
 
-        FlowFile flowFile = session.get();
+        FlowFile original = session.get();
         String prefix;
-        if (flowFile == null) {
-            flowFile = session.create();
+        if (original == null) {
             prefix = context.getProperty(PREFIX).evaluateAttributeExpressions().getValue();
         } else {
-            prefix = context.getProperty(PREFIX).evaluateAttributeExpressions(flowFile).getValue();
+            prefix = context.getProperty(PREFIX).evaluateAttributeExpressions(original).getValue();
+            session.remove(original);
         }
 
         boolean useVersions = context.getProperty(USE_VERSIONS).asBoolean();
@@ -238,6 +238,7 @@ public class ListS3 extends AbstractS3Processor {
                 }
 
                 // Create the flowfile
+                FlowFile flowFile = session.create();
                 flowFile = session.putAllAttributes(flowFile, attributes);
                 session.transfer(flowFile, REL_SUCCESS);
 
