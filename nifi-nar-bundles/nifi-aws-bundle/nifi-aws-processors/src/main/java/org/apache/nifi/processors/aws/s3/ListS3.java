@@ -190,10 +190,10 @@ public class ListS3 extends AbstractS3Processor {
         FlowFile original = session.get();
         String prefix;
         if (original == null) {
+            prefix = context.getProperty(PREFIX).evaluateAttributeExpressions().getValue();
+        } else {
             prefix = context.getProperty(PREFIX).evaluateAttributeExpressions(original).getValue();
             session.remove(original);
-        } else {
-            prefix = context.getProperty(PREFIX).evaluateAttributeExpressions().getValue();
         }
 
         boolean useVersions = context.getProperty(USE_VERSIONS).asBoolean();
