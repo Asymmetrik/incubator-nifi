@@ -71,7 +71,7 @@ public class ConsumeKafka extends AbstractKafkaProcessor<Consumer<byte[], byte[]
             .description("A Group ID is used to identify consumers that are within the same consumer group. Corresponds to Kafka's 'group.id' property.")
             .required(true)
             .addValidator(StandardValidators.NON_BLANK_VALIDATOR)
-            .expressionLanguageSupported(false)
+            .expressionLanguageSupported(true)
             .build();
     static final PropertyDescriptor AUTO_OFFSET_RESET = new PropertyDescriptor.Builder()
             .name(ConsumerConfig.AUTO_OFFSET_RESET_CONFIG)
