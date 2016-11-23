@@ -213,7 +213,7 @@ public class PutElasticsearchHttp extends AbstractElasticsearchHttpProcessor {
         List<FlowFile> flowFilesToTransfer = new LinkedList<>(flowFiles);
 
         final StringBuilder sb = new StringBuilder();
-        final String baseUrl = trimToEmpty(context.getProperty(ES_URL).getValue());
+        final String baseUrl = trimToEmpty(context.getProperty(ES_URL).evaluateAttributeExpressions().getValue());
         final URL url;
         try {
             url = new URL((baseUrl.endsWith("/") ? baseUrl : baseUrl + "/") + "_bulk");

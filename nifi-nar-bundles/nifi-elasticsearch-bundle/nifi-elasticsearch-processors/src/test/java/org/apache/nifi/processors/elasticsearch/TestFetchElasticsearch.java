@@ -76,9 +76,24 @@ public class TestFetchElasticsearch {
     }
 
     @Test
+    public void testHostnameExpressionLanguage() throws IOException {
+        runner = TestRunners.newTestRunner(new FetchElasticsearchTestProcessor(true)); // all docs are found
+        runner.setProperty(AbstractElasticsearchTransportClientProcessor.CLUSTER_NAME, "elasticsearch");
+        runner.setProperty(AbstractElasticsearchTransportClientProcessor.HOSTS, "${xxx}");
+        runner.setProperty(AbstractElasticsearchTransportClientProcessor.PING_TIMEOUT, "5s");
+        runner.setProperty(AbstractElasticsearchTransportClientProcessor.SAMPLER_INTERVAL, "5s");
+
+        runner.setProperty(FetchElasticsearch.INDEX, "doc");
+        runner.setProperty(FetchElasticsearch.TYPE, "status");
+        runner.setProperty(FetchElasticsearch.DOC_ID, "${doc_id}");
+
+        runner.assertValid();
+    }
+
+    @Test
     public void testFetchElasticsearchOnTrigger() throws IOException {
         runner = TestRunners.newTestRunner(new FetchElasticsearchTestProcessor(true)); // all docs are found
-        runner.setValidateExpressionUsage(true);
+        runner.setValidateExpressionUsage(false);
         runner.setProperty(AbstractElasticsearchTransportClientProcessor.CLUSTER_NAME, "elasticsearch");
         runner.setProperty(AbstractElasticsearchTransportClientProcessor.HOSTS, "127.0.0.1:9300");
         runner.setProperty(AbstractElasticsearchTransportClientProcessor.PING_TIMEOUT, "5s");
@@ -111,7 +126,7 @@ public class TestFetchElasticsearch {
         runner.setProperty(AbstractElasticsearchTransportClientProcessor.SAMPLER_INTERVAL, "5s");
         runner.setProperty(FetchElasticsearch.INDEX, "doc");
         runner.setProperty(FetchElasticsearch.TYPE, "status");
-        runner.setValidateExpressionUsage(true);
+        runner.setValidateExpressionUsage(false);
         runner.setProperty(FetchElasticsearch.DOC_ID, "${doc_id}");
 
         runner.enqueue(docExample, new HashMap<String, String>() {{
@@ -135,7 +150,7 @@ public class TestFetchElasticsearch {
         runner.setProperty(AbstractElasticsearchTransportClientProcessor.SAMPLER_INTERVAL, "5s");
         runner.setProperty(FetchElasticsearch.INDEX, "doc");
         runner.setProperty(FetchElasticsearch.TYPE, "status");
-        runner.setValidateExpressionUsage(true);
+        runner.setValidateExpressionUsage(false);
         runner.setProperty(FetchElasticsearch.DOC_ID, "${doc_id}");
 
         runner.assertNotValid();
@@ -151,7 +166,7 @@ public class TestFetchElasticsearch {
         runner.setProperty(AbstractElasticsearchTransportClientProcessor.SAMPLER_INTERVAL, "5s");
         runner.setProperty(FetchElasticsearch.INDEX, "doc");
         runner.setProperty(FetchElasticsearch.TYPE, "status");
-        runner.setValidateExpressionUsage(true);
+        runner.setValidateExpressionUsage(false);
         runner.setProperty(FetchElasticsearch.DOC_ID, "${doc_id}");
 
         // No Node Available exception
@@ -236,7 +251,7 @@ public class TestFetchElasticsearch {
         runner.setProperty(AbstractElasticsearchTransportClientProcessor.SAMPLER_INTERVAL, "5s");
         runner.setProperty(FetchElasticsearch.INDEX, "doc");
         runner.setProperty(FetchElasticsearch.TYPE, "status");
-        runner.setValidateExpressionUsage(true);
+        runner.setValidateExpressionUsage(false);
         runner.setProperty(FetchElasticsearch.DOC_ID, "${doc_id}");
 
         // Allow time for the controller service to fully initialize
@@ -344,7 +359,7 @@ public class TestFetchElasticsearch {
         System.out.println("Starting test " + new Object() {
         }.getClass().getEnclosingMethod().getName());
         final TestRunner runner = TestRunners.newTestRunner(new FetchElasticsearch());
-        runner.setValidateExpressionUsage(true);
+        runner.setValidateExpressionUsage(false);
 
         //Local Cluster - Mac pulled from brew
         runner.setProperty(AbstractElasticsearchTransportClientProcessor.CLUSTER_NAME, "elasticsearch_brew");
@@ -375,7 +390,7 @@ public class TestFetchElasticsearch {
         System.out.println("Starting test " + new Object() {
         }.getClass().getEnclosingMethod().getName());
         final TestRunner runner = TestRunners.newTestRunner(new FetchElasticsearch());
-        runner.setValidateExpressionUsage(true);
+        runner.setValidateExpressionUsage(false);
 
         //Local Cluster - Mac pulled from brew
         runner.setProperty(AbstractElasticsearchTransportClientProcessor.CLUSTER_NAME, "elasticsearch_brew");

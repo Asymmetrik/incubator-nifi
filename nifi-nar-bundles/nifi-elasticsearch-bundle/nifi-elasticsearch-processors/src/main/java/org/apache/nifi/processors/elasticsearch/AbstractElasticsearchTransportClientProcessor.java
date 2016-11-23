@@ -53,13 +53,15 @@ public abstract class AbstractElasticsearchTransportClientProcessor extends Abst
     private static final Validator HOSTNAME_PORT_VALIDATOR = new Validator() {
         @Override
         public ValidationResult validate(final String subject, final String input, final ValidationContext context) {
-            final List<String> esList = Arrays.asList(input.split(","));
-            for (String hostnamePort : esList) {
-                String[] addresses = hostnamePort.split(":");
-                // Protect against invalid input like http://127.0.0.1:9300 (URL scheme should not be there)
-                if (addresses.length != 2) {
-                    return new ValidationResult.Builder().subject(subject).input(input).explanation(
-                            "Must be in hostname:port form (no scheme such as http://").valid(false).build();
+            if (!input.startsWith("${")) {
+                final List<String> esList = Arrays.asList(input.split(","));
+                for (String hostnamePort : esList) {
+                    String[] addresses = hostnamePort.split(":");
+                    // Protect against invalid input like http://127.0.0.1:9300 (URL scheme should not be there)
+                    if (addresses.length != 2) {
+                        return new ValidationResult.Builder().subject(subject).input(input).explanation(
+                                "Must be in hostname:port form (no scheme such as http://").valid(false).build();
+                    }
                 }
             }
             return new ValidationResult.Builder().subject(subject).input(input).explanation(
@@ -71,6 +73,7 @@ public abstract class AbstractElasticsearchTransportClientProcessor extends Abst
             .name("Cluster Name")
             .description("Name of the ES cluster (for example, elasticsearch_brew). Defaults to 'elasticsearch'")
             .required(true)
+            .expressionLanguageSupported(true)
             .addValidator(StandardValidators.NON_EMPTY_VALIDATOR)
             .defaultValue("elasticsearch")
             .build();
@@ -81,7 +84,7 @@ public abstract class AbstractElasticsearchTransportClientProcessor extends Abst
                     + "host1:port,host2:port,....  For example testcluster:9300. This processor uses the Transport Client to "
                     + "connect to hosts. The default transport client port is 9300.")
             .required(true)
-            .expressionLanguageSupported(false)
+            .expressionLanguageSupported(true)
             .addValidator(HOSTNAME_PORT_VALIDATOR)
             .build();
 
@@ -135,7 +138,7 @@ public abstract class AbstractElasticsearchTransportClientProcessor extends Abst
 
         log.debug("Creating ElasticSearch Client");
         try {
-            final String clusterName = context.getProperty(CLUSTER_NAME).getValue();
+            final String clusterName = context.getProperty(CLUSTER_NAME).evaluateAttributeExpressions().getValue();
             final String pingTimeout = context.getProperty(PING_TIMEOUT).getValue();
             final String samplerInterval = context.getProperty(SAMPLER_INTERVAL).getValue();
             final String username = context.getProperty(USERNAME).getValue();
@@ -171,7 +174,7 @@ public abstract class AbstractElasticsearchTransportClientProcessor extends Abst
 
             TransportClient transportClient = getTransportClient(settingsBuilder, shieldUrl, username, password);
 
-            final String hosts = context.getProperty(HOSTS).getValue();
+            final String hosts = context.getProperty(HOSTS).evaluateAttributeExpressions().getValue();
             esHosts = getEsHosts(hosts);
 
             if (esHosts != null) {
