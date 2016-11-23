@@ -111,7 +111,7 @@ public class PutKafka extends AbstractKafkaProcessor<KafkaPublisher> {
             .description("A comma-separated list of known Kafka Brokers in the format <host>:<port>")
             .required(true)
             .addValidator(StandardValidators.createRegexMatchingValidator(Pattern.compile(BROKER_REGEX)))
-            .expressionLanguageSupported(false)
+            .expressionLanguageSupported(true)
             .build();
     public static final PropertyDescriptor TOPIC = new PropertyDescriptor.Builder()
             .name("Topic Name")
@@ -478,7 +478,7 @@ public class PutKafka extends AbstractKafkaProcessor<KafkaPublisher> {
     private Properties buildKafkaConfigProperties(final ProcessContext context) {
         Properties properties = new Properties();
         String timeout = String.valueOf(context.getProperty(TIMEOUT).asTimePeriod(TimeUnit.MILLISECONDS).longValue());
-        properties.setProperty("bootstrap.servers", context.getProperty(SEED_BROKERS).getValue());
+        properties.setProperty("bootstrap.servers", context.getProperty(SEED_BROKERS).evaluateAttributeExpressions().getValue());
         properties.setProperty("acks", context.getProperty(DELIVERY_GUARANTEE).getValue());
         properties.setProperty("buffer.memory", String.valueOf(context.getProperty(MAX_BUFFER_SIZE).asDataSize(DataUnit.B).longValue()));
         properties.setProperty("compression.type", context.getProperty(COMPRESSION_CODEC).getValue());
