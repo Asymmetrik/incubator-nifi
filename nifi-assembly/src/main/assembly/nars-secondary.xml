@@ -42,7 +42,7 @@
                 <include>nifi-social-media-nar</include>
                 <include>nifi-hl7-nar</include>
                 <include>nifi-language-translation-nar</include>
-                <include>nifi-geo-nar</include>
+                <include>nifi-enrich-nar</include>
                 <include>nifi-ambari-nar</include>
                 <include>nifi-avro-nar</include>
                 <include>nifi-media-nar</include>
@@ -61,6 +61,12 @@
                 <include>nifi-hive-nar</include>
                 <include>nifi-mqtt-nar</include>
                 <include>nifi-snmp-nar</include>
+                <include>nifi-datadog-nar</include>
+                <include>nifi-email-nar</include>
+                <include>nifi-evtx-nar</include>
+                <include>nifi-ignite-nar</include>
+                <include>nifi-site-to-site-reporting-nar</include>
+                <include>nifi-windows-event-log-nar</include>
             </includes>
         </dependencySet>
     </dependencySets>
