@@ -29,6 +29,7 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.TimeUnit;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -85,6 +86,7 @@ public class ScanAttribute extends AbstractProcessor {
             .name("Dictionary File")
             .description("A new-line-delimited text file that includes the terms that should trigger a match. Empty lines are ignored.")
             .required(true)
+            .expressionLanguageSupported(true)
             .addValidator(StandardValidators.FILE_EXISTS_VALIDATOR)
             .build();
     public static final PropertyDescriptor DICTIONARY_FILTER = new PropertyDescriptor.Builder()
@@ -97,6 +99,20 @@ public class ScanAttribute extends AbstractProcessor {
             .addValidator(StandardValidators.createRegexValidator(0, 1, false))
             .defaultValue(null)
             .build();
+    public static final PropertyDescriptor FILE_WATCH_INTERVAL = new PropertyDescriptor.Builder()
+            .name("Dictionary File Watch Interval")
+            .description("Interval to check for updates to Dictionary File. If zero, will always check")
+            .required(true)
+            .addValidator(StandardValidators.TIME_PERIOD_VALIDATOR)
+            .defaultValue("1 sec")
+            .build();
+    public static final PropertyDescriptor BATCH_SIZE = new PropertyDescriptor.Builder()
+            .name("Batch Size")
+            .description("The maximum number of FlowFiles to process at a time")
+            .required(true)
+            .addValidator(StandardValidators.POSITIVE_INTEGER_VALIDATOR)
+            .defaultValue("50")
+            .build();
 
     private List<PropertyDescriptor> properties;
     private Set<Relationship> relationships;
@@ -105,6 +121,7 @@ public class ScanAttribute extends AbstractProcessor {
     private volatile Pattern attributePattern = null;
     private volatile Set<String> dictionaryTerms = null;
     private volatile SynchronousFileWatcher fileWatcher = null;
+    private volatile int batchSize;
 
     public static final Relationship REL_MATCHED = new Relationship.Builder()
             .name("matched")
@@ -122,6 +139,8 @@ public class ScanAttribute extends AbstractProcessor {
         properties.add(ATTRIBUTE_PATTERN);
         properties.add(MATCHING_CRITERIA);
         properties.add(DICTIONARY_FILTER);
+        properties.add(FILE_WATCH_INTERVAL);
+        properties.add(BATCH_SIZE);
         this.properties = Collections.unmodifiableList(properties);
 
         final Set<Relationship> relationships = new HashSet<>();
@@ -149,13 +168,16 @@ public class ScanAttribute extends AbstractProcessor {
         this.attributePattern = (attributeRegex.equals(".*")) ? null : Pattern.compile(attributeRegex);
 
         this.dictionaryTerms = createDictionary(context);
-        this.fileWatcher = new SynchronousFileWatcher(Paths.get(context.getProperty(DICTIONARY_FILE).getValue()), new LastModifiedMonitor(), 1000L);
+        this.fileWatcher = new SynchronousFileWatcher(Paths.get(context.getProperty(DICTIONARY_FILE).evaluateAttributeExpressions().getValue()),
+                new LastModifiedMonitor(), context.getProperty(FILE_WATCH_INTERVAL).asTimePeriod(TimeUnit.MILLISECONDS));
+
+        this.batchSize = context.getProperty(BATCH_SIZE).asInteger();
     }
 
     private Set<String> createDictionary(final ProcessContext context) throws IOException {
         final Set<String> terms = new HashSet<>();
 
-        final File file = new File(context.getProperty(DICTIONARY_FILE).getValue());
+        final File file = new File(context.getProperty(DICTIONARY_FILE).evaluateAttributeExpressions().getValue());
         try (final InputStream fis = new FileInputStream(file);
                 final BufferedReader reader = new BufferedReader(new InputStreamReader(fis))) {
 
@@ -190,7 +212,7 @@ public class ScanAttribute extends AbstractProcessor {
 
     @Override
     public void onTrigger(final ProcessContext context, final ProcessSession session) throws ProcessException {
-        final List<FlowFile> flowFiles = session.get(50);
+        final List<FlowFile> flowFiles = session.get(batchSize);
         if (flowFiles.isEmpty()) {
             return;
         }

@@ -22,13 +22,20 @@ import java.util.Map;
 import org.apache.nifi.util.TestRunner;
 import org.apache.nifi.util.TestRunners;
 
+import org.junit.Before;
 import org.junit.Test;
 
 public class TestScanAttribute {
+    private TestRunner runner;
+
+    @Before
+    public void setup() {
+        runner = TestRunners.newTestRunner(new ScanAttribute());
+        runner.setValidateExpressionUsage(false);
+    }
 
     @Test
     public void testSingleMatch() {
-        final TestRunner runner = TestRunners.newTestRunner(new ScanAttribute());
         runner.setProperty(ScanAttribute.DICTIONARY_FILE, "src/test/resources/ScanAttribute/dictionary1");
 
         final Map<String, String> attributes = new HashMap<>();
@@ -64,7 +71,6 @@ public class TestScanAttribute {
 
     @Test
     public void testAllMatch() {
-        final TestRunner runner = TestRunners.newTestRunner(new ScanAttribute());
         runner.setProperty(ScanAttribute.DICTIONARY_FILE, "src/test/resources/ScanAttribute/dictionary1");
         runner.setProperty(ScanAttribute.MATCHING_CRITERIA, ScanAttribute.MATCH_CRITERIA_ALL);
         runner.setProperty(ScanAttribute.ATTRIBUTE_PATTERN, "a.*");
@@ -101,7 +107,6 @@ public class TestScanAttribute {
 
     @Test
     public void testWithEmptyEntries() {
-        final TestRunner runner = TestRunners.newTestRunner(new ScanAttribute());
         runner.setProperty(ScanAttribute.DICTIONARY_FILE, "src/test/resources/ScanAttribute/dictionary-with-empty-new-lines");
 
         final Map<String, String> attributes = new HashMap<>();
@@ -121,7 +126,6 @@ public class TestScanAttribute {
 
     @Test
     public void testWithDictionaryFilter() {
-        final TestRunner runner = TestRunners.newTestRunner(new ScanAttribute());
         runner.setProperty(ScanAttribute.DICTIONARY_FILE, "src/test/resources/ScanAttribute/dictionary-with-extra-info");
         runner.setProperty(ScanAttribute.DICTIONARY_FILTER, "(.*)<greeting>");
 
@@ -144,5 +148,19 @@ public class TestScanAttribute {
         runner.run();
         runner.assertAllFlowFilesTransferred(ScanAttribute.REL_MATCHED, 1);
         runner.clearTransferState();
+    }
+
+    @Test
+    public void testInvalidBatchSize() {
+        runner.setProperty(ScanAttribute.DICTIONARY_FILE, "src/test/resources/ScanAttribute/dictionary1");
+        runner.setProperty(ScanAttribute.BATCH_SIZE, "0");
+        runner.assertNotValid();
+    }
+
+    @Test
+    public void testInvalidWatchInterval() {
+        runner.setProperty(ScanAttribute.DICTIONARY_FILE, "src/test/resources/ScanAttribute/dictionary1");
+        runner.setProperty(ScanAttribute.FILE_WATCH_INTERVAL, "xyz");
+        runner.assertNotValid();
     }
 }
