@@ -35,6 +35,7 @@ public class TestPutKinesisStream {
     @Before
     public void setUp() throws Exception {
         runner = TestRunners.newTestRunner(PutKinesisStream.class);
+        runner.setValidateExpressionUsage(false);
         runner.setProperty(PutKinesisStream.ACCESS_KEY, "abcd");
         runner.setProperty(PutKinesisStream.SECRET_KEY, "secret key");
         runner.setProperty(PutKinesisStream.KINESIS_STREAM_NAME, "kstream");
