@@ -20,12 +20,14 @@ package org.apache.nifi.hbase;
 import java.io.BufferedInputStream;
 import java.io.IOException;
 import java.io.InputStream;
+import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Set;
+import java.util.concurrent.atomic.AtomicReference;
 
 import org.apache.commons.lang3.StringUtils;
 import org.apache.nifi.annotation.behavior.EventDriven;
@@ -46,7 +48,6 @@ import org.apache.nifi.processor.Relationship;
 import org.apache.nifi.processor.exception.ProcessException;
 import org.apache.nifi.processor.io.InputStreamCallback;
 import org.apache.nifi.processor.util.StandardValidators;
-import org.apache.nifi.util.ObjectHolder;
 import org.codehaus.jackson.JsonNode;
 import org.codehaus.jackson.map.ObjectMapper;
 
@@ -89,8 +90,7 @@ public class PutHBaseJSON extends AbstractPutHBase {
             .defaultValue(COMPLEX_FIELD_TEXT.getValue())
             .build();
 
-    protected static final String STRING_ENCODING_VALUE = "String";
-    protected static final String BYTES_ENCODING_VALUE = "Bytes";
+
 
     protected static final AllowableValue FIELD_ENCODING_STRING = new AllowableValue(STRING_ENCODING_VALUE, STRING_ENCODING_VALUE,
             "Stores the value of each field as a UTF-8 String.");
@@ -115,6 +115,7 @@ public class PutHBaseJSON extends AbstractPutHBase {
         properties.add(TABLE_NAME);
         properties.add(ROW_ID);
         properties.add(ROW_FIELD_NAME);
+        properties.add(ROW_ID_ENCODING_STRATEGY);
         properties.add(COLUMN_FAMILY);
         properties.add(BATCH_SIZE);
         properties.add(COMPLEX_FIELD_STRATEGY);
@@ -163,10 +164,11 @@ public class PutHBaseJSON extends AbstractPutHBase {
         final boolean extractRowId = !StringUtils.isBlank(rowFieldName);
         final String complexFieldStrategy = context.getProperty(COMPLEX_FIELD_STRATEGY).getValue();
         final String fieldEncodingStrategy = context.getProperty(FIELD_ENCODING_STRATEGY).getValue();
+        final String rowIdEncodingStrategy = context.getProperty(ROW_ID_ENCODING_STRATEGY).getValue();
 
         // Parse the JSON document
         final ObjectMapper mapper = new ObjectMapper();
-        final ObjectHolder<JsonNode> rootNodeRef = new ObjectHolder<>(null);
+        final AtomicReference<JsonNode> rootNodeRef = new AtomicReference<>(null);
         try {
             session.read(flowFile, new InputStreamCallback() {
                 @Override
@@ -189,13 +191,13 @@ public class PutHBaseJSON extends AbstractPutHBase {
         }
 
         final Collection<PutColumn> columns = new ArrayList<>();
-        final ObjectHolder<String> rowIdHolder = new ObjectHolder<>(null);
+        final AtomicReference<String> rowIdHolder = new AtomicReference<>(null);
 
         // convert each field/value to a column for the put, skip over nulls and arrays
         final Iterator<String> fieldNames = rootNode.getFieldNames();
         while (fieldNames.hasNext()) {
             final String fieldName = fieldNames.next();
-            final ObjectHolder<byte[]> fieldValueHolder = new ObjectHolder<>(null);
+            final AtomicReference<byte[]> fieldValueHolder = new AtomicReference<>(null);
 
             final JsonNode fieldNode = rootNode.get(fieldName);
             if (fieldNode.isNull()) {
@@ -236,7 +238,7 @@ public class PutHBaseJSON extends AbstractPutHBase {
                 if (extractRowId && fieldName.equals(rowFieldName)) {
                     rowIdHolder.set(fieldNode.asText());
                 } else {
-                    columns.add(new PutColumn(columnFamily, fieldName, fieldValueHolder.get()));
+                    columns.add(new PutColumn(columnFamily.getBytes(StandardCharsets.UTF_8), fieldName.getBytes(StandardCharsets.UTF_8), fieldValueHolder.get()));
                 }
             }
         }
@@ -250,7 +252,9 @@ public class PutHBaseJSON extends AbstractPutHBase {
         }
 
         final String putRowId = (extractRowId ? rowIdHolder.get() : rowId);
-        return new PutFlowFile(tableName, putRowId, columns, flowFile);
+
+        byte[] rowKeyBytes = getRow(putRowId,context.getProperty(ROW_ID_ENCODING_STRATEGY).getValue());
+        return new PutFlowFile(tableName, rowKeyBytes, columns, flowFile);
     }
 
     /*

@@ -16,17 +16,17 @@
  */
 package org.apache.nifi.processors.lumberjack.handler;
 
-import org.apache.nifi.logging.ProcessorLog;
+import java.nio.channels.SelectionKey;
+import java.nio.channels.SocketChannel;
+import java.nio.charset.Charset;
+import java.util.concurrent.BlockingQueue;
+
+import org.apache.nifi.logging.ComponentLog;
 import org.apache.nifi.processor.util.listen.dispatcher.AsyncChannelDispatcher;
 import org.apache.nifi.processor.util.listen.event.Event;
 import org.apache.nifi.processor.util.listen.event.EventFactory;
 import org.apache.nifi.processor.util.listen.handler.ChannelHandler;
 import org.apache.nifi.processor.util.listen.handler.ChannelHandlerFactory;
-
-import java.nio.channels.SelectionKey;
-import java.nio.channels.SocketChannel;
-import java.nio.charset.Charset;
-import java.util.concurrent.BlockingQueue;
 
 /**
  * Default factory for creating Lumberjack socket channel handlers.
@@ -39,7 +39,7 @@ public class LumberjackSocketChannelHandlerFactory<E extends Event<SocketChannel
                                            final Charset charset,
                                            final EventFactory<E> eventFactory,
                                            final BlockingQueue<E> events,
-                                           final ProcessorLog logger) {
+                                           final ComponentLog logger) {
         return new LumberjackSocketChannelHandler<>(key, dispatcher, charset, eventFactory, events, logger);
     }
 
@@ -49,7 +49,7 @@ public class LumberjackSocketChannelHandlerFactory<E extends Event<SocketChannel
                                               final Charset charset,
                                               final EventFactory<E> eventFactory,
                                               final BlockingQueue<E> events,
-                                              final ProcessorLog logger) {
+                                              final ComponentLog logger) {
         return new LumberjackSSLSocketChannelHandler<>(key, dispatcher, charset, eventFactory, events, logger);
     }
 

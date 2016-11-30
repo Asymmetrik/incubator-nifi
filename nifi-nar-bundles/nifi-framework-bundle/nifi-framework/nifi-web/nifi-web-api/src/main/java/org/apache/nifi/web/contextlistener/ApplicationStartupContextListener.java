@@ -16,10 +16,9 @@
  */
 package org.apache.nifi.web.contextlistener;
 
-import java.io.IOException;
-import javax.servlet.ServletContextEvent;
-import javax.servlet.ServletContextListener;
-import org.apache.nifi.cluster.manager.impl.WebClusterManager;
+import org.apache.nifi.authentication.LoginIdentityProvider;
+import org.apache.nifi.authorization.Authorizer;
+import org.apache.nifi.cluster.coordination.http.replication.RequestReplicator;
 import org.apache.nifi.controller.FlowController;
 import org.apache.nifi.controller.repository.RepositoryPurgeException;
 import org.apache.nifi.services.FlowService;
@@ -30,6 +29,10 @@ import org.slf4j.LoggerFactory;
 import org.springframework.beans.BeansException;
 import org.springframework.context.ApplicationContext;
 import org.springframework.web.context.support.WebApplicationContextUtils;
+
+import javax.servlet.ServletContextEvent;
+import javax.servlet.ServletContextListener;
+import java.io.IOException;
 
 /**
  * Application context listener for starting the application. If the application is configured for a standalone environment or the application is a node in a clustered environment then a flow
@@ -45,105 +48,88 @@ public class ApplicationStartupContextListener implements ServletContextListener
 
         ApplicationContext ctx = WebApplicationContextUtils.getWebApplicationContext(sce.getServletContext());
         NiFiProperties properties = ctx.getBean("nifiProperties", NiFiProperties.class);
-        if (properties.isClusterManager()) {
-            try {
+        FlowService flowService = null;
+        try {
+            flowService = ctx.getBean("flowService", FlowService.class);
+            final FlowController flowController = ctx.getBean("flowController", FlowController.class);
 
-                logger.info("Starting Cluster Manager...");
+            // start and load the flow if we're not clustered (clustered flow loading should
+            // happen once the application (wars) is fully loaded and initialized). non clustered
+            // nifi instance need to load the flow before the application (wars) are fully loaded.
+            // during the flow loading (below) the flow controller is lazily initialized. when the
+            // flow is loaded after the application is completely initialized (wars deploy), as
+            // required with a clustered node, users are able to make web requests before the flow
+            // is loaded (and the flow controller is initialized) which shouldn't be allowed. moving
+            // the flow loading here when not clustered resolves this.
+            if (!properties.isNode()) {
+                logger.info("Starting Flow Controller...");
 
-                WebClusterManager clusterManager = ctx.getBean("clusterManager", WebClusterManager.class);
-                clusterManager.start();
+                // start and load the flow
+                flowService.start();
+                flowService.load(null);
 
-                logger.info("Cluster Manager started successfully.");
-            } catch (final BeansException | IOException e) {
-                throw new NiFiCoreException("Unable to start Cluster Manager.", e);
+                /*
+                 * Start up all processors if specified.
+                 *
+                 * When operating as the node, the cluster manager controls
+                 * which processors should start. As part of the flow
+                 * reloading actions, the node will start the necessary
+                 * processors.
+                 */
+                flowController.onFlowInitialized(properties.getAutoResumeState());
+
+                logger.info("Flow Controller started successfully.");
             }
-
-        } else {
-            FlowService flowService = null;
-            try {
-                flowService = ctx.getBean("flowService", FlowService.class);
-
-                // start and load the flow if we're not clustered (clustered flow loading should
-                // happen once the application (wars) is fully loaded and initialized). non clustered
-                // nifi instance need to load the flow before the application (wars) are fully loaded.
-                // during the flow loading (below) the flow controller is lazily initialized. when the
-                // flow is loaded after the application is completely initialized (wars deploy), as
-                // required with a clustered node, users are able to make web requests before the flow
-                // is loaded (and the flow controller is initialized) which shouldn't be allowed. moving
-                // the flow loading here when not clustered resolves this.
-                if (!properties.isNode()) {
-                    logger.info("Starting Flow Controller...");
-
-                    // start and load the flow
-                    flowService.start();
-                    flowService.load(null);
-
-                    /*
-                     * Start up all processors if specified.
-                     *
-                     * When operating as the node, the cluster manager controls
-                     * which processors should start. As part of the flow
-                     * reloading actions, the node will start the necessary
-                     * processors.
-                     */
-                    final FlowController flowController = flowService.getController();
-                    flowController.onFlowInitialized(properties.getAutoResumeState());
-
-                    logger.info("Flow Controller started successfully.");
-                }
-            } catch (BeansException | RepositoryPurgeException | IOException e) {
-                // ensure the flow service is terminated
-                if (flowService != null && flowService.isRunning()) {
-                    flowService.stop(false);
-                }
-                throw new NiFiCoreException("Unable to start Flow Controller.", e);
-            }
+        } catch (BeansException | RepositoryPurgeException | IOException e) {
+            shutdown(flowService, ctx.getBean("requestReplicator", RequestReplicator.class));
+            throw new NiFiCoreException("Unable to start Flow Controller.", e);
         }
 
+        try {
+            // attempt to get a few beans that we want to to ensure properly created since they are lazily initialized
+            ctx.getBean("loginIdentityProvider", LoginIdentityProvider.class);
+            ctx.getBean("authorizer", Authorizer.class);
+        } catch (final BeansException e) {
+            shutdown(flowService, ctx.getBean("requestReplicator", RequestReplicator.class));
+            throw new NiFiCoreException("Unable to start Flow Controller.", e);
+        }
     }
 
     @Override
     public void contextDestroyed(ServletContextEvent sce) {
         ApplicationContext ctx = WebApplicationContextUtils.getWebApplicationContext(sce.getServletContext());
-        NiFiProperties properties = ctx.getBean("nifiProperties", NiFiProperties.class);
-        if (properties.isClusterManager()) {
-            try {
-                logger.info("Initiating shutdown of Cluster Manager...");
 
-                WebClusterManager clusterManager = ctx.getBean("clusterManager", WebClusterManager.class);
-                clusterManager.stop();
+        logger.info("Initiating shutdown of flow service...");
+        shutdown(ctx.getBean("flowService", FlowService.class), ctx.getBean("requestReplicator", RequestReplicator.class));
+        logger.info("Flow service termination completed.");
+    }
 
-                logger.info("Cluster Manager termination completed.");
-            } catch (final BeansException | IOException e) {
-                String msg = "Problem occured ensuring Cluster Manager was properly terminated due to " + e;
-                if (logger.isDebugEnabled()) {
-                    logger.warn(msg, e);
-                } else {
-                    logger.warn(msg);
-                }
+    private void shutdown(final FlowService flowService, final RequestReplicator requestReplicator) {
+        try {
+            // ensure the flow service is terminated
+            if (flowService != null && flowService.isRunning()) {
+                flowService.stop(false);
             }
-        } else {
-            try {
+        } catch (final Exception e) {
+            final String msg = "Problem occurred ensuring flow controller or repository was properly terminated due to " + e;
+            if (logger.isDebugEnabled()) {
+                logger.warn(msg, e);
+            } else {
+                logger.warn(msg);
+            }
+        }
 
-                logger.info("Initiating shutdown of flow service...");
-
-                FlowService flowService = ctx.getBean("flowService", FlowService.class);
-                if (flowService.isRunning()) {
-                    flowService.stop(/**
-                             * force
-                             */
-                            false);
-                }
-
-                logger.info("Flow service termination completed.");
-
-            } catch (final Exception e) {
-                String msg = "Problem occurred ensuring flow controller or repository was properly terminated due to " + e;
-                if (logger.isDebugEnabled()) {
-                    logger.warn(msg, e);
-                } else {
-                    logger.warn(msg);
-                }
+        try {
+            // ensure the request replicator is shutdown
+            if (requestReplicator != null) {
+                requestReplicator.shutdown();
+            }
+        } catch (final Exception e) {
+            final String msg = "Problem occurred ensuring request replicator was properly terminated due to " + e;
+            if (logger.isDebugEnabled()) {
+                logger.warn(msg, e);
+            } else {
+                logger.warn(msg);
             }
         }
     }

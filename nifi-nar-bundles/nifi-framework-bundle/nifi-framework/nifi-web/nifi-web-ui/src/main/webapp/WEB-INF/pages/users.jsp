@@ -30,15 +30,19 @@
         <link rel="stylesheet" href="js/jquery/ui-smoothness/jquery-ui-1.10.4.min.css" type="text/css" />
         <link rel="stylesheet" href="js/jquery/slickgrid/css/slick.grid.css" type="text/css" />
         <link rel="stylesheet" href="js/jquery/slickgrid/css/slick-default-theme.css" type="text/css" />
+        <link rel="stylesheet" href="fonts/flowfont/flowfont.css" type="text/css" />
+        <link rel="stylesheet" href="assets/font-awesome/css/font-awesome.min.css" type="text/css" />
+        <script type="text/javascript" src="js/d3/d3.min.js"></script>
         <script type="text/javascript" src="js/jquery/jquery-2.1.1.min.js"></script>
+        <script type="text/javascript" src="js/jquery/ui-smoothness/jquery-ui-1.10.4.min.js"></script>
         <script type="text/javascript" src="js/jquery/jquery.base64.js"></script>
         <script type="text/javascript" src="js/jquery/jquery.center.js"></script>
         <script type="text/javascript" src="js/jquery/tabbs/jquery.tabbs.js?${project.version}"></script>
         <script type="text/javascript" src="js/jquery/combo/jquery.combo.js?${project.version}"></script>
+        <script type="text/javascript" src="js/jquery/propertytable/jquery.propertytable.js?${project.version}"></script>
         <script type="text/javascript" src="js/jquery/modal/jquery.modal.js?${project.version}"></script>
         <script type="text/javascript" src="js/jquery/jquery.ellipsis.js"></script>
         <script type="text/javascript" src="js/jquery/jquery.each.js"></script>
-        <script type="text/javascript" src="js/jquery/ui-smoothness/jquery-ui-1.10.4.min.js"></script>
         <script type="text/javascript" src="js/jquery/qtip2/jquery.qtip.min.js"></script>
         <script type="text/javascript" src="js/jquery/jquery.event.drag-2.2.min.js"></script>
         <script type="text/javascript" src="js/jquery/slickgrid/plugins/slick.cellrangeselector.js"></script>
@@ -51,22 +55,18 @@
         <script type="text/javascript" src="js/jquery/slickgrid/slick.core.js"></script>
         <script type="text/javascript" src="js/jquery/slickgrid/slick.grid.js"></script>
         <script type="text/javascript" src="js/nf/nf-namespace.js?${project.version}"></script>
+        <script type="text/javascript" src="js/nf/nf-ng-namespace.js?${project.version}"></script>
         ${nf.users.script.tags}
+        <script type="text/javascript" src="js/jquery/nfeditor/languages/nfel.js?${project.version}"></script>
+        <script type="text/javascript" src="js/jquery/nfeditor/jquery.nfeditor.js?${project.version}"></script>
     </head>
-    <body>
+    <body ng-controller="ngSummaryAppCtrl">
         <jsp:include page="/WEB-INF/partials/message-pane.jsp"/>
         <jsp:include page="/WEB-INF/partials/banners-utility.jsp"/>
-        <jsp:include page="/WEB-INF/partials/yes-no-dialog.jsp"/>
         <jsp:include page="/WEB-INF/partials/ok-dialog.jsp"/>
-        <jsp:include page="/WEB-INF/partials/users/users-content.jsp"/>
-        <jsp:include page="/WEB-INF/partials/users/user-details-dialog.jsp"/>
-        <jsp:include page="/WEB-INF/partials/users/user-roles-dialog.jsp"/>
-        <jsp:include page="/WEB-INF/partials/users/group-roles-dialog.jsp"/>
+        <jsp:include page="/WEB-INF/partials/users/user-dialog.jsp"/>
+        <jsp:include page="/WEB-INF/partials/users/user-policies-dialog.jsp"/>
         <jsp:include page="/WEB-INF/partials/users/user-delete-dialog.jsp"/>
-        <jsp:include page="/WEB-INF/partials/users/user-revoke-dialog.jsp"/>
-        <jsp:include page="/WEB-INF/partials/users/group-revoke-dialog.jsp"/>
-        <jsp:include page="/WEB-INF/partials/users/user-group-dialog.jsp"/>
-        <div id="faded-background"></div>
-        <div id="glass-pane"></div>
+        <jsp:include page="/WEB-INF/partials/users/users-content.jsp"/>
     </body>
 </html>

@@ -44,7 +44,7 @@
                 <include>slf4j-api</include>
             </includes>
         </dependencySet>
-        
+
         <!-- Write out the bootstrap lib component to its own dir -->
         <dependencySet>
             <scope>runtime</scope>
@@ -54,13 +54,13 @@
             <fileMode>0660</fileMode>
             <useTransitiveFiltering>true</useTransitiveFiltering>
             <includes>
-            	<include>nifi-bootstrap</include>
-            	<include>slf4j-api</include>
-            	<include>logback-classic</include>
-            	<include>nifi-api</include>
+                <include>nifi-bootstrap</include>
+                <include>slf4j-api</include>
+                <include>logback-classic</include>
+                <include>nifi-api</include>
             </includes>
         </dependencySet>
-        
+
         <!-- Write out the conf directory contents -->
         <dependencySet>
             <scope>runtime</scope>
@@ -70,7 +70,7 @@
             <fileMode>0664</fileMode>
             <useTransitiveFiltering>true</useTransitiveFiltering>
             <includes>
-            	<include>nifi-resources</include>
+                <include>nifi-resources</include>
             </includes>
             <unpack>true</unpack>
             <unpackOptions>
@@ -90,7 +90,7 @@
             <fileMode>0770</fileMode>
             <useTransitiveFiltering>true</useTransitiveFiltering>
             <includes>
-            	<include>nifi-resources</include>
+                <include>nifi-resources</include>
             </includes>
             <unpack>true</unpack>
             <unpackOptions>
@@ -100,7 +100,7 @@
                 </includes>
             </unpackOptions>
         </dependencySet>
-        
+
         <!-- Writes out the docs directory contents -->
         <dependencySet>
             <scope>runtime</scope>
@@ -108,7 +108,7 @@
             <outputDirectory>docs/</outputDirectory>
             <useTransitiveFiltering>true</useTransitiveFiltering>
             <includes>
-            	<include>nifi-docs</include>
+                <include>nifi-docs</include>
             </includes>
             <unpack>true</unpack>
             <unpackOptions>
@@ -119,7 +119,7 @@
                   <exclude>NOTICE</exclude>
                 </excludes>
             </unpackOptions>
-        </dependencySet>                
+        </dependencySet>
     </dependencySets>
     <files>
         <file>
@@ -135,7 +135,7 @@
             <destName>LICENSE</destName>
             <fileMode>0644</fileMode>
             <filtered>true</filtered>
-        </file>       
+        </file>
         <file>
             <source>./NOTICE</source>
             <outputDirectory>./</outputDirectory>

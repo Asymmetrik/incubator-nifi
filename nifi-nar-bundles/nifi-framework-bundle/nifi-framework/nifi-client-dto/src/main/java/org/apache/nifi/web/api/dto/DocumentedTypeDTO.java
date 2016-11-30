@@ -17,8 +17,9 @@
 package org.apache.nifi.web.api.dto;
 
 import com.wordnik.swagger.annotations.ApiModelProperty;
-import java.util.Set;
+
 import javax.xml.bind.annotation.XmlType;
+import java.util.Set;
 
 /**
  * Class used for providing documentation of a specified type.
@@ -28,6 +29,7 @@ public class DocumentedTypeDTO {
 
     private String type;
     private String description;
+    private String usageRestriction;
     private Set<String> tags;
 
     /**
@@ -45,10 +47,24 @@ public class DocumentedTypeDTO {
     }
 
     /**
+     * @return An optional description of why the usage of this component is restricted
+     */
+    @ApiModelProperty(
+            value = "The description of why the usage of this component is restricted."
+    )
+    public String getUsageRestriction() {
+        return usageRestriction;
+    }
+
+    public void setUsageRestriction(String usageRestriction) {
+        this.usageRestriction = usageRestriction;
+    }
+
+    /**
      * @return The type is the fully-qualified name of a Java class
      */
     @ApiModelProperty(
-            value = "The fulley qualified name of the type."
+            value = "The fully qualified name of the type."
     )
     public String getType() {
         return type;

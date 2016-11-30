@@ -16,16 +16,6 @@
  */
 package org.apache.nifi.processors.lumberjack.handler;
 
-import org.apache.nifi.logging.ProcessorLog;
-import org.apache.nifi.processor.util.listen.dispatcher.AsyncChannelDispatcher;
-import org.apache.nifi.processor.util.listen.event.Event;
-import org.apache.nifi.processor.util.listen.event.EventFactory;
-import org.apache.nifi.processor.util.listen.handler.socket.StandardSocketChannelHandler;
-import org.apache.nifi.processor.util.listen.response.socket.SocketChannelResponder;
-import org.apache.nifi.processors.lumberjack.frame.LumberjackDecoder;
-import org.apache.nifi.processors.lumberjack.frame.LumberjackFrame;
-import org.apache.nifi.processors.lumberjack.frame.LumberjackFrameException;
-
 import java.io.IOException;
 import java.net.InetAddress;
 import java.nio.ByteBuffer;
@@ -34,6 +24,16 @@ import java.nio.channels.SocketChannel;
 import java.nio.charset.Charset;
 import java.util.List;
 import java.util.concurrent.BlockingQueue;
+
+import org.apache.nifi.logging.ComponentLog;
+import org.apache.nifi.processor.util.listen.dispatcher.AsyncChannelDispatcher;
+import org.apache.nifi.processor.util.listen.event.Event;
+import org.apache.nifi.processor.util.listen.event.EventFactory;
+import org.apache.nifi.processor.util.listen.handler.socket.StandardSocketChannelHandler;
+import org.apache.nifi.processor.util.listen.response.socket.SocketChannelResponder;
+import org.apache.nifi.processors.lumberjack.frame.LumberjackDecoder;
+import org.apache.nifi.processors.lumberjack.frame.LumberjackFrame;
+import org.apache.nifi.processors.lumberjack.frame.LumberjackFrameException;
 
 /**
  * Extends the StandardSocketChannelHandler to decode bytes into Lumberjack frames.
@@ -48,7 +48,7 @@ public class LumberjackSocketChannelHandler<E extends Event<SocketChannel>> exte
                                     final Charset charset,
                                     final EventFactory<E> eventFactory,
                                     final BlockingQueue<E> events,
-                                    final ProcessorLog logger) {
+                                    final ComponentLog logger) {
         super(key, dispatcher, charset, eventFactory, events, logger);
         this.decoder = new LumberjackDecoder(charset);
         this.frameHandler = new LumberjackFrameHandler<>(key, charset, eventFactory, events, dispatcher, logger);

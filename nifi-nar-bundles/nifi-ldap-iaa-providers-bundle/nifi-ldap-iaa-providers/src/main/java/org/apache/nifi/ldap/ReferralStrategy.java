@@ -22,7 +22,7 @@ package org.apache.nifi.ldap;
 public enum ReferralStrategy {
 
     FOLLOW("follow"),
-    INGORE("ignore"),
+    IGNORE("ignore"),
     THROW("throw");
 
     private final String value;
@@ -31,8 +31,7 @@ public enum ReferralStrategy {
         this.value = value;
     }
 
-    @Override
-    public String toString() {
+    public String getValue() {
         return value;
     }
 

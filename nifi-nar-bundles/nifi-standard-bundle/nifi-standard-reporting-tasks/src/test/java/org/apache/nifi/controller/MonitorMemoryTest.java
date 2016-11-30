@@ -16,18 +16,11 @@
  */
 package org.apache.nifi.controller;
 
-import static org.junit.Assert.assertTrue;
-import static org.mockito.Mockito.mock;
-
-import java.io.File;
-import java.lang.reflect.Field;
-import java.lang.reflect.Modifier;
-
 import org.apache.commons.io.FileUtils;
 import org.apache.nifi.admin.service.AuditService;
-import org.apache.nifi.admin.service.UserService;
+import org.apache.nifi.authorization.Authorizer;
 import org.apache.nifi.controller.repository.FlowFileEventRepository;
-import org.apache.nifi.provenance.MockProvenanceEventRepository;
+import org.apache.nifi.provenance.MockProvenanceRepository;
 import org.apache.nifi.util.CapturingLogger;
 import org.apache.nifi.util.NiFiProperties;
 import org.junit.After;
@@ -36,6 +29,15 @@ import org.junit.Ignore;
 import org.junit.Test;
 import org.slf4j.Logger;
 
+import java.io.File;
+import java.lang.reflect.Field;
+import java.lang.reflect.Modifier;
+import java.util.HashMap;
+import java.util.Map;
+
+import static org.junit.Assert.assertTrue;
+import static org.mockito.Mockito.mock;
+
 public class MonitorMemoryTest {
 
     private FlowController fc;
@@ -43,10 +45,11 @@ public class MonitorMemoryTest {
     @Before
     public void before() throws Exception {
         System.setProperty("nifi.properties.file.path", "src/test/resources/nifi.properties");
-        NiFiProperties.getInstance().setProperty(NiFiProperties.ADMINISTRATIVE_YIELD_DURATION, "1 sec");
-        NiFiProperties.getInstance().setProperty(NiFiProperties.STATE_MANAGEMENT_CONFIG_FILE, "target/test-classes/state-management.xml");
-        NiFiProperties.getInstance().setProperty(NiFiProperties.STATE_MANAGEMENT_LOCAL_PROVIDER_ID, "local-provider");
-        fc = this.buildFlowControllerForTest();
+        final Map<String, String> addProps = new HashMap<>();
+        addProps.put(NiFiProperties.ADMINISTRATIVE_YIELD_DURATION, "1 sec");
+        addProps.put(NiFiProperties.STATE_MANAGEMENT_CONFIG_FILE, "target/test-classes/state-management.xml");
+        addProps.put(NiFiProperties.STATE_MANAGEMENT_LOCAL_PROVIDER_ID, "local-provider");
+        fc = this.buildFlowControllerForTest(addProps);
     }
 
     @After
@@ -59,15 +62,18 @@ public class MonitorMemoryTest {
     @Test(expected = IllegalStateException.class)
     public void validatevalidationKicksInOnWrongPoolNames() throws Exception {
         ReportingTaskNode reportingTask = fc.createReportingTask(MonitorMemory.class.getName());
-        reportingTask.setProperty(MonitorMemory.MEMORY_POOL_PROPERTY.getName(), "foo");
+
+        Map<String,String> props = new HashMap<>();
+        props.put(MonitorMemory.MEMORY_POOL_PROPERTY.getName(), "foo");
+        reportingTask.setProperties(props);
         ProcessScheduler ps = fc.getProcessScheduler();
         ps.schedule(reportingTask);
     }
 
     @Test
     @Ignore // temporarily ignoring it since it fails intermittently due to
-            // unpredictability during full build
-            // still keeping it for local testing
+    // unpredictability during full build
+    // still keeping it for local testing
     public void validateWarnWhenPercentThresholdReached() throws Exception {
         this.doValidate("10%");
     }
@@ -87,10 +93,13 @@ public class MonitorMemoryTest {
     public void doValidate(String threshold) throws Exception {
         CapturingLogger capturingLogger = this.wrapAndReturnCapturingLogger();
         ReportingTaskNode reportingTask = fc.createReportingTask(MonitorMemory.class.getName());
-        reportingTask.setScheduldingPeriod("1 sec");
-        reportingTask.setProperty(MonitorMemory.MEMORY_POOL_PROPERTY.getName(), "PS Old Gen");
-        reportingTask.setProperty(MonitorMemory.REPORTING_INTERVAL.getName(), "100 millis");
-        reportingTask.setProperty(MonitorMemory.THRESHOLD_PROPERTY.getName(), threshold);
+        reportingTask.setSchedulingPeriod("1 sec");
+
+        Map<String,String> props = new HashMap<>();
+        props.put(MonitorMemory.MEMORY_POOL_PROPERTY.getName(), "PS Old Gen");
+        props.put(MonitorMemory.REPORTING_INTERVAL.getName(), "100 millis");
+        props.put(MonitorMemory.THRESHOLD_PROPERTY.getName(), threshold);
+        reportingTask.setProperties(props);
 
         ProcessScheduler ps = fc.getProcessScheduler();
         ps.schedule(reportingTask);
@@ -127,15 +136,19 @@ public class MonitorMemoryTest {
         return capturingLogger;
     }
 
-    private FlowController buildFlowControllerForTest() throws Exception {
-        NiFiProperties properties = NiFiProperties.getInstance();
+    private FlowController buildFlowControllerForTest(final Map<String, String> addProps) throws Exception {
+        addProps.put(NiFiProperties.PROVENANCE_REPO_IMPLEMENTATION_CLASS, MockProvenanceRepository.class.getName());
+        addProps.put("nifi.remote.input.socket.port", "");
+        addProps.put("nifi.remote.input.secure", "");
+        final NiFiProperties nifiProperties = NiFiProperties.createBasicNiFiProperties(null, addProps);
 
-        properties.setProperty(NiFiProperties.PROVENANCE_REPO_IMPLEMENTATION_CLASS,
-                MockProvenanceEventRepository.class.getName());
-        properties.setProperty("nifi.remote.input.socket.port", "");
-        properties.setProperty("nifi.remote.input.secure", "");
-
-        return FlowController.createStandaloneInstance(mock(FlowFileEventRepository.class), properties,
-                mock(UserService.class), mock(AuditService.class), null);
+        return FlowController.createStandaloneInstance(
+                mock(FlowFileEventRepository.class),
+                nifiProperties,
+                mock(Authorizer.class),
+                mock(AuditService.class),
+                null,
+                null,
+                null);
     }
 }

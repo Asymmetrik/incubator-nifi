@@ -16,7 +16,15 @@
  */
 package org.apache.nifi.processors.lumberjack.handler;
 
-import org.apache.nifi.logging.ProcessorLog;
+import java.io.IOException;
+import java.net.InetAddress;
+import java.nio.channels.SelectionKey;
+import java.nio.channels.SocketChannel;
+import java.nio.charset.Charset;
+import java.util.List;
+import java.util.concurrent.BlockingQueue;
+
+import org.apache.nifi.logging.ComponentLog;
 import org.apache.nifi.processor.util.listen.dispatcher.AsyncChannelDispatcher;
 import org.apache.nifi.processor.util.listen.event.Event;
 import org.apache.nifi.processor.util.listen.event.EventFactory;
@@ -26,14 +34,6 @@ import org.apache.nifi.processors.lumberjack.frame.LumberjackDecoder;
 import org.apache.nifi.processors.lumberjack.frame.LumberjackFrame;
 import org.apache.nifi.processors.lumberjack.frame.LumberjackFrameException;
 import org.apache.nifi.remote.io.socket.ssl.SSLSocketChannel;
-
-import java.io.IOException;
-import java.net.InetAddress;
-import java.nio.channels.SelectionKey;
-import java.nio.channels.SocketChannel;
-import java.nio.charset.Charset;
-import java.util.List;
-import java.util.concurrent.BlockingQueue;
 
 /**
  * A Lumberjack implementation of SSLSocketChannelHandler.
@@ -48,7 +48,7 @@ public class LumberjackSSLSocketChannelHandler<E extends Event<SocketChannel>> e
                                        final Charset charset,
                                        final EventFactory<E> eventFactory,
                                        final BlockingQueue<E> events,
-                                       final ProcessorLog logger) {
+                                       final ComponentLog logger) {
         super(key, dispatcher, charset, eventFactory, events, logger);
         this.decoder = new LumberjackDecoder(charset);
         this.frameHandler = new LumberjackFrameHandler<>(key, charset, eventFactory, events, dispatcher, logger);

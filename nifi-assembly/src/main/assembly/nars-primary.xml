@@ -32,23 +32,23 @@
             <useStrictFiltering>true</useStrictFiltering>
             <includes>
                 <!-- standard -->
-            	<include>nifi-standard-services-api-nar</include>
-            	<include>nifi-ssl-context-service-nar</include>
-            	<include>nifi-distributed-cache-services-nar</include>
-            	<include>nifi-standard-nar</include>
-            	<include>nifi-update-attribute-nar</include>
-            	<include>nifi-http-context-map-nar</include>
-            	<include>nifi-html-nar</include>
-            	<include>nifi-scripting-nar</include>
+                <include>nifi-standard-services-api-nar</include>
+                <include>nifi-ssl-context-service-nar</include>
+                <include>nifi-distributed-cache-services-nar</include>
+                <include>nifi-standard-nar</include>
+                <include>nifi-update-attribute-nar</include>
+                <include>nifi-http-context-map-nar</include>
+                <include>nifi-html-nar</include>
+                <include>nifi-scripting-nar</include>
                 <!-- extras -->
-            	<include>nifi-mongodb-nar</include>
-            	<include>nifi-aws-nar</include>
-            	<include>nifi-elasticsearch-nar</include>
-            	<include>nifi-kafka-nar</include>
-            	<include>nifi-kafka-pubsub-nar</include>
-            	<include>nifi-slack-nar</include>
+                <include>nifi-mongodb-nar</include>
+                <include>nifi-aws-nar</include>
+                <include>nifi-elasticsearch-nar</include>
+                <include>nifi-kafka-0-8-nar</include>
+                <include>nifi-kafka-0-9-nar</include>
+                <include>nifi-kafka-0-10-nar</include>
+                <include>nifi-slack-nar</include>
             </includes>
         </dependencySet>
     </dependencySets>
 </assembly>
-

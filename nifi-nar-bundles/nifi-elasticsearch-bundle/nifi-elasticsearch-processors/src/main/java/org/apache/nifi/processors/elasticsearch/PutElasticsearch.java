@@ -27,7 +27,7 @@ import org.apache.nifi.annotation.lifecycle.OnStopped;
 import org.apache.nifi.components.PropertyDescriptor;
 import org.apache.nifi.expression.AttributeExpression;
 import org.apache.nifi.flowfile.FlowFile;
-import org.apache.nifi.logging.ProcessorLog;
+import org.apache.nifi.logging.ComponentLog;
 import org.apache.nifi.processor.ProcessContext;
 import org.apache.nifi.processor.ProcessSession;
 import org.apache.nifi.processor.Relationship;
@@ -62,7 +62,7 @@ import java.util.Set;
         + "the index to insert into and the type of the document. If the cluster has been configured for authorization "
         + "and/or secure transport (SSL/TLS) and the Shield plugin is available, secure connections can be made. This processor "
         + "supports Elasticsearch 2.x clusters.")
-public class PutElasticsearch extends AbstractElasticsearchProcessor {
+public class PutElasticsearch extends AbstractElasticsearchTransportClientProcessor {
 
     static final Relationship REL_SUCCESS = new Relationship.Builder().name("success")
             .description("All FlowFiles that are written to Elasticsearch are routed to this relationship").build();
@@ -165,7 +165,7 @@ public class PutElasticsearch extends AbstractElasticsearchProcessor {
             return;
         }
 
-        final ProcessorLog logger = getLogger();
+        final ComponentLog logger = getLogger();
         // Keep track of the list of flow files that need to be transferred. As they are transferred, remove them from the list.
         List<FlowFile> flowFilesToTransfer = new LinkedList<>(flowFiles);
         try {
@@ -211,17 +211,21 @@ public class PutElasticsearch extends AbstractElasticsearchProcessor {
 
             final BulkResponse response = bulk.execute().actionGet();
             if (response.hasFailures()) {
-                for (final BulkItemResponse item : response.getItems()) {
-                    final FlowFile flowFile = flowFilesToTransfer.get(item.getItemId());
-                    if (item.isFailed()) {
-                        logger.error("Failed to insert {} into Elasticsearch due to {}, transferring to failure",
-                                new Object[]{flowFile, item.getFailure().getMessage()});
-                        session.transfer(flowFile, REL_FAILURE);
+                // Responses are guaranteed to be in order, remove them in reverse order
+                BulkItemResponse[] responses = response.getItems();
+                if (responses != null && responses.length > 0) {
+                    for (int i = responses.length - 1; i >= 0; i--) {
+                        final FlowFile flowFile = flowFilesToTransfer.get(i);
+                        if (responses[i].isFailed()) {
+                            logger.error("Failed to insert {} into Elasticsearch due to {}, transferring to failure",
+                                    new Object[]{flowFile, responses[i].getFailure().getMessage()});
+                            session.transfer(flowFile, REL_FAILURE);
 
-                    } else {
-                        session.transfer(flowFile, REL_SUCCESS);
+                        } else {
+                            session.transfer(flowFile, REL_SUCCESS);
+                        }
+                        flowFilesToTransfer.remove(flowFile);
                     }
-                    flowFilesToTransfer.remove(flowFile);
                 }
             }
 

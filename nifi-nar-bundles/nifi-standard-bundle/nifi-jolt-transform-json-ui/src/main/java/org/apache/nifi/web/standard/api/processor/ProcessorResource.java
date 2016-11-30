@@ -33,7 +33,6 @@ import org.apache.nifi.web.NiFiWebConfigurationContext;
 
 import org.apache.nifi.web.NiFiWebConfigurationRequestContext;
 import org.apache.nifi.web.standard.api.AbstractStandardResource;
-import org.apache.nifi.web.util.CustomUIUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -47,8 +46,8 @@ public class ProcessorResource extends AbstractStandardResource {
     @Path("/details")
     public Response getDetails(@QueryParam("processorId") final String processorId) {
         final NiFiWebConfigurationContext nifiWebContext = getWebConfigurationContext();
-        final ComponentDetails componentDetails = CustomUIUtils.getComponentDetails(nifiWebContext, processorId, request);
-        final Response.ResponseBuilder response = CustomUIUtils.applyCacheControl(Response.ok(componentDetails));
+        final ComponentDetails componentDetails = ProcessorWebUtils.getComponentDetails(nifiWebContext, processorId, request);
+        final Response.ResponseBuilder response = ProcessorWebUtils.applyCacheControl(Response.ok(componentDetails));
         return response.build();
     }
 
@@ -59,9 +58,9 @@ public class ProcessorResource extends AbstractStandardResource {
     public Response setProperties(@QueryParam("processorId") final String processorId, @QueryParam("revisionId") final Long revisionId,
                                   @QueryParam("clientId") final String clientId, Map<String,String> properties){
         final NiFiWebConfigurationContext nifiWebContext = getWebConfigurationContext();
-        final NiFiWebConfigurationRequestContext niFiRequestContext = CustomUIUtils.getRequestContext(processorId,revisionId,clientId,request);
-        final ComponentDetails componentDetails = nifiWebContext.setProperties(niFiRequestContext,properties);
-        final Response.ResponseBuilder response = CustomUIUtils.applyCacheControl(Response.ok(componentDetails));
+        final NiFiWebConfigurationRequestContext niFiRequestContext = ProcessorWebUtils.getRequestContext(processorId,revisionId,clientId,request);
+        final ComponentDetails componentDetails = nifiWebContext.updateComponent(niFiRequestContext,null,properties);
+        final Response.ResponseBuilder response = ProcessorWebUtils.applyCacheControl(Response.ok(componentDetails));
         return response.build();
     }
 

@@ -20,13 +20,13 @@ var TransformJsonState = function($stateProvider) {
 
     $stateProvider
         .state('jolttransformjson', {
-            url: "/transformjson?id&processorId&revision&clientId&editable",
+            url: "/transformjson?id&revision&clientId&editable",
             templateUrl: "app/transformjson/transformjson.view.html",
             controller: 'TransformJsonController',
             resolve: {
                 details: ['ProcessorService','$stateParams',
                     function (ProcessorService,$stateParams) {
-                        return ProcessorService.getDetails($stateParams.processorId);
+                        return ProcessorService.getDetails($stateParams.id);
                     }
                 ]
             }

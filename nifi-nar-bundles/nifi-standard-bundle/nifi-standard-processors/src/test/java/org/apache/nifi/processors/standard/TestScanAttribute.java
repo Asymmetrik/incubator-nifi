@@ -16,7 +16,6 @@
  */
 package org.apache.nifi.processors.standard;
 
-import java.io.IOException;
 import java.util.HashMap;
 import java.util.Map;
 

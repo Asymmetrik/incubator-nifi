@@ -17,10 +17,14 @@
 package org.apache.nifi.util;
 
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertNull;
 
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.HashSet;
+import java.util.Map;
 import java.util.Set;
+import java.util.function.Predicate;
 
 import org.apache.nifi.annotation.lifecycle.OnStopped;
 import org.apache.nifi.flowfile.FlowFile;
@@ -30,8 +34,6 @@ import org.apache.nifi.processor.ProcessSession;
 import org.apache.nifi.processor.ProcessorInitializationContext;
 import org.apache.nifi.processor.Relationship;
 import org.apache.nifi.processor.exception.ProcessException;
-import org.apache.nifi.registry.VariableRegistryUtils;
-import org.junit.Ignore;
 import org.junit.Test;
 
 public class TestStandardProcessorTestRunner {
@@ -53,6 +55,54 @@ public class TestStandardProcessorTestRunner {
 
         assertEquals(1, proc.getOnStoppedCallsWithContext());
         assertEquals(1, proc.getOnStoppedCallsWithoutContext());
+    }
+
+    @Test
+    public void testAllConditionsMet() {
+        TestRunner runner = new StandardProcessorTestRunner(new GoodProcessor());
+
+        final Map<String, String> attributes = new HashMap<>();
+        attributes.put("GROUP_ATTRIBUTE_KEY", "1");
+        attributes.put("KeyB", "hihii");
+        runner.enqueue("1,hello\n1,good-bye".getBytes(), attributes);
+
+        runner.run();
+        runner.assertAllFlowFilesTransferred(GoodProcessor.REL_SUCCESS, 1);
+
+        runner.assertAllConditionsMet("success",
+            mff -> mff.isAttributeEqual("GROUP_ATTRIBUTE_KEY", "1") && mff.isContentEqual("1,hello\n1,good-bye")
+        );
+    }
+
+    @Test
+    public void testAllConditionsMetComplex() {
+        TestRunner runner = new StandardProcessorTestRunner(new GoodProcessor());
+
+        final Map<String, String> attributes = new HashMap<>();
+        attributes.put("GROUP_ATTRIBUTE_KEY", "1");
+        attributes.put("KeyB", "hihii");
+        runner.enqueue("1,hello\n1,good-bye".getBytes(), attributes);
+
+        attributes.clear();
+        attributes.put("age", "34");
+        runner.enqueue("May Andersson".getBytes(), attributes);
+
+        runner.run();
+        runner.assertAllFlowFilesTransferred(GoodProcessor.REL_SUCCESS, 2);
+
+        Predicate<MockFlowFile> firstPredicate = mff -> mff.isAttributeEqual("GROUP_ATTRIBUTE_KEY", "1");
+        Predicate<MockFlowFile> either = firstPredicate.or(mff -> mff.isAttributeEqual("age", "34"));
+
+        runner.assertAllConditionsMet("success", either);
+    }
+
+    @Test
+    public void testNumThreads() {
+        final ProcessorWithOnStop proc = new ProcessorWithOnStop();
+        final TestRunner runner = TestRunners.newTestRunner(proc);
+        runner.setThreadCount(5);
+        runner.run(1, true);
+        assertEquals(5, runner.getProcessContext().getMaxConcurrentTasks());
     }
 
     @Test
@@ -104,70 +154,17 @@ public class TestStandardProcessorTestRunner {
         runner.assertAllFlowFilesContainAttribute(AddAttributeProcessor.KEY);
     }
 
-    @Test(expected = AssertionError.class)
-    @Ignore("This should not be enabled until we actually fail processor unit tests for using deprecated methods")
-    public void testFailOnDeprecatedTypeAnnotation() {
-        new StandardProcessorTestRunner(new DeprecatedAnnotation(), VariableRegistryUtils.createVariableRegistry());
-    }
-
     @Test
-    @Ignore("This should not be enabled until we actually fail processor unit tests for using deprecated methods")
-    public void testDoesNotFailOnNonDeprecatedTypeAnnotation() {
-        new StandardProcessorTestRunner(new NewAnnotation(), VariableRegistryUtils.createVariableRegistry());
-    }
+    public void testVariables() {
+        final AddAttributeProcessor proc = new AddAttributeProcessor();
+        final TestRunner runner = TestRunners.newTestRunner(proc);
+        assertNull(runner.getVariableValue("hello"));
 
-    @Test(expected = AssertionError.class)
-    @Ignore("This should not be enabled until we actually fail processor unit tests for using deprecated methods")
-    public void testFailOnDeprecatedMethodAnnotation() {
-        new StandardProcessorTestRunner(new DeprecatedMethodAnnotation(), VariableRegistryUtils.createVariableRegistry());
-    }
+        runner.setVariable("hello", "world");
+        assertEquals("world", runner.getVariableValue("hello"));
 
-    @Test
-    @Ignore("This should not be enabled until we actually fail processor unit tests for using deprecated methods")
-    public void testDoesNotFailOnNonDeprecatedMethodAnnotation() {
-        new StandardProcessorTestRunner(new NewMethodAnnotation(), VariableRegistryUtils.createVariableRegistry());
-    }
-
-    @SuppressWarnings("deprecation")
-    @org.apache.nifi.processor.annotation.Tags({"deprecated"})
-    private static class DeprecatedAnnotation extends AbstractProcessor {
-
-        @Override
-        public void onTrigger(ProcessContext context, ProcessSession session) throws ProcessException {
-        }
-    }
-
-    @org.apache.nifi.annotation.documentation.Tags({"deprecated"})
-    private static class NewAnnotation extends AbstractProcessor {
-
-        @Override
-        public void onTrigger(ProcessContext context, ProcessSession session) throws ProcessException {
-        }
-    }
-
-    private static class NewMethodAnnotation extends AbstractProcessor {
-
-        @org.apache.nifi.annotation.lifecycle.OnScheduled
-        public void dummy() {
-
-        }
-
-        @Override
-        public void onTrigger(ProcessContext context, ProcessSession session) throws ProcessException {
-        }
-    }
-
-    private static class DeprecatedMethodAnnotation extends AbstractProcessor {
-
-        @SuppressWarnings("deprecation")
-        @org.apache.nifi.processor.annotation.OnScheduled
-        public void dummy() {
-
-        }
-
-        @Override
-        public void onTrigger(ProcessContext context, ProcessSession session) throws ProcessException {
-        }
+        assertEquals("world", runner.removeVariable("hello"));
+        assertNull(runner.getVariableValue("hello"));
     }
 
     private static class ProcessorWithOnStop extends AbstractProcessor {
@@ -230,6 +227,41 @@ public class TestStandardProcessorTestRunner {
                 session.transfer(ff, REL_FAILURE);
             }
             counter++;
+        }
+    }
+
+    private static class GoodProcessor extends AbstractProcessor {
+
+        public static final Relationship REL_SUCCESS = new Relationship.Builder()
+        .name("success")
+        .description("Successfully created FlowFile from ...")
+        .build();
+
+        public static final Relationship REL_FAILURE = new Relationship.Builder()
+        .name("failure")
+        .description("... execution failed. Incoming FlowFile will be penalized and routed to this relationship")
+        .build();
+
+        private final Set<Relationship> relationships;
+
+        public GoodProcessor() {
+            final Set<Relationship> r = new HashSet<>();
+            r.add(REL_SUCCESS);
+            r.add(REL_FAILURE);
+            relationships = Collections.unmodifiableSet(r);
+        }
+
+        @Override
+        public Set<Relationship> getRelationships() {
+            return relationships;
+        }
+
+        @Override
+        public void onTrigger(ProcessContext context, ProcessSession session) throws ProcessException {
+
+            for( FlowFile incoming : session.get(20)) {
+                session.transfer(incoming, REL_SUCCESS);
+            }
         }
     }
 }

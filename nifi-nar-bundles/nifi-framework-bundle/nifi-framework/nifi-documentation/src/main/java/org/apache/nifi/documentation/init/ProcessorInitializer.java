@@ -21,11 +21,13 @@ import org.apache.nifi.components.ConfigurableComponent;
 import org.apache.nifi.documentation.ConfigurableComponentInitializer;
 import org.apache.nifi.documentation.mock.MockProcessContext;
 import org.apache.nifi.documentation.mock.MockProcessorInitializationContext;
-import org.apache.nifi.documentation.mock.MockProcessorLogger;
+import org.apache.nifi.documentation.mock.MockComponentLogger;
 import org.apache.nifi.documentation.util.ReflectionUtils;
-import org.apache.nifi.logging.ProcessorLog;
+import org.apache.nifi.logging.ComponentLog;
+import org.apache.nifi.nar.ExtensionManager;
 import org.apache.nifi.nar.NarCloseable;
 import org.apache.nifi.processor.Processor;
+import org.apache.nifi.processor.ProcessorInitializationContext;
 
 /**
  * Initializes a Procesor using a MockProcessorInitializationContext
@@ -37,19 +39,22 @@ public class ProcessorInitializer implements ConfigurableComponentInitializer {
     @Override
     public void initialize(ConfigurableComponent component) {
         Processor processor = (Processor) component;
-        try (NarCloseable narCloseable = NarCloseable.withNarLoader()) {
-            processor.initialize(new MockProcessorInitializationContext());
+        ProcessorInitializationContext initializationContext = new MockProcessorInitializationContext();
+        try (NarCloseable narCloseable = NarCloseable.withComponentNarLoader(component.getClass(), initializationContext.getIdentifier())) {
+            processor.initialize(initializationContext);
         }
     }
 
     @Override
     public void teardown(ConfigurableComponent component) {
         Processor processor = (Processor) component;
-        try (NarCloseable narCloseable = NarCloseable.withNarLoader()) {
+        try (NarCloseable narCloseable = NarCloseable.withComponentNarLoader(component.getClass(), component.getIdentifier())) {
 
-            final ProcessorLog logger = new MockProcessorLogger();
+            final ComponentLog logger = new MockComponentLogger();
             final MockProcessContext context = new MockProcessContext();
-            ReflectionUtils.quietlyInvokeMethodsWithAnnotations(OnShutdown.class, org.apache.nifi.processor.annotation.OnShutdown.class, processor, logger, context);
+            ReflectionUtils.quietlyInvokeMethodsWithAnnotation(OnShutdown.class, processor, logger, context);
+        } finally {
+            ExtensionManager.removeInstanceClassLoaderIfExists(component.getIdentifier());
         }
     }
 }

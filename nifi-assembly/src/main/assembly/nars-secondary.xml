@@ -31,38 +31,43 @@
             <useTransitiveFiltering>true</useTransitiveFiltering>
             <useStrictFiltering>true</useStrictFiltering>
             <includes>
-            	<include>nifi-hadoop-libraries-nar</include>
-            	<include>nifi-hadoop-nar</include>
-            	<include>nifi-kite-nar</include>
-            	<include>nifi-flume-nar</include>
-            	<include>nifi-ldap-iaa-providers-nar</include>
-            	<include>nifi-kerberos-iaa-providers-nar</include>
-            	<include>nifi-dbcp-service-nar</include>
-            	<include>nifi-solr-nar</include>
-            	<include>nifi-social-media-nar</include>
-            	<include>nifi-hl7-nar</include>
-            	<include>nifi-language-translation-nar</include>
-            	<include>nifi-geo-nar</include>
-            	<include>nifi-ambari-nar</include>
-            	<include>nifi-avro-nar</include>
-            	<include>nifi-media-nar</include>
-            	<include>nifi-couchbase-nar</include>
-            	<include>nifi-hbase-nar</include>
-            	<include>nifi-riemann-nar</include>
-            	<include>nifi-hbase_1_1_2-client-service-nar</include>
-            	<include>nifi-azure-nar</include>
-            	<include>nifi-lumberjack-nar</include>
-            	<include>nifi-amqp-nar</include>
-            	<include>nifi-splunk-nar</include>
-            	<include>nifi-jms-cf-service-nar</include>
-            	<include>nifi-jms-processors-nar</include>
-            	<include>nifi-cassandra-nar</include>
-            	<include>nifi-spring-nar</include>
-            	<include>nifi-hive-nar</include>
-            	<include>nifi-mqtt-nar</include>
-            	<include>nifi-snmp-nar</include>
+                <include>nifi-hadoop-libraries-nar</include>
+                <include>nifi-hadoop-nar</include>
+                <include>nifi-kite-nar</include>
+                <include>nifi-flume-nar</include>
+                <include>nifi-ldap-iaa-providers-nar</include>
+                <include>nifi-kerberos-iaa-providers-nar</include>
+                <include>nifi-dbcp-service-nar</include>
+                <include>nifi-solr-nar</include>
+                <include>nifi-social-media-nar</include>
+                <include>nifi-hl7-nar</include>
+                <include>nifi-language-translation-nar</include>
+                <include>nifi-enrich-nar</include>
+                <include>nifi-ambari-nar</include>
+                <include>nifi-avro-nar</include>
+                <include>nifi-media-nar</include>
+                <include>nifi-couchbase-nar</include>
+                <include>nifi-hbase-nar</include>
+                <include>nifi-riemann-nar</include>
+                <include>nifi-hbase_1_1_2-client-service-nar</include>
+                <include>nifi-azure-nar</include>
+                <include>nifi-lumberjack-nar</include>
+                <include>nifi-amqp-nar</include>
+                <include>nifi-splunk-nar</include>
+                <include>nifi-jms-cf-service-nar</include>
+                <include>nifi-jms-processors-nar</include>
+                <include>nifi-cassandra-nar</include>
+                <include>nifi-spring-nar</include>
+                <include>nifi-hive-nar</include>
+                <include>nifi-mqtt-nar</include>
+                <include>nifi-snmp-nar</include>
+                <include>nifi-datadog-nar</include>
+                <include>nifi-email-nar</include>
+                <include>nifi-evtx-nar</include>
+                <include>nifi-ignite-nar</include>
+                <include>nifi-site-to-site-reporting-nar</include>
+                <include>nifi-windows-event-log-nar</include>
             </includes>
         </dependencySet>
     </dependencySets>
 </assembly>
-

@@ -17,6 +17,12 @@
 $(document).ready(function () {
     // initialize the counters page
     nf.Users.init();
+
+    //alter styles if we're not in the shell
+    if (top === window) {
+        $('#users').css('top', 20);
+        $('#users-refresh-container').css('bottom', 20);
+    }
 });
 
 nf.Users = (function () {
@@ -26,39 +32,28 @@ nf.Users = (function () {
      */
     var config = {
         urls: {
-            banners: '../nifi-api/controller/banners',
-            controllerAbout: '../nifi-api/controller/about',
-            authorities: '../nifi-api/controller/authorities'
+            banners: '../nifi-api/flow/banners',
+            controllerAbout: '../nifi-api/flow/about',
+            currentUser: '../nifi-api/flow/current-user'
         }
     };
 
     /**
      * Loads the current users authorities.
      */
-    var loadAuthorities = function () {
-        return $.Deferred(function (deferred) {
-            $.ajax({
-                type: 'GET',
-                url: config.urls.authorities,
-                dataType: 'json'
-            }).done(function (response) {
-                if (nf.Common.isDefinedAndNotNull(response.authorities)) {
-                    // record the users authorities
-                    nf.Common.setAuthorities(response.authorities);
-                    deferred.resolve(response);
-                } else {
-                    deferred.reject();
-                }
-            }).fail(function (xhr, status, error) {
-                nf.Common.handleAjaxError(xhr, status, error);
-                deferred.reject();
-            });
-        }).promise();
+    var ensureAccess = function () {
+        return $.ajax({
+            type: 'GET',
+            url: config.urls.currentUser,
+            dataType: 'json'
+        }).done(function (currentUser) {
+            nf.Common.setCurrentUser(currentUser);
+        }).fail(nf.Common.handleAjaxError);
     };
 
     var initializeUsersPage = function () {
         // define mouse over event for the refresh button
-        nf.Common.addHoverEffect('#refresh-button', 'button-refresh', 'button-refresh-hover').click(function () {
+        nf.Common.addHoverEffect('#user-refresh-button', 'button-refresh', 'button-refresh-hover').click(function () {
             nf.UsersTable.loadUsersTable();
         });
 
@@ -117,9 +112,12 @@ nf.Users = (function () {
          */
         init: function () {
             nf.Storage.init();
-            
+
+            // initialize the client
+            nf.Client.init();
+
             // load the users authorities
-            loadAuthorities().done(function () {
+            ensureAccess().done(function () {
                 // create the counters table
                 nf.UsersTable.init();
 
@@ -127,6 +125,9 @@ nf.Users = (function () {
                 nf.UsersTable.loadUsersTable().done(function () {
                     // finish initializing users page
                     initializeUsersPage().done(function () {
+                        // listen for browser resize events to update the page size
+                        $(window).resize(nf.UsersTable.resetTableSize);
+                        
                         // configure the initial grid height
                         nf.UsersTable.resetTableSize();
 
@@ -143,6 +144,28 @@ nf.Users = (function () {
                             document.title = countersTitle;
                             $('#users-header-text').text(countersTitle);
                         }).fail(nf.Common.handleAjaxError);
+                    });
+
+                    $(window).on('resize', function (e) {
+                        // resize dialogs when appropriate
+                        var dialogs = $('.dialog');
+                        for (var i = 0, len = dialogs.length; i < len; i++) {
+                            if ($(dialogs[i]).is(':visible')){
+                                setTimeout(function(dialog){
+                                    dialog.modal('resize');
+                                }, 50, $(dialogs[i]));
+                            }
+                        }
+
+                        // resize grids when appropriate
+                        var gridElements = $('*[class*="slickgrid_"]');
+                        for (var j = 0, len = gridElements.length; j < len; j++) {
+                            if ($(gridElements[j]).is(':visible')){
+                                setTimeout(function(gridElement){
+                                    gridElement.data('gridInstance').resizeCanvas();
+                                }, 50, $(gridElements[j]));
+                            }
+                        }
                     });
                 });
             });

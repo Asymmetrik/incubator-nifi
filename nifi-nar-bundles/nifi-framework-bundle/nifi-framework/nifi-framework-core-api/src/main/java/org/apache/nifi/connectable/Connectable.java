@@ -16,11 +16,7 @@
  */
 package org.apache.nifi.connectable;
 
-import java.util.Collection;
-import java.util.List;
-import java.util.Set;
-import java.util.concurrent.TimeUnit;
-
+import org.apache.nifi.authorization.resource.ComponentAuthorizable;
 import org.apache.nifi.components.ValidationResult;
 import org.apache.nifi.controller.Triggerable;
 import org.apache.nifi.groups.ProcessGroup;
@@ -28,10 +24,15 @@ import org.apache.nifi.processor.ProcessSession;
 import org.apache.nifi.processor.Relationship;
 import org.apache.nifi.scheduling.SchedulingStrategy;
 
+import java.util.Collection;
+import java.util.List;
+import java.util.Set;
+import java.util.concurrent.TimeUnit;
+
 /**
  * Represents a connectable component to which or from which data can flow.
  */
-public interface Connectable extends Triggerable {
+public interface Connectable extends Triggerable, ComponentAuthorizable, Positionable {
 
     /**
      * @return the unique identifier for this <code>Connectable</code>
@@ -104,18 +105,6 @@ public interface Connectable extends Triggerable {
      * source
      */
     Set<Connection> getConnections(Relationship relationship);
-
-    /**
-     * @return the position on the graph where this Connectable is located
-     */
-    Position getPosition();
-
-    /**
-     * Updates this component's position on the graph
-     *
-     * @param position new position
-     */
-    void setPosition(Position position);
 
     /**
      * @return the name of this Connectable
@@ -273,4 +262,9 @@ public interface Connectable extends Triggerable {
     void verifyCanClearState() throws IllegalStateException;
 
     SchedulingStrategy getSchedulingStrategy();
+
+    /**
+     * @return the type of the component. I.e., the class name of the implementation
+     */
+    String getComponentType();
 }

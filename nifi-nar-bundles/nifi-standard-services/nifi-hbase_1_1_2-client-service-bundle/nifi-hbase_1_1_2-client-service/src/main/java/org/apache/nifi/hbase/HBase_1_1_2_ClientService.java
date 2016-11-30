@@ -35,6 +35,7 @@ import org.apache.hadoop.hbase.filter.ParseFilter;
 import org.apache.hadoop.hbase.util.Bytes;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.nifi.annotation.behavior.DynamicProperty;
+import org.apache.nifi.annotation.behavior.RequiresInstanceClassLoading;
 import org.apache.nifi.annotation.documentation.CapabilityDescription;
 import org.apache.nifi.annotation.documentation.Tags;
 import org.apache.nifi.annotation.lifecycle.OnDisabled;
@@ -55,8 +56,8 @@ import org.apache.nifi.hbase.scan.ResultCell;
 import org.apache.nifi.hbase.scan.ResultHandler;
 import org.apache.nifi.processor.util.StandardValidators;
 import org.apache.nifi.reporting.InitializationException;
-import org.apache.nifi.util.NiFiProperties;
 
+import java.io.File;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.security.PrivilegedExceptionAction;
@@ -68,6 +69,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.concurrent.atomic.AtomicReference;
 
+@RequiresInstanceClassLoading
 @Tags({ "hbase", "client"})
 @CapabilityDescription("Implementation of HBaseClientService for HBase 1.1.2. This service can be configured by providing " +
         "a comma-separated list of configuration files, or by specifying values for the other properties. If configuration files " +
@@ -91,13 +93,15 @@ public class HBase_1_1_2_ClientService extends AbstractControllerService impleme
 
     private List<PropertyDescriptor> properties;
     private KerberosProperties kerberosProperties;
+    private volatile File kerberosConfigFile = null;
 
     // Holder of cached Configuration information so validation does not reload the same config over and over
     private final AtomicReference<ValidationResources> validationResourceHolder = new AtomicReference<>();
 
     @Override
     protected void init(ControllerServiceInitializationContext config) throws InitializationException {
-        this.kerberosProperties = getKerberosProperties();
+        kerberosConfigFile = config.getKerberosConfigurationFile();
+        kerberosProperties = getKerberosProperties(kerberosConfigFile);
 
         List<PropertyDescriptor> props = new ArrayList<>();
         props.add(HADOOP_CONF_FILES);
@@ -107,11 +111,12 @@ public class HBase_1_1_2_ClientService extends AbstractControllerService impleme
         props.add(ZOOKEEPER_CLIENT_PORT);
         props.add(ZOOKEEPER_ZNODE_PARENT);
         props.add(HBASE_CLIENT_RETRIES);
+        props.add(PHOENIX_CLIENT_JAR_LOCATION);
         this.properties = Collections.unmodifiableList(props);
     }
 
-    protected KerberosProperties getKerberosProperties() {
-        return KerberosProperties.create(NiFiProperties.getInstance());
+    protected KerberosProperties getKerberosProperties(File kerberosConfigFile) {
+        return new KerberosProperties(kerberosConfigFile);
     }
 
     @Override
@@ -269,16 +274,18 @@ public class HBase_1_1_2_ClientService extends AbstractControllerService impleme
             // Create one Put per row....
             final Map<String, Put> rowPuts = new HashMap<>();
             for (final PutFlowFile putFlowFile : puts) {
-                Put put = rowPuts.get(putFlowFile.getRow());
+                //this is used for the map key as a byte[] does not work as a key.
+                final String rowKeyString = new String(putFlowFile.getRow(), StandardCharsets.UTF_8);
+                Put put = rowPuts.get(rowKeyString);
                 if (put == null) {
-                    put = new Put(putFlowFile.getRow().getBytes(StandardCharsets.UTF_8));
-                    rowPuts.put(putFlowFile.getRow(), put);
+                    put = new Put(putFlowFile.getRow());
+                    rowPuts.put(rowKeyString, put);
                 }
 
                 for (final PutColumn column : putFlowFile.getColumns()) {
                     put.addColumn(
-                            column.getColumnFamily().getBytes(StandardCharsets.UTF_8),
-                            column.getColumnQualifier().getBytes(StandardCharsets.UTF_8),
+                            column.getColumnFamily(),
+                            column.getColumnQualifier(),
                             column.getBuffer());
                 }
             }
@@ -288,13 +295,13 @@ public class HBase_1_1_2_ClientService extends AbstractControllerService impleme
     }
 
     @Override
-    public void put(final String tableName, final String rowId, final Collection<PutColumn> columns) throws IOException {
+    public void put(final String tableName, final byte[] rowId, final Collection<PutColumn> columns) throws IOException {
         try (final Table table = connection.getTable(TableName.valueOf(tableName))) {
-            Put put = new Put(rowId.getBytes(StandardCharsets.UTF_8));
+            Put put = new Put(rowId);
             for (final PutColumn column : columns) {
                 put.addColumn(
-                        column.getColumnFamily().getBytes(StandardCharsets.UTF_8),
-                        column.getColumnQualifier().getBytes(StandardCharsets.UTF_8),
+                        column.getColumnFamily(),
+                        column.getColumnQualifier(),
                         column.getBuffer());
             }
             table.put(put);
@@ -426,4 +433,8 @@ public class HBase_1_1_2_ClientService extends AbstractControllerService impleme
         return Bytes.toBytes(s);
     }
 
+    @Override
+    public byte[] toBytesBinary(String s) {
+        return Bytes.toBytesBinary(s);
+    }
 }

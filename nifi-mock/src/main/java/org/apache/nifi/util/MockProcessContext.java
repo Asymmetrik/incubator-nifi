@@ -27,7 +27,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
-
 import org.apache.nifi.attribute.expression.language.Query;
 import org.apache.nifi.attribute.expression.language.Query.Range;
 import org.apache.nifi.components.ConfigurableComponent;
@@ -37,14 +36,16 @@ import org.apache.nifi.components.ValidationResult;
 import org.apache.nifi.components.state.StateManager;
 import org.apache.nifi.controller.ControllerService;
 import org.apache.nifi.controller.ControllerServiceLookup;
+import org.apache.nifi.controller.NodeTypeProvider;
 import org.apache.nifi.processor.Processor;
 import org.apache.nifi.processor.Relationship;
 import org.apache.nifi.processor.SchedulingContext;
 import org.apache.nifi.registry.VariableRegistry;
 import org.apache.nifi.state.MockStateManager;
 import org.junit.Assert;
+import static java.util.Objects.requireNonNull;
 
-public class MockProcessContext extends MockControllerServiceLookup implements SchedulingContext, ControllerServiceLookup {
+public class MockProcessContext extends MockControllerServiceLookup implements SchedulingContext, ControllerServiceLookup, NodeTypeProvider {
 
     private final ConfigurableComponent component;
     private final Map<PropertyDescriptor, String> properties = new HashMap<>();
@@ -62,14 +63,18 @@ public class MockProcessContext extends MockControllerServiceLookup implements S
     private volatile Set<Relationship> connections = new HashSet<>();
     private volatile Set<Relationship> unavailableRelationships = new HashSet<>();
 
-    public MockProcessContext(final ConfigurableComponent component, final VariableRegistry variableRegistry) {
-        this(component, new MockStateManager(component), variableRegistry);
+    private volatile boolean isClustered;
+    private volatile boolean isPrimaryNode;
+
+    public MockProcessContext(final ConfigurableComponent component) {
+        this(component, new MockStateManager(component),VariableRegistry.EMPTY_REGISTRY);
     }
 
     /**
      * Creates a new MockProcessContext for the given Processor
      *
      * @param component being mocked
+     * @param stateManager state manager
      * @param variableRegistry variableRegistry
      */
     public MockProcessContext(final ConfigurableComponent component, final StateManager stateManager, final VariableRegistry variableRegistry) {
@@ -369,5 +374,26 @@ public class MockProcessContext extends MockControllerServiceLookup implements S
 
     protected void setMaxConcurrentTasks(int maxConcurrentTasks) {
         this.maxConcurrentTasks = maxConcurrentTasks;
+    }
+
+    @Override
+    public boolean isClustered() {
+        return isClustered;
+    }
+
+    @Override
+    public boolean isPrimary() {
+        return isPrimaryNode;
+    }
+
+    public void setClustered(boolean clustered) {
+        isClustered = clustered;
+    }
+
+    public void setPrimaryNode(boolean primaryNode) {
+        if (!isClustered && primaryNode) {
+            throw new IllegalArgumentException("Primary node is only available in cluster. Use setClustered(true) first.");
+        }
+        isPrimaryNode = primaryNode;
     }
 }

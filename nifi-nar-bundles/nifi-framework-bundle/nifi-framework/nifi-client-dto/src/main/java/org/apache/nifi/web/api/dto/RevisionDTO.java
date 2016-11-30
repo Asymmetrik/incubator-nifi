@@ -17,6 +17,7 @@
 package org.apache.nifi.web.api.dto;
 
 import com.wordnik.swagger.annotations.ApiModelProperty;
+
 import javax.xml.bind.annotation.XmlType;
 
 /**
@@ -69,7 +70,8 @@ public class RevisionDTO {
      * @return The user that last modified the flow
      */
     @ApiModelProperty(
-            value = "The user that last modified the flow."
+            value = "The user that last modified the flow.",
+            readOnly = true
     )
     public String getLastModifier() {
         return lastModifier;

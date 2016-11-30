@@ -16,10 +16,6 @@
  */
 package org.apache.nifi.integration.util;
 
-import java.util.HashMap;
-import java.util.Map;
-import java.util.concurrent.TimeUnit;
-import org.apache.nifi.authorization.exception.ProviderCreationException;
 import org.apache.nifi.authentication.AuthenticationResponse;
 import org.apache.nifi.authentication.LoginCredentials;
 import org.apache.nifi.authentication.LoginIdentityProvider;
@@ -27,6 +23,11 @@ import org.apache.nifi.authentication.LoginIdentityProviderConfigurationContext;
 import org.apache.nifi.authentication.LoginIdentityProviderInitializationContext;
 import org.apache.nifi.authentication.exception.IdentityAccessException;
 import org.apache.nifi.authentication.exception.InvalidLoginCredentialsException;
+import org.apache.nifi.authentication.exception.ProviderCreationException;
+
+import java.util.HashMap;
+import java.util.Map;
+import java.util.concurrent.TimeUnit;
 
 /**
  *
@@ -40,7 +41,7 @@ public class NiFiTestLoginIdentityProvider implements LoginIdentityProvider {
      */
     public NiFiTestLoginIdentityProvider() {
         users = new HashMap<>();
-        users.put("user@nifi", "whateve");
+        users.put("user@nifi", "whatever");
         users.put("unregistered-user@nifi", "password");
     }
 

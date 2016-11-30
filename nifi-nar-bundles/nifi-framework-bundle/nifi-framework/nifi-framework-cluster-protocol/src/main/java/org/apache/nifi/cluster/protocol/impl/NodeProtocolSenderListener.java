@@ -24,16 +24,15 @@ import org.apache.nifi.cluster.protocol.ProtocolException;
 import org.apache.nifi.cluster.protocol.ProtocolHandler;
 import org.apache.nifi.cluster.protocol.ProtocolListener;
 import org.apache.nifi.cluster.protocol.UnknownServiceAddressException;
-import org.apache.nifi.cluster.protocol.message.NodeBulletinsMessage;
+import org.apache.nifi.cluster.protocol.message.ClusterWorkloadRequestMessage;
+import org.apache.nifi.cluster.protocol.message.ClusterWorkloadResponseMessage;
 import org.apache.nifi.cluster.protocol.message.ConnectionRequestMessage;
 import org.apache.nifi.cluster.protocol.message.ConnectionResponseMessage;
-import org.apache.nifi.cluster.protocol.message.ControllerStartupFailureMessage;
 import org.apache.nifi.cluster.protocol.message.HeartbeatMessage;
-import org.apache.nifi.cluster.protocol.message.ReconnectionFailureMessage;
+import org.apache.nifi.cluster.protocol.message.HeartbeatResponseMessage;
 import org.apache.nifi.reporting.BulletinRepository;
 
 public class NodeProtocolSenderListener implements NodeProtocolSender, ProtocolListener {
-
     private final NodeProtocolSender sender;
     private final ProtocolListener listener;
 
@@ -50,16 +49,18 @@ public class NodeProtocolSenderListener implements NodeProtocolSender, ProtocolL
     @Override
     public void stop() throws IOException {
         if (!isRunning()) {
-            throw new IllegalStateException("Instance is already stopped.");
+            return;
         }
+
         listener.stop();
     }
 
     @Override
     public void start() throws IOException {
         if (isRunning()) {
-            throw new IllegalStateException("Instance is already started.");
+            return;
         }
+
         listener.start();
     }
 
@@ -84,32 +85,22 @@ public class NodeProtocolSenderListener implements NodeProtocolSender, ProtocolL
     }
 
     @Override
-    public void heartbeat(final HeartbeatMessage msg) throws ProtocolException, UnknownServiceAddressException {
-        sender.heartbeat(msg);
-    }
-
-    @Override
     public ConnectionResponseMessage requestConnection(final ConnectionRequestMessage msg) throws ProtocolException, UnknownServiceAddressException {
         return sender.requestConnection(msg);
     }
 
     @Override
-    public void notifyControllerStartupFailure(final ControllerStartupFailureMessage msg) throws ProtocolException, UnknownServiceAddressException {
-        sender.notifyControllerStartupFailure(msg);
-    }
-
-    @Override
-    public void notifyReconnectionFailure(final ReconnectionFailureMessage msg) throws ProtocolException, UnknownServiceAddressException {
-        sender.notifyReconnectionFailure(msg);
-    }
-
-    @Override
-    public void sendBulletins(NodeBulletinsMessage msg) throws ProtocolException, UnknownServiceAddressException {
-        sender.sendBulletins(msg);
-    }
-
-    @Override
     public void setBulletinRepository(final BulletinRepository bulletinRepository) {
         listener.setBulletinRepository(bulletinRepository);
+    }
+
+    @Override
+    public HeartbeatResponseMessage heartbeat(final HeartbeatMessage msg, final String address) throws ProtocolException {
+        return sender.heartbeat(msg, address);
+    }
+
+    @Override
+    public ClusterWorkloadResponseMessage clusterWorkload(ClusterWorkloadRequestMessage msg) throws ProtocolException {
+        return sender.clusterWorkload(msg);
     }
 }

@@ -274,19 +274,6 @@ class TestGetHTTPGroovy extends GroovyTestCase {
         final String MSG = "This is a test message"
         final String url = "${HTTPS_URL}/ReverseHandler.groovy?string=${URLEncoder.encode(MSG, "UTF-8")}"
 
-        // Determine expected default TLS version based on Java version
-        logger.info("System Java Version: ${System.getProperty("java.version")}")
-        logger.info("Implementation version: ${Runtime.getPackage().getImplementationVersion()}")
-        logger.info("Specification version: ${Runtime.getPackage().getSpecificationVersion()}")
-        String EXPECTED_TLS_VERSION
-        if ((Runtime.getPackage().getSpecificationVersion() as double) > 1.7) {
-            logger.info("Java 8 or above; default TLS version is TLSv1.2")
-            EXPECTED_TLS_VERSION = TLSv1_2
-        } else {
-            logger.info("Java 7 or below; default TLS version is TLSv1")
-            EXPECTED_TLS_VERSION = TLSv1
-        }
-
         // Configure server with all TLS protocols
         server = createServer()
 
@@ -308,7 +295,7 @@ class TestGetHTTPGroovy extends GroovyTestCase {
         logger.info("Selected protocol: ${selectedProtocol}")
 
         // Assert
-        assert selectedProtocol == EXPECTED_TLS_VERSION
+        assert selectedProtocol == TLSv1_2
     }
 
     private static void enableContextServiceProtocol(TestRunner runner, String protocol) {

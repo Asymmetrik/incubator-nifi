@@ -39,7 +39,7 @@ import org.apache.nifi.annotation.lifecycle.OnShutdown;
 import org.apache.nifi.annotation.lifecycle.OnUnscheduled;
 import org.apache.nifi.components.PropertyDescriptor;
 import org.apache.nifi.flowfile.FlowFile;
-import org.apache.nifi.logging.ProcessorLog;
+import org.apache.nifi.logging.ComponentLog;
 import org.apache.nifi.processor.ProcessContext;
 import org.apache.nifi.processor.ProcessSession;
 import org.apache.nifi.processor.Relationship;
@@ -55,6 +55,7 @@ import java.nio.ByteBuffer;
 import java.nio.charset.Charset;
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.Date;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
@@ -150,7 +151,7 @@ public class PutCassandraQL extends AbstractCassandraProcessor {
 
     @OnScheduled
     public void onScheduled(final ProcessContext context) {
-        ProcessorLog log = getLogger();
+        ComponentLog log = getLogger();
         try {
             connectToCassandra(context);
         } catch (final NoHostAvailableException nhae) {
@@ -169,7 +170,7 @@ public class PutCassandraQL extends AbstractCassandraProcessor {
 
     @Override
     public void onTrigger(final ProcessContext context, final ProcessSession session) throws ProcessException {
-        ProcessorLog logger = getLogger();
+        ComponentLog logger = getLogger();
         FlowFile flowFile = session.get();
         if (flowFile == null) {
             return;
@@ -318,7 +319,6 @@ public class PutCassandraQL extends AbstractCassandraProcessor {
                     if (mainType.equals(DataType.ascii())
                             || mainType.equals(DataType.text())
                             || mainType.equals(DataType.varchar())
-                            || mainType.equals(DataType.timestamp())
                             || mainType.equals(DataType.timeuuid())
                             || mainType.equals(DataType.uuid())
                             || mainType.equals(DataType.inet())
@@ -345,6 +345,8 @@ public class PutCassandraQL extends AbstractCassandraProcessor {
                     } else if (mainType.equals(DataType.blob())) {
                         statement.setBytes(paramIndex, (ByteBuffer) typeCodec.parse(paramValue));
 
+                    } else if (mainType.equals(DataType.timestamp())) {
+                        statement.setTimestamp(paramIndex, (Date) typeCodec.parse(paramValue));
                     }
                     return;
                 } else {

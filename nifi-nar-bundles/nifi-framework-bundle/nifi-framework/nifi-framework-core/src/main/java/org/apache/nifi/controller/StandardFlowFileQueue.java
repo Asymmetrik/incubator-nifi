@@ -16,25 +16,6 @@
  */
 package org.apache.nifi.controller;
 
-import java.io.FileNotFoundException;
-import java.io.IOException;
-import java.io.Serializable;
-import java.util.ArrayList;
-import java.util.Collection;
-import java.util.Collections;
-import java.util.Comparator;
-import java.util.Iterator;
-import java.util.List;
-import java.util.Map;
-import java.util.PriorityQueue;
-import java.util.Queue;
-import java.util.Set;
-import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.ConcurrentMap;
-import java.util.concurrent.TimeUnit;
-import java.util.concurrent.atomic.AtomicReference;
-import java.util.concurrent.locks.ReentrantReadWriteLock;
-
 import org.apache.nifi.connectable.Connection;
 import org.apache.nifi.controller.queue.DropFlowFileState;
 import org.apache.nifi.controller.queue.DropFlowFileStatus;
@@ -74,6 +55,25 @@ import org.apache.nifi.util.concurrency.TimedLock;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.io.FileNotFoundException;
+import java.io.IOException;
+import java.io.Serializable;
+import java.util.ArrayList;
+import java.util.Collection;
+import java.util.Collections;
+import java.util.Comparator;
+import java.util.Iterator;
+import java.util.List;
+import java.util.Map;
+import java.util.PriorityQueue;
+import java.util.Queue;
+import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ConcurrentMap;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicReference;
+import java.util.concurrent.locks.ReentrantReadWriteLock;
+
 /**
  * A FlowFileQueue is used to queue FlowFile objects that are awaiting further
  * processing. Must be thread safe.
@@ -95,7 +95,10 @@ public class StandardFlowFileQueue implements FlowFileQueue {
 
     private boolean swapMode = false;
 
-    private final AtomicReference<MaxQueueSize> maxQueueSize = new AtomicReference<>(new MaxQueueSize("0 MB", 0L, 0L));
+    public static final int DEFAULT_BACKPRESSURE_COUNT = 10000;
+    public static final String DEFAULT_BACKPRESSURE_SIZE = "1 GB";
+    private final AtomicReference<MaxQueueSize> maxQueueSize = new AtomicReference<>(new MaxQueueSize(DEFAULT_BACKPRESSURE_SIZE,
+            DataUnit.parseDataSize(DEFAULT_BACKPRESSURE_SIZE, DataUnit.B).longValue(), DEFAULT_BACKPRESSURE_COUNT));
     private final AtomicReference<TimePeriod> expirationPeriod = new AtomicReference<>(new TimePeriod("0 mins", 0L));
 
     private final EventReporter eventReporter;
@@ -111,7 +114,6 @@ public class StandardFlowFileQueue implements FlowFileQueue {
     private final FlowFileRepository flowFileRepository;
     private final ProvenanceEventRepository provRepository;
     private final ResourceClaimManager resourceClaimManager;
-    private final Heartbeater heartbeater;
 
     private final ConcurrentMap<String, DropFlowFileRequest> dropRequestMap = new ConcurrentHashMap<>();
     private final ConcurrentMap<String, ListFlowFileRequest> listRequestMap = new ConcurrentHashMap<>();
@@ -120,8 +122,7 @@ public class StandardFlowFileQueue implements FlowFileQueue {
     private final ProcessScheduler scheduler;
 
     public StandardFlowFileQueue(final String identifier, final Connection connection, final FlowFileRepository flowFileRepo, final ProvenanceEventRepository provRepo,
-        final ResourceClaimManager resourceClaimManager, final ProcessScheduler scheduler, final FlowFileSwapManager swapManager, final EventReporter eventReporter, final int swapThreshold,
-        final Heartbeater heartbeater) {
+        final ResourceClaimManager resourceClaimManager, final ProcessScheduler scheduler, final FlowFileSwapManager swapManager, final EventReporter eventReporter, final int swapThreshold) {
         activeQueue = new PriorityQueue<>(20, new Prioritizer(new ArrayList<FlowFilePrioritizer>()));
         priorities = new ArrayList<>();
         swapQueue = new ArrayList<>();
@@ -135,7 +136,6 @@ public class StandardFlowFileQueue implements FlowFileQueue {
         this.swapThreshold = swapThreshold;
         this.scheduler = scheduler;
         this.connection = connection;
-        this.heartbeater = heartbeater;
 
         readLock = new TimedLock(this.lock.readLock(), identifier + " Read Lock", 100);
         writeLock = new TimedLock(this.lock.writeLock(), identifier + " Write Lock", 100);
@@ -389,7 +389,8 @@ public class StandardFlowFileQueue implements FlowFileQueue {
             if (flowFile != null) {
                 incrementActiveQueueSize(-1, -flowFile.getSize());
             }
-        } while (isExpired);
+        }
+        while (isExpired);
 
         if (!expiredRecords.isEmpty()) {
             incrementActiveQueueSize(-expiredRecords.size(), -expiredBytes);
@@ -546,6 +547,8 @@ public class StandardFlowFileQueue implements FlowFileQueue {
         if (swapQueue.size() < SWAP_RECORD_POLL_SIZE) {
             return;
         }
+
+        migrateSwapToActive();
 
         final int numSwapFiles = swapQueue.size() / SWAP_RECORD_POLL_SIZE;
 
@@ -733,7 +736,6 @@ public class StandardFlowFileQueue implements FlowFileQueue {
         }
 
         @Override
-        @SuppressWarnings("deprecation")
         public int compare(final FlowFileRecord f1, final FlowFileRecord f2) {
             int returnVal = 0;
             final boolean f1Penalized = f1.isPenalized();
@@ -818,6 +820,7 @@ public class StandardFlowFileQueue implements FlowFileQueue {
         long swapByteCount = 0L;
         Long maxId = null;
         List<ResourceClaim> resourceClaims = new ArrayList<>();
+        final long startNanos = System.nanoTime();
 
         writeLock.lock();
         try {
@@ -862,6 +865,11 @@ public class StandardFlowFileQueue implements FlowFileQueue {
             this.swapLocations.addAll(swapLocations);
         } finally {
             writeLock.unlock("Recover Swap Files");
+        }
+
+        if (!swapLocations.isEmpty()) {
+            final long millis = TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - startNanos);
+            logger.info("Recovered {} swap files for {} in {} millis", swapLocations.size(), this, millis);
         }
 
         return new StandardSwapSummary(new QueueSize(swapFlowFileCount, swapByteCount), maxId, resourceClaims);
@@ -1182,9 +1190,6 @@ public class StandardFlowFileQueue implements FlowFileQueue {
                         logger.info("Successfully dropped {} FlowFiles ({} bytes) from Connection with ID {} on behalf of {}",
                             dropRequest.getDroppedSize().getObjectCount(), dropRequest.getDroppedSize().getByteCount(), StandardFlowFileQueue.this.getIdentifier(), requestor);
                         dropRequest.setState(DropFlowFileState.COMPLETE);
-                        if (heartbeater != null) {
-                            heartbeater.heartbeat();
-                        }
                     } catch (final Exception e) {
                         logger.error("Failed to drop FlowFiles from Connection with ID {} due to {}", StandardFlowFileQueue.this.getIdentifier(), e.toString());
                         logger.error("", e);

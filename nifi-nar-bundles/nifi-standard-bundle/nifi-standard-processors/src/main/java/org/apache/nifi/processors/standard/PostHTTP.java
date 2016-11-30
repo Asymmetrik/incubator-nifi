@@ -82,8 +82,8 @@ import org.apache.http.impl.conn.PoolingHttpClientConnectionManager;
 import org.apache.http.protocol.HttpContext;
 import org.apache.http.protocol.HttpCoreContext;
 import org.apache.http.util.EntityUtils;
-import org.apache.nifi.annotation.behavior.DynamicProperty;
 import org.apache.http.util.VersionInfo;
+import org.apache.nifi.annotation.behavior.DynamicProperty;
 import org.apache.nifi.annotation.behavior.InputRequirement;
 import org.apache.nifi.annotation.behavior.InputRequirement.Requirement;
 import org.apache.nifi.annotation.behavior.SupportsBatching;
@@ -97,7 +97,7 @@ import org.apache.nifi.components.ValidationResult;
 import org.apache.nifi.expression.AttributeExpression;
 import org.apache.nifi.flowfile.FlowFile;
 import org.apache.nifi.flowfile.attributes.CoreAttributes;
-import org.apache.nifi.logging.ProcessorLog;
+import org.apache.nifi.logging.ComponentLog;
 import org.apache.nifi.processor.AbstractProcessor;
 import org.apache.nifi.processor.DataUnit;
 import org.apache.nifi.processor.ProcessContext;
@@ -108,6 +108,7 @@ import org.apache.nifi.processor.exception.ProcessException;
 import org.apache.nifi.processor.io.InputStreamCallback;
 import org.apache.nifi.processor.util.StandardValidators;
 import org.apache.nifi.security.util.CertificateUtils;
+import org.apache.nifi.security.util.KeyStoreUtils;
 import org.apache.nifi.ssl.SSLContextService;
 import org.apache.nifi.stream.io.BufferedInputStream;
 import org.apache.nifi.stream.io.BufferedOutputStream;
@@ -120,14 +121,14 @@ import org.apache.nifi.util.FlowFilePackagerV1;
 import org.apache.nifi.util.FlowFilePackagerV2;
 import org.apache.nifi.util.FlowFilePackagerV3;
 import org.apache.nifi.util.FormatUtils;
-import org.apache.nifi.util.ObjectHolder;
 import org.apache.nifi.util.StopWatch;
 import org.apache.nifi.util.StringUtils;
 import com.sun.jersey.api.client.ClientResponse.Status;
 
 @SupportsBatching
 @InputRequirement(Requirement.INPUT_REQUIRED)
-@DynamicProperty(name = "Header Name", value = "Header Value", description = "This allows custom headers to be passed with the request. If batching is on and Send as a flowfile is true, expression language substitutions will assume the first value encountered.")
+@DynamicProperty(name = "Header Name", value = "Header Value", description = "This allows custom headers to be passed with the request. " +
+        "If batching is on and Send as a flowfile is true, expression language substitutions will assume the first value encountered.")
 @Tags({"http", "https", "remote", "copy", "archive"})
 @CapabilityDescription("Performs an HTTP Post with the content of the FlowFile")
 public class PostHTTP extends AbstractProcessor {
@@ -451,7 +452,7 @@ public class PostHTTP extends AbstractProcessor {
         SSLContextBuilder builder = SSLContexts.custom();
         final String trustFilename = service.getTrustStoreFile();
         if (trustFilename != null) {
-            final KeyStore truststore = KeyStore.getInstance(service.getTrustStoreType());
+            final KeyStore truststore = KeyStoreUtils.getTrustStore(service.getTrustStoreType());
             try (final InputStream in = new FileInputStream(new File(service.getTrustStoreFile()))) {
                 truststore.load(in, service.getTrustStorePassword().toCharArray());
             }
@@ -460,7 +461,7 @@ public class PostHTTP extends AbstractProcessor {
 
         final String keyFilename = service.getKeyStoreFile();
         if (keyFilename != null) {
-            final KeyStore keystore = KeyStore.getInstance(service.getKeyStoreType());
+            final KeyStore keystore = KeyStoreUtils.getKeyStore(service.getKeyStoreType());
             try (final InputStream in = new FileInputStream(new File(service.getKeyStoreFile()))) {
                 keystore.load(in, service.getKeyStorePassword().toCharArray());
             }
@@ -487,7 +488,7 @@ public class PostHTTP extends AbstractProcessor {
         final RequestConfig requestConfig = requestConfigBuilder.build();
 
         final StreamThrottler throttler = throttlerRef.get();
-        final ProcessorLog logger = getLogger();
+        final ComponentLog logger = getLogger();
 
         final Double maxBatchBytes = context.getProperty(MAX_BATCH_SIZE).asDataSize(DataUnit.B);
         String lastUrl = null;
@@ -498,7 +499,7 @@ public class PostHTTP extends AbstractProcessor {
         CloseableHttpClient client = null;
         final String transactionId = UUID.randomUUID().toString();
 
-        final ObjectHolder<String> dnHolder = new ObjectHolder<>("none");
+        final AtomicReference<String> dnHolder = new AtomicReference<>("none");
         while (true) {
             FlowFile flowFile = session.get();
             if (flowFile == null) {
@@ -914,7 +915,7 @@ public class PostHTTP extends AbstractProcessor {
     }
 
     private DestinationAccepts getDestinationAcceptance(final boolean sendAsFlowFile, final HttpClient client, final String uri,
-                                                        final ProcessorLog logger, final String transactionId) throws IOException {
+                                                        final ComponentLog logger, final String transactionId) throws IOException {
         final HttpHead head = new HttpHead(uri);
         if (sendAsFlowFile) {
             head.addHeader(TRANSACTION_ID_HEADER, transactionId);

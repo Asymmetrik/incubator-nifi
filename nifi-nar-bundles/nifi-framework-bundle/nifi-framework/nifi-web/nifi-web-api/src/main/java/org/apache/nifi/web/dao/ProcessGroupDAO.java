@@ -16,16 +16,17 @@
  */
 package org.apache.nifi.web.dao;
 
-import java.util.Set;
+import org.apache.nifi.controller.ScheduledState;
 import org.apache.nifi.groups.ProcessGroup;
 import org.apache.nifi.web.api.dto.ProcessGroupDTO;
+
+import java.util.Set;
 
 public interface ProcessGroupDAO {
 
     /**
      * Determines if the specified remote process group exists.
      *
-     * @param groupId id
      * @return true if group exists
      */
     boolean hasProcessGroup(String groupId);
@@ -58,9 +59,18 @@ public interface ProcessGroupDAO {
     /**
      * Verifies the specified process group can be modified.
      *
-     * @param processGroupDTO dto
+     * @param groupId id
+     * @param state scheduled state
      */
-    void verifyUpdate(ProcessGroupDTO processGroupDTO);
+    void verifyScheduleComponents(String groupId, ScheduledState state, Set<String> componentIds);
+
+    /**
+     * Schedules the components in the specified process group.
+     *
+     * @param groupId id
+     * @param state scheduled state
+     */
+    void scheduleComponents(String groupId, ScheduledState state, Set<String> componentIds);
 
     /**
      * Updates the specified process group.

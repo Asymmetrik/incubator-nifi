@@ -86,7 +86,7 @@ public class TestProcessorResource extends JerseyTest {
         final ComponentDetails componentDetails = new ComponentDetails.Builder().properties(properties).build();
 
         Mockito.when(servletContext.getAttribute(Mockito.anyString())).thenReturn(niFiWebConfigurationContext);
-        Mockito.when(niFiWebConfigurationContext.setProperties(any(NiFiWebConfigurationRequestContext.class),any(Map.class))).thenReturn(componentDetails);
+        Mockito.when(niFiWebConfigurationContext.updateComponent(any(NiFiWebConfigurationRequestContext.class),any(String.class),any(Map.class))).thenReturn(componentDetails);
 
         ClientResponse response = client().resource(getBaseURI()).path("/standard/processor/properties")
                                                                .queryParam("processorId","1")

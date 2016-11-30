@@ -16,23 +16,22 @@
  */
 package org.apache.nifi.audit;
 
-import java.util.Date;
-
 import org.apache.nifi.action.Action;
 import org.apache.nifi.action.Component;
 import org.apache.nifi.action.FlowChangeAction;
 import org.apache.nifi.action.Operation;
 import org.apache.nifi.action.details.ActionDetails;
+import org.apache.nifi.authorization.user.NiFiUser;
+import org.apache.nifi.authorization.user.NiFiUserUtils;
 import org.apache.nifi.connectable.Funnel;
-import org.apache.nifi.web.security.user.NiFiUserUtils;
-import org.apache.nifi.user.NiFiUser;
 import org.apache.nifi.web.dao.FunnelDAO;
-
 import org.aspectj.lang.ProceedingJoinPoint;
 import org.aspectj.lang.annotation.Around;
 import org.aspectj.lang.annotation.Aspect;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+
+import java.util.Date;
 
 @Aspect
 public class FunnelAuditor extends NiFiAuditor {
@@ -67,18 +66,17 @@ public class FunnelAuditor extends NiFiAuditor {
      * Audits the removal of a funnel.
      *
      * @param proceedingJoinPoint join point
-     * @param groupId group id
      * @param funnelId funnel id
      * @param funnelDAO funnel dao
      * @throws Throwable ex
      */
     @Around("within(org.apache.nifi.web.dao.FunnelDAO+) && "
-            + "execution(void deleteFunnel(java.lang.String, java.lang.String)) && "
-            + "args(groupId, funnelId) && "
+            + "execution(void deleteFunnel(java.lang.String)) && "
+            + "args(funnelId) && "
             + "target(funnelDAO)")
-    public void removeFunnelAdvice(ProceedingJoinPoint proceedingJoinPoint, String groupId, String funnelId, FunnelDAO funnelDAO) throws Throwable {
+    public void removeFunnelAdvice(ProceedingJoinPoint proceedingJoinPoint, String funnelId, FunnelDAO funnelDAO) throws Throwable {
         // get the funnel before removing it
-        Funnel funnel = funnelDAO.getFunnel(groupId, funnelId);
+        Funnel funnel = funnelDAO.getFunnel(funnelId);
 
         // remove the funnel
         proceedingJoinPoint.proceed();
@@ -122,7 +120,6 @@ public class FunnelAuditor extends NiFiAuditor {
             // create the action for adding this funnel
             action = new FlowChangeAction();
             action.setUserIdentity(user.getIdentity());
-            action.setUserName(user.getUserName());
             action.setOperation(operation);
             action.setTimestamp(new Date());
             action.setSourceId(funnel.getIdentifier());

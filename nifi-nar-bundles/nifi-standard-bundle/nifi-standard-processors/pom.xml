@@ -14,7 +14,7 @@ language governing permissions and limitations under the License. -->
     <parent>
         <groupId>org.apache.nifi</groupId>
         <artifactId>nifi-standard-bundle</artifactId>
-        <version>0.7.1-A4-SNAPSHOT</version>
+        <version>1.1.0-A1-SNAPSHOT</version>
     </parent>
     <artifactId>nifi-standard-processors</artifactId>
     <packaging>jar</packaging>
@@ -155,7 +155,7 @@ language governing permissions and limitations under the License. -->
         <dependency>
             <groupId>org.apache.tika</groupId>
             <artifactId>tika-core</artifactId>
-            <version>1.7</version>
+            <version>1.14</version>
         </dependency>
         <dependency>
             <groupId>com.fasterxml.jackson.core</groupId>
@@ -169,10 +169,10 @@ language governing permissions and limitations under the License. -->
             <groupId>org.apache.nifi</groupId>
             <artifactId>nifi-dbcp-service-api</artifactId>
         </dependency>
-		<dependency>
-			<groupId>org.codehaus.jackson</groupId>
-			<artifactId>jackson-mapper-asl</artifactId>
-		</dependency>
+        <dependency>
+            <groupId>org.codehaus.jackson</groupId>
+            <artifactId>jackson-mapper-asl</artifactId>
+        </dependency>
         <dependency>
             <groupId>com.squareup.okhttp</groupId>
             <artifactId>okhttp</artifactId>
@@ -188,6 +188,10 @@ language governing permissions and limitations under the License. -->
             <groupId>de.svenkubiak</groupId>
             <artifactId>jBcrypt</artifactId>
             <version>0.4.1</version>
+        </dependency>
+        <dependency>
+            <groupId>com.google.guava</groupId>
+            <artifactId>guava</artifactId>
         </dependency>
         <dependency>
             <groupId>org.apache.nifi</groupId>
@@ -238,7 +242,23 @@ language governing permissions and limitations under the License. -->
         <dependency>
             <groupId>org.apache.nifi</groupId>
             <artifactId>nifi-standard-utils</artifactId>
-            <version>0.7.1-A4-SNAPSHOT</version>
+            <version>1.1.0-A1-SNAPSHOT</version>
+        </dependency>
+        <dependency>
+            <groupId>net.sf.supercsv</groupId>
+            <artifactId>super-csv</artifactId>
+            <version>2.4.0</version>
+        </dependency>
+        <dependency>
+            <groupId>com.fluenda</groupId>
+            <artifactId>ParCEFone</artifactId>
+            <version>1.2.0</version>
+            <exclusions>
+                <exclusion>
+                    <groupId>org.slf4j</groupId>
+                    <artifactId>slf4j-log4j12</artifactId>
+                </exclusion>
+            </exclusions>
         </dependency>
     </dependencies>
 
@@ -316,6 +336,7 @@ language governing permissions and limitations under the License. -->
                         <exclude>src/test/resources/TestSplitText/6.txt</exclude>
                         <exclude>src/test/resources/TestJoltTransformJson/input.json</exclude>
                         <exclude>src/test/resources/TestJoltTransformJson/chainrSpec.json</exclude>
+                        <exclude>src/test/resources/TestJoltTransformJson/customChainrSpec.json</exclude>
                         <exclude>src/test/resources/TestJoltTransformJson/chainrOutput.json</exclude>
                         <exclude>src/test/resources/TestJoltTransformJson/cardrSpec.json</exclude>
                         <exclude>src/test/resources/TestJoltTransformJson/cardrOutput.json</exclude>

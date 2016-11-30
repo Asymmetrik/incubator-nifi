@@ -16,7 +16,22 @@
  */
 package org.apache.nifi.processors.lumberjack.handler;
 
-import org.apache.nifi.logging.ProcessorLog;
+import java.io.IOException;
+import java.net.InetSocketAddress;
+import java.nio.ByteBuffer;
+import java.nio.channels.SocketChannel;
+import java.nio.charset.Charset;
+import java.nio.charset.StandardCharsets;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Map;
+import java.util.concurrent.BlockingQueue;
+import java.util.concurrent.LinkedBlockingQueue;
+
+import javax.net.ssl.SSLContext;
+import javax.xml.bind.DatatypeConverter;
+
+import org.apache.nifi.logging.ComponentLog;
 import org.apache.nifi.processor.util.listen.dispatcher.AsyncChannelDispatcher;
 import org.apache.nifi.processor.util.listen.dispatcher.ChannelDispatcher;
 import org.apache.nifi.processor.util.listen.dispatcher.SocketChannelDispatcher;
@@ -30,20 +45,6 @@ import org.junit.Before;
 import org.junit.Test;
 import org.mockito.Mockito;
 
-import javax.net.ssl.SSLContext;
-import javax.xml.bind.DatatypeConverter;
-import java.io.IOException;
-import java.net.InetSocketAddress;
-import java.nio.ByteBuffer;
-import java.nio.channels.SocketChannel;
-import java.nio.charset.Charset;
-import java.nio.charset.StandardCharsets;
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Map;
-import java.util.concurrent.BlockingQueue;
-import java.util.concurrent.LinkedBlockingQueue;
-
 
 
 
@@ -52,7 +53,7 @@ public class TestLumberjackSocketChannelHandler {
     private ChannelHandlerFactory<TestEvent,AsyncChannelDispatcher> channelHandlerFactory;
     private BlockingQueue<ByteBuffer> byteBuffers;
     private BlockingQueue<TestEvent> events;
-    private ProcessorLog logger = Mockito.mock(ProcessorLog.class);
+    private ComponentLog logger = Mockito.mock(ComponentLog.class);
     private int maxConnections;
     private SSLContext sslContext;
     private Charset charset;
@@ -67,7 +68,7 @@ public class TestLumberjackSocketChannelHandler {
         byteBuffers.add(ByteBuffer.allocate(4096));
 
         events = new LinkedBlockingQueue<>();
-        logger = Mockito.mock(ProcessorLog.class);
+        logger = Mockito.mock(ComponentLog.class);
 
         maxConnections = 1;
         sslContext = null;

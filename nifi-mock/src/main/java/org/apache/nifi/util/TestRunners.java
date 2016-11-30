@@ -17,18 +17,16 @@
 package org.apache.nifi.util;
 
 import org.apache.nifi.processor.Processor;
-import org.apache.nifi.registry.VariableRegistryUtils;
 
 public class TestRunners {
 
     public static TestRunner newTestRunner(final Processor processor) {
-        return new StandardProcessorTestRunner(processor, VariableRegistryUtils.createVariableRegistry());
+        return new StandardProcessorTestRunner(processor);
     }
 
     public static TestRunner newTestRunner(final Class<? extends Processor> processorClass) {
         try {
             return newTestRunner(processorClass.newInstance());
-
         } catch (final Exception e) {
             System.err.println("Could not instantiate instance of class " + processorClass.getName() + " due to: " + e);
             throw new RuntimeException(e);

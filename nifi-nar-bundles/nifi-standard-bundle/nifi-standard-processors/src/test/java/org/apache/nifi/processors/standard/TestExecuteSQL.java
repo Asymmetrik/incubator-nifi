@@ -172,6 +172,35 @@ public class TestExecuteSQL {
     }
 
     @Test
+    public void testWithduplicateColumns() throws SQLException {
+        // remove previous test database, if any
+        final File dbLocation = new File(DB_LOCATION);
+        dbLocation.delete();
+
+        // load test data to database
+        final Connection con = ((DBCPService) runner.getControllerService("dbcp")).getConnection();
+        Statement stmt = con.createStatement();
+
+        try {
+            stmt.execute("drop table host1");
+            stmt.execute("drop table host2");
+        } catch (final SQLException sqle) {
+        }
+
+        stmt.execute("create table host1 (id integer not null, host varchar(45))");
+        stmt.execute("create table host2 (id integer not null, host varchar(45))");
+        stmt.execute("insert into host1 values(1,'host1')");
+        stmt.execute("insert into host2 values(1,'host2')");
+        stmt.execute("select a.host as hostA,b.host as hostB from host1 a join host2 b on b.id=a.id");
+        runner.setIncomingConnection(false);
+        runner.setProperty(ExecuteSQL.SQL_SELECT_QUERY, "select a.host as hostA,b.host as hostB from host1 a join host2 b on b.id=a.id");
+        runner.run();
+
+        runner.assertAllFlowFilesTransferred(ExecuteSQL.REL_SUCCESS, 1);
+        runner.getFlowFilesForRelationship(ExecuteSQL.REL_SUCCESS).get(0).assertAttributeEquals(ExecuteSQL.RESULT_ROW_COUNT, "1");
+    }
+
+    @Test
     public void testWithSqlException() throws SQLException {
         // remove previous test database, if any
         final File dbLocation = new File(DB_LOCATION);
@@ -189,7 +218,7 @@ public class TestExecuteSQL {
         stmt.execute("create table TEST_NO_ROWS (id integer)");
 
         runner.setIncomingConnection(false);
-        // Try a valid SQL statment that will generate an error (val1 does not exist, e.g.)
+        // Try a valid SQL statement that will generate an error (val1 does not exist, e.g.)
         runner.setProperty(ExecuteSQL.SQL_SELECT_QUERY, "SELECT val1 FROM TEST_NO_ROWS");
         runner.run();
 

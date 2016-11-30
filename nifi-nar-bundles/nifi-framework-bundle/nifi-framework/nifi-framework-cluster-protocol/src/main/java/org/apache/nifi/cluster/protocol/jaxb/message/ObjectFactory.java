@@ -20,16 +20,18 @@ import javax.xml.bind.annotation.XmlRegistry;
 
 import org.apache.nifi.cluster.protocol.message.ConnectionRequestMessage;
 import org.apache.nifi.cluster.protocol.message.ConnectionResponseMessage;
-import org.apache.nifi.cluster.protocol.message.ControllerStartupFailureMessage;
 import org.apache.nifi.cluster.protocol.message.DisconnectMessage;
 import org.apache.nifi.cluster.protocol.message.FlowRequestMessage;
 import org.apache.nifi.cluster.protocol.message.FlowResponseMessage;
 import org.apache.nifi.cluster.protocol.message.HeartbeatMessage;
+import org.apache.nifi.cluster.protocol.message.HeartbeatResponseMessage;
+import org.apache.nifi.cluster.protocol.message.ClusterWorkloadRequestMessage;
+import org.apache.nifi.cluster.protocol.message.ClusterWorkloadResponseMessage;
 import org.apache.nifi.cluster.protocol.message.MulticastProtocolMessage;
-import org.apache.nifi.cluster.protocol.message.NodeBulletinsMessage;
+import org.apache.nifi.cluster.protocol.message.NodeConnectionStatusRequestMessage;
+import org.apache.nifi.cluster.protocol.message.NodeConnectionStatusResponseMessage;
+import org.apache.nifi.cluster.protocol.message.NodeStatusChangeMessage;
 import org.apache.nifi.cluster.protocol.message.PingMessage;
-import org.apache.nifi.cluster.protocol.message.PrimaryRoleAssignmentMessage;
-import org.apache.nifi.cluster.protocol.message.ReconnectionFailureMessage;
 import org.apache.nifi.cluster.protocol.message.ReconnectionRequestMessage;
 import org.apache.nifi.cluster.protocol.message.ReconnectionResponseMessage;
 import org.apache.nifi.cluster.protocol.message.ServiceBroadcastMessage;
@@ -44,10 +46,6 @@ public class ObjectFactory {
 
     public ReconnectionRequestMessage createReconnectionRequestMessage() {
         return new ReconnectionRequestMessage();
-    }
-
-    public ReconnectionFailureMessage createReconnectionFailureMessage() {
-        return new ReconnectionFailureMessage();
     }
 
     public ReconnectionResponseMessage createReconnectionResponseMessage() {
@@ -90,15 +88,28 @@ public class ObjectFactory {
         return new MulticastProtocolMessage();
     }
 
-    public ControllerStartupFailureMessage createControllerStartupFailureMessage() {
-        return new ControllerStartupFailureMessage();
+    public NodeStatusChangeMessage createNodeStatusChangeMessage() {
+        return new NodeStatusChangeMessage();
     }
 
-    public PrimaryRoleAssignmentMessage createPrimaryRoleAssignmentMessage() {
-        return new PrimaryRoleAssignmentMessage();
+    public NodeConnectionStatusRequestMessage createNodeConnectionStatusRequestMessage() {
+        return new NodeConnectionStatusRequestMessage();
     }
 
-    public NodeBulletinsMessage createBulletinsMessage() {
-        return new NodeBulletinsMessage();
+    public NodeConnectionStatusResponseMessage createNodeConnectionStatusResponsetMessage() {
+        return new NodeConnectionStatusResponseMessage();
     }
+
+    public HeartbeatResponseMessage createHeartbeatResponse() {
+        return new HeartbeatResponseMessage();
+    }
+
+    public ClusterWorkloadRequestMessage createClusterWorkloadRequest() {
+        return new ClusterWorkloadRequestMessage();
+    }
+
+    public ClusterWorkloadResponseMessage createClusterWorkloadResponse() {
+        return new ClusterWorkloadResponseMessage();
+    }
+
 }

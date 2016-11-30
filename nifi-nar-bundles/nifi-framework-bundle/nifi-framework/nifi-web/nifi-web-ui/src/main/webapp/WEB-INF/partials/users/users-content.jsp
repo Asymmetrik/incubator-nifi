@@ -18,29 +18,24 @@
 <div id="users">
     <div id="users-header-and-filter">
         <div id="users-header-text">NiFi Users</div>
-        <div id="users-filter-controls">
-            <div id="users-filter-container">
-                <input type="text" id="users-filter"/>
-                <div id="users-filter-type"></div>
-            </div>
-            <div id="users-filter-stats">
-                Displaying&nbsp;<span id="displayed-users"></span>&nbsp;of&nbsp;<span id="total-users"></span>
-            </div>
-        </div>
     </div>
-    <div id="users-refresh-container">
-        <div id="refresh-button" class="users-refresh pointer" title="Refresh"></div>
-        <div id="users-last-refreshed-container">
-            Last updated:&nbsp;<span id="users-last-refreshed"></span>
+    <div id="users-filter-controls">
+        <div id="users-filter-status" class="filter-status">
+            Displaying&nbsp;<span id="displayed-users"></span>&nbsp;of&nbsp;<span id="total-users"></span>
         </div>
-        <div id="users-loading-container" class="loading-container"></div>
-        <div id="group-controls-container">
-            <div id="group-collaspe-container">
-                <div id="group-collaspe-checkbox" class="nf-checkbox checkbox-unchecked"></div>
-                <span>&nbsp;Show by group</span>
-            </div>
-            <div id="group-button" class="button-normal pointer">Group</div>
+        <div id="users-filter-container">
+            <input type="text" placeholder="Filter" id="users-filter" class="filter"/>
+            <div id="users-filter-type" class="filter-type"></div>
         </div>
+        <button id="new-user-button" class="fa fa-user-plus"></button>
+        <div class="clear"></div>
     </div>
     <div id="users-table"></div>
+</div>
+<div id="users-refresh-container">
+    <button id="user-refresh-button" class="refresh-button pointer fa fa-refresh" title="Refresh"></button>
+    <div id="users-last-refreshed-container" class="last-refreshed-container">
+        Last updated:&nbsp;<span id="users-last-refreshed" class="value-color"></span>
+    </div>
+    <div id="users-loading-container" class="loading-container"></div>
 </div>

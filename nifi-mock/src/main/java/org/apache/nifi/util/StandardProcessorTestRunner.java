@@ -21,9 +21,7 @@ import static java.util.Objects.requireNonNull;
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.io.InputStream;
-import java.lang.annotation.Annotation;
 import java.lang.reflect.InvocationTargetException;
-import java.lang.reflect.Method;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -35,6 +33,7 @@ import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutorService;
@@ -43,6 +42,8 @@ import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
+import java.util.function.Predicate;
+
 import org.apache.nifi.annotation.behavior.TriggerSerially;
 import org.apache.nifi.annotation.lifecycle.OnAdded;
 import org.apache.nifi.annotation.lifecycle.OnConfigurationRestored;
@@ -67,8 +68,7 @@ import org.apache.nifi.processor.ProcessSessionFactory;
 import org.apache.nifi.processor.Processor;
 import org.apache.nifi.processor.Relationship;
 import org.apache.nifi.provenance.ProvenanceEventRecord;
-import org.apache.nifi.provenance.ProvenanceReporter;
-import org.apache.nifi.registry.VariableRegistry;
+import org.apache.nifi.registry.VariableDescriptor;
 import org.apache.nifi.reporting.InitializationException;
 import org.apache.nifi.state.MockStateManager;
 import org.junit.Assert;
@@ -84,34 +84,23 @@ public class StandardProcessorTestRunner implements TestRunner {
     private final boolean triggerSerially;
     private final MockStateManager processorStateManager;
     private final Map<String, MockStateManager> controllerServiceStateManagers = new HashMap<>();
-    private final VariableRegistry variableRegistry;
+    private final MockVariableRegistry variableRegistry;
 
     private int numThreads = 1;
     private final AtomicInteger invocations = new AtomicInteger(0);
 
-    private static final Set<Class<? extends Annotation>> deprecatedTypeAnnotations = new HashSet<>();
-    private static final Set<Class<? extends Annotation>> deprecatedMethodAnnotations = new HashSet<>();
-    private final Map<String, MockProcessorLog> controllerServiceLoggers = new HashMap<>();
-    private final MockProcessorLog logger;
+    private final Map<String, MockComponentLog> controllerServiceLoggers = new HashMap<>();
+    private final MockComponentLog logger;
 
-    static {
-        // do this in a separate method, just so that we can add a @SuppressWarnings annotation
-        // because we want to indicate explicitly that we know that we are using deprecated
-        // classes here.
-        populateDeprecatedMethods();
-    }
-
-    StandardProcessorTestRunner(final Processor processor, final VariableRegistry variableRegistry) {
+    StandardProcessorTestRunner(final Processor processor) {
         this.processor = processor;
         this.idGenerator = new AtomicLong(0L);
         this.sharedState = new SharedSessionState(processor, idGenerator);
         this.flowFileQueue = sharedState.getFlowFileQueue();
         this.sessionFactory = new MockSessionFactory(sharedState, processor);
         this.processorStateManager = new MockStateManager(processor);
-        this.variableRegistry = variableRegistry;
+        this.variableRegistry = new MockVariableRegistry();
         this.context = new MockProcessContext(processor, processorStateManager, variableRegistry);
-
-        detectDeprecatedAnnotations(processor);
 
         final MockProcessorInitializationContext mockInitContext = new MockProcessorInitializationContext(processor, context);
         processor.initialize(mockInitContext);
@@ -126,42 +115,6 @@ public class StandardProcessorTestRunner implements TestRunner {
         triggerSerially = null != processor.getClass().getAnnotation(TriggerSerially.class);
 
         ReflectionUtils.quietlyInvokeMethodsWithAnnotation(OnConfigurationRestored.class, processor);
-    }
-
-    @SuppressWarnings("deprecation")
-    private static void populateDeprecatedMethods() {
-        deprecatedTypeAnnotations.add(org.apache.nifi.processor.annotation.CapabilityDescription.class);
-        deprecatedTypeAnnotations.add(org.apache.nifi.processor.annotation.EventDriven.class);
-        deprecatedTypeAnnotations.add(org.apache.nifi.processor.annotation.SideEffectFree.class);
-        deprecatedTypeAnnotations.add(org.apache.nifi.processor.annotation.SupportsBatching.class);
-        deprecatedTypeAnnotations.add(org.apache.nifi.processor.annotation.Tags.class);
-        deprecatedTypeAnnotations.add(org.apache.nifi.processor.annotation.TriggerWhenEmpty.class);
-        deprecatedTypeAnnotations.add(org.apache.nifi.processor.annotation.TriggerWhenAnyDestinationAvailable.class);
-        deprecatedTypeAnnotations.add(org.apache.nifi.processor.annotation.TriggerSerially.class);
-
-        deprecatedMethodAnnotations.add(org.apache.nifi.processor.annotation.OnRemoved.class);
-        deprecatedMethodAnnotations.add(org.apache.nifi.processor.annotation.OnAdded.class);
-        deprecatedMethodAnnotations.add(org.apache.nifi.processor.annotation.OnScheduled.class);
-        deprecatedMethodAnnotations.add(org.apache.nifi.processor.annotation.OnShutdown.class);
-        deprecatedMethodAnnotations.add(org.apache.nifi.processor.annotation.OnStopped.class);
-        deprecatedMethodAnnotations.add(org.apache.nifi.processor.annotation.OnUnscheduled.class);
-    }
-
-    private static void detectDeprecatedAnnotations(final Processor processor) {
-        for (final Class<? extends Annotation> annotationClass : deprecatedTypeAnnotations) {
-            if (processor.getClass().isAnnotationPresent(annotationClass)) {
-                Assert.fail("Processor is using deprecated Annotation " + annotationClass.getCanonicalName());
-            }
-        }
-
-        for (final Class<? extends Annotation> annotationClass : deprecatedMethodAnnotations) {
-            for (final Method method : processor.getClass().getMethods()) {
-                if (method.isAnnotationPresent(annotationClass)) {
-                    Assert.fail("Processor is using deprecated Annotation " + annotationClass.getCanonicalName() + " for method " + method);
-                }
-            }
-        }
-
     }
 
     @Override
@@ -302,6 +255,26 @@ public class StandardProcessorTestRunner implements TestRunner {
     }
 
     @Override
+    public void assertAllFlowFilesTransferred(final String relationship) {
+        for (final MockProcessSession session : sessionFactory.getCreatedSessions()) {
+            session.assertAllFlowFilesTransferred(relationship);
+        }
+    }
+
+    @Override
+    public void assertAllFlowFilesTransferred(final Relationship relationship) {
+        for (final MockProcessSession session : sessionFactory.getCreatedSessions()) {
+            session.assertAllFlowFilesTransferred(relationship);
+        }
+    }
+
+    @Override
+    public void assertAllFlowFilesTransferred(final String relationship, final int count) {
+        assertAllFlowFilesTransferred(relationship);
+        assertTransferCount(relationship, count);
+    }
+
+    @Override
     public void assertAllFlowFilesContainAttribute(final String attributeName) {
         assertAllFlowFiles(new FlowFileValidator() {
             @Override
@@ -322,37 +295,17 @@ public class StandardProcessorTestRunner implements TestRunner {
     }
 
     @Override
-    public void assertAllFlowFiles(final FlowFileValidator validator) {
+    public void assertAllFlowFiles(FlowFileValidator validator) {
         for (final MockProcessSession session : sessionFactory.getCreatedSessions()) {
             session.assertAllFlowFiles(validator);
         }
     }
 
     @Override
-    public void assertAllFlowFiles(final Relationship relationship, final FlowFileValidator validator) {
+    public void assertAllFlowFiles(Relationship relationship, FlowFileValidator validator) {
         for (final MockProcessSession session : sessionFactory.getCreatedSessions()) {
             session.assertAllFlowFiles(relationship, validator);
         }
-    }
-
-    @Override
-    public void assertAllFlowFilesTransferred(final String relationship) {
-        for (final MockProcessSession session : sessionFactory.getCreatedSessions()) {
-            session.assertAllFlowFilesTransferred(relationship);
-        }
-    }
-
-    @Override
-    public void assertAllFlowFilesTransferred(final Relationship relationship) {
-        for (final MockProcessSession session : sessionFactory.getCreatedSessions()) {
-            session.assertAllFlowFilesTransferred(relationship);
-        }
-    }
-
-    @Override
-    public void assertAllFlowFilesTransferred(final String relationship, final int count) {
-        assertAllFlowFilesTransferred(relationship);
-        assertTransferCount(relationship, count);
     }
 
     @Override
@@ -416,54 +369,55 @@ public class StandardProcessorTestRunner implements TestRunner {
     }
 
     @Override
-    public void enqueue(final Path path) throws IOException {
-        enqueue(path, new HashMap<String, String>());
+    public MockFlowFile enqueue(final Path path) throws IOException {
+        return enqueue(path, new HashMap<String, String>());
     }
 
     @Override
-    public void enqueue(final Path path, final Map<String, String> attributes) throws IOException {
+    public MockFlowFile enqueue(final Path path, final Map<String, String> attributes) throws IOException {
         final Map<String, String> modifiedAttributes = new HashMap<>(attributes);
         if (!modifiedAttributes.containsKey(CoreAttributes.FILENAME.key())) {
             modifiedAttributes.put(CoreAttributes.FILENAME.key(), path.toFile().getName());
         }
         try (final InputStream in = Files.newInputStream(path)) {
-            enqueue(in, modifiedAttributes);
+            return enqueue(in, modifiedAttributes);
         }
     }
 
     @Override
-    public void enqueue(final byte[] data) {
-        enqueue(data, new HashMap<String, String>());
+    public MockFlowFile enqueue(final byte[] data) {
+        return enqueue(data, new HashMap<String, String>());
     }
 
     @Override
-    public void enqueue(final String data) {
-        enqueue(data.getBytes(StandardCharsets.UTF_8), Collections.<String, String> emptyMap());
+    public MockFlowFile enqueue(final String data) {
+        return enqueue(data.getBytes(StandardCharsets.UTF_8), Collections.<String, String> emptyMap());
     }
 
     @Override
-    public void enqueue(final byte[] data, final Map<String, String> attributes) {
-        enqueue(new ByteArrayInputStream(data), attributes);
+    public MockFlowFile enqueue(final byte[] data, final Map<String, String> attributes) {
+        return enqueue(new ByteArrayInputStream(data), attributes);
     }
 
     @Override
-    public void enqueue(final String data, final Map<String, String> attributes) {
-        enqueue(data.getBytes(StandardCharsets.UTF_8), attributes);
+    public MockFlowFile enqueue(final String data, final Map<String, String> attributes) {
+        return enqueue(data.getBytes(StandardCharsets.UTF_8), attributes);
     }
 
 
     @Override
-    public void enqueue(final InputStream data) {
-        enqueue(data, new HashMap<String, String>());
+    public MockFlowFile enqueue(final InputStream data) {
+        return enqueue(data, new HashMap<String, String>());
     }
 
     @Override
-    public void enqueue(final InputStream data, final Map<String, String> attributes) {
+    public MockFlowFile enqueue(final InputStream data, final Map<String, String> attributes) {
         final MockProcessSession session = new MockProcessSession(new SharedSessionState(processor, idGenerator), processor);
         MockFlowFile flowFile = session.create();
         flowFile = session.importFrom(data, flowFile);
         flowFile = session.putAllAttributes(flowFile, attributes);
         enqueue(flowFile);
+        return flowFile;
     }
 
     @Override
@@ -509,15 +463,6 @@ public class StandardProcessorTestRunner implements TestRunner {
         });
 
         return flowFiles;
-    }
-
-    /**
-     * @deprecated The ProvenanceReporter should not be accessed through the test runner, as it does not expose the events that were emitted.
-     */
-    @Override
-    @Deprecated
-    public ProvenanceReporter getProvenanceReporter() {
-        return sharedState.getProvenanceReporter();
     }
 
     @Override
@@ -643,14 +588,7 @@ public class StandardProcessorTestRunner implements TestRunner {
 
     @Override
     public void addControllerService(final String identifier, final ControllerService service, final Map<String, String> properties) throws InitializationException {
-        // hold off on failing due to deprecated annotation for now... will introduce later.
-        // for ( final Method method : service.getClass().getMethods() ) {
-        // if ( method.isAnnotationPresent(org.apache.nifi.controller.annotation.OnConfigured.class) ) {
-        // Assert.fail("Controller Service " + service + " is using deprecated Annotation " + org.apache.nifi.controller.annotation.OnConfigured.class + " for method " + method);
-        // }
-        // }
-
-        final MockProcessorLog logger = new MockProcessorLog(identifier, service);
+        final MockComponentLog logger = new MockComponentLog(identifier, service);
         controllerServiceLoggers.put(identifier, logger);
         final MockStateManager serviceStateManager = new MockStateManager(service);
         final MockControllerServiceInitializationContext initContext = new MockControllerServiceInitializationContext(requireNonNull(service), requireNonNull(identifier), logger, serviceStateManager);
@@ -879,13 +817,82 @@ public class StandardProcessorTestRunner implements TestRunner {
     }
 
     @Override
-    public MockProcessorLog getLogger() {
+    public MockComponentLog getLogger() {
         return logger;
     }
 
     @Override
-    public MockProcessorLog getControllerServiceLogger(final String identifier) {
+    public MockComponentLog getControllerServiceLogger(final String identifier) {
         return controllerServiceLoggers.get(identifier);
     }
 
+    @Override
+    public void setClustered(boolean clustered) {
+        context.setClustered(clustered);
+    }
+
+    @Override
+    public void setPrimaryNode(boolean primaryNode) {
+        context.setPrimaryNode(primaryNode);
+    }
+
+    @Override
+    public String getVariableValue(final String name) {
+        Objects.requireNonNull(name);
+
+        return variableRegistry.getVariableValue(name);
+    }
+
+    @Override
+    public void setVariable(final String name, final String value) {
+        Objects.requireNonNull(name);
+        Objects.requireNonNull(value);
+
+        final VariableDescriptor descriptor = new VariableDescriptor.Builder(name).build();
+        variableRegistry.setVariable(descriptor, value);
+    }
+
+    @Override
+    public String removeVariable(final String name) {
+        Objects.requireNonNull(name);
+
+        return variableRegistry.removeVariable(new VariableDescriptor.Builder(name).build());
+    }
+
+    /**
+     * Asserts that all FlowFiles meet all conditions.
+     *
+     * @param relationshipName relationship name
+     * @param predicate conditions
+     */
+    @Override
+    public void assertAllConditionsMet(final String relationshipName, Predicate<MockFlowFile> predicate) {
+        assertAllConditionsMet(new Relationship.Builder().name(relationshipName).build(), predicate);
+    }
+
+    /**
+     * Asserts that all FlowFiles meet all conditions.
+     *
+     * @param relationship relationship
+     * @param predicate conditions
+     */
+    @Override
+    public void assertAllConditionsMet(final Relationship relationship, Predicate<MockFlowFile> predicate) {
+
+        if (predicate==null) {
+            Assert.fail("predicate cannot be null");
+        }
+
+        final List<MockFlowFile> flowFiles = getFlowFilesForRelationship(relationship);
+
+        if (flowFiles.isEmpty()) {
+            Assert.fail("Relationship " + relationship.getName() + " does not contain any FlowFile");
+        }
+
+        for (MockFlowFile flowFile : flowFiles) {
+            if (predicate.test(flowFile)==false) {
+                Assert.fail("FlowFile " + flowFile + " does not meet all condition");
+            }
+        }
+    }
 }

@@ -34,7 +34,7 @@ import javax.jms.Topic;
 
 import org.apache.nifi.jms.processors.JMSConsumer.ConsumerCallback;
 import org.apache.nifi.jms.processors.JMSConsumer.JMSResponse;
-import org.apache.nifi.logging.ProcessorLog;
+import org.apache.nifi.logging.ComponentLog;
 import org.junit.Test;
 import org.springframework.jms.connection.CachingConnectionFactory;
 import org.springframework.jms.core.JmsTemplate;
@@ -47,7 +47,8 @@ public class JMSPublisherConsumerTest {
     public void validateBytesConvertedToBytesMessageOnSend() throws Exception {
         final String destinationName = "testQueue";
         JmsTemplate jmsTemplate = CommonTest.buildJmsTemplateForDestination(false);
-        JMSPublisher publisher = new JMSPublisher(jmsTemplate, mock(ProcessorLog.class));
+
+        JMSPublisher publisher = new JMSPublisher(jmsTemplate, mock(ComponentLog.class));
         publisher.publish(destinationName, "hellomq".getBytes());
 
         Message receivedMessage = jmsTemplate.receive(destinationName);
@@ -64,7 +65,7 @@ public class JMSPublisherConsumerTest {
         final String destinationName = "testQueue";
         JmsTemplate jmsTemplate = CommonTest.buildJmsTemplateForDestination(false);
 
-        JMSPublisher publisher = new JMSPublisher(jmsTemplate, mock(ProcessorLog.class));
+        JMSPublisher publisher = new JMSPublisher(jmsTemplate, mock(ComponentLog.class));
         Map<String, String> flowFileAttributes = new HashMap<>();
         flowFileAttributes.put("foo", "foo");
         flowFileAttributes.put(JmsHeaders.REPLY_TO, "myTopic");
@@ -97,7 +98,7 @@ public class JMSPublisherConsumerTest {
             }
         });
 
-        JMSConsumer consumer = new JMSConsumer(jmsTemplate, mock(ProcessorLog.class));
+        JMSConsumer consumer = new JMSConsumer(jmsTemplate, mock(ComponentLog.class));
         try {
             consumer.consume(destinationName, new ConsumerCallback() {
                 @Override
@@ -126,7 +127,7 @@ public class JMSPublisherConsumerTest {
             }
         });
 
-        JMSConsumer consumer = new JMSConsumer(jmsTemplate, mock(ProcessorLog.class));
+        JMSConsumer consumer = new JMSConsumer(jmsTemplate, mock(ComponentLog.class));
         final AtomicBoolean callbackInvoked = new AtomicBoolean();
         consumer.consume(destinationName, new ConsumerCallback() {
             @Override
@@ -147,11 +148,11 @@ public class JMSPublisherConsumerTest {
     public void validateMessageRedeliveryWhenNotAcked() throws Exception {
         String destinationName = "testQueue";
         JmsTemplate jmsTemplate = CommonTest.buildJmsTemplateForDestination(false);
-        JMSPublisher publisher = new JMSPublisher(jmsTemplate, mock(ProcessorLog.class));
+        JMSPublisher publisher = new JMSPublisher(jmsTemplate, mock(ComponentLog.class));
         publisher.publish(destinationName, "1".getBytes(StandardCharsets.UTF_8));
         publisher.publish(destinationName, "2".getBytes(StandardCharsets.UTF_8));
 
-        JMSConsumer consumer = new JMSConsumer(jmsTemplate, mock(ProcessorLog.class));
+        JMSConsumer consumer = new JMSConsumer(jmsTemplate, mock(ComponentLog.class));
         final AtomicBoolean callbackInvoked = new AtomicBoolean();
         try {
             consumer.consume(destinationName, new ConsumerCallback() {

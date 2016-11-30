@@ -22,13 +22,6 @@
  */
 nf.ComponentState = (function () {
 
-    var config = {
-        filterText: 'Filter',
-        styles: {
-            filterList: 'filter-list'
-        }
-    };
-
     /**
      * Filters the component state table.
      */
@@ -105,12 +98,7 @@ nf.ComponentState = (function () {
      * accounts for that.
      */
     var getFilterText = function () {
-        var filterText = '';
-        var filterField = $('#component-state-filter');
-        if (!filterField.hasClass(config.styles.filterList)) {
-            filterText = filterField.val();
-        }
-        return filterText;
+        return $('#component-state-filter').val();
     };
 
     /**
@@ -195,7 +183,7 @@ nf.ComponentState = (function () {
         $('#component-state-description').text('');
 
         // clear any filter strings
-        $('#component-state-filter').addClass(config.styles.filterList).val(config.filterText);
+        $('#component-state-filter').val('');
 
         // reset clear link
         $('#clear-link').removeClass('disabled').attr('title', '');
@@ -210,24 +198,21 @@ nf.ComponentState = (function () {
     return {
         init: function () {
             // intialize the component state filter
-            $('#component-state-filter').on('focus', function () {
-                if ($(this).hasClass(config.styles.filterList)) {
-                    $(this).removeClass(config.styles.filterList).val('');
-                }
-            }).on('blur', function () {
-                if ($(this).val() === '') {
-                    $(this).addClass(config.styles.filterList).val(config.filterText);
-                }
-            }).on('keyup', function () {
+            $('#component-state-filter').on('keyup', function () {
                 applyFilter();
-            }).addClass(config.styles.filterList).val(config.filterText);
+            });
 
             // initialize the processor configuration dialog
             $('#component-state-dialog').modal({
+                scrollableContentStyle: 'scrollable',
                 headerText: 'Component State',
-                overlayBackground: false,
                 buttons: [{
                     buttonText: 'Close',
+                    color: {
+                        base: '#728E9B',
+                        hover: '#004849',
+                        text: '#ffffff'
+                    },
                     handler: {
                         click: function () {
                             $(this).modal('hide');
@@ -237,11 +222,14 @@ nf.ComponentState = (function () {
                 handler: {
                     close: function () {
                         resetDialog();
+                    },
+                    resize: function () {
+                        $('#component-state-description')
+                            .width($('#component-state-dialog').find('.dialog-content').innerWidth() - 1)
+                            .text($('#component-state-description').attr('title'))
+                            .ellipsis();
                     }
                 }
-            }).draggable({
-                containment: 'parent',
-                handle: '.dialog-header'
             });
 
             // clear state link
@@ -254,21 +242,12 @@ nf.ComponentState = (function () {
                     var stateEntryCount = componentStateGrid.getDataLength();
 
                     if (stateEntryCount > 0) {
-                        // clear the state
-                        var revision = nf.Client.getRevision();
-                        var component = componentStateTable.data('component');
+                        var componentEntity = componentStateTable.data('component');
                         $.ajax({
                             type: 'POST',
-                            url: component.uri + '/state/clear-requests',
-                            data: {
-                                version: revision.version,
-                                clientId: revision.clientId
-                            },
+                            url: componentEntity.uri + '/state/clear-requests',
                             dataType: 'json'
                         }).done(function (response) {
-                            // update the revision
-                            nf.Client.setRevision(response.revision);
-
                             // clear the table
                             clearTable();
 
@@ -277,8 +256,8 @@ nf.ComponentState = (function () {
                         }).fail(nf.Common.handleAjaxError);
                     } else {
                         nf.Dialog.showOkDialog({
-                            dialogContent: 'This component has no state to clear.',
-                            overlayBackground: false
+                            headerText: 'Component State',
+                            dialogContent: 'This component has no state to clear.'
                         });
                     }
                 }
@@ -292,7 +271,13 @@ nf.ComponentState = (function () {
 
             // conditionally show the cluster node identifier
             if (nf.Canvas.isClustered()) {
-                componentStateColumns.push({id: 'scope', field: 'scope', name: 'Scope', sortable: true, resizable: true});
+                componentStateColumns.push({
+                    id: 'scope',
+                    field: 'scope',
+                    name: 'Scope',
+                    sortable: true,
+                    resizable: true
+                });
             }
 
             var componentStateOptions = {
@@ -300,7 +285,8 @@ nf.ComponentState = (function () {
                 enableTextSelectionOnCells: true,
                 enableCellNavigation: false,
                 enableColumnReorder: false,
-                autoEdit: false
+                autoEdit: false,
+                rowHeight: 24
             };
 
             // initialize the dataview
@@ -356,13 +342,13 @@ nf.ComponentState = (function () {
         /**
          * Shows the state for a given component.
          *
-         * @param {object} component
+         * @param {object} componentEntity
          * @param {boolean} canClear
          */
-        showState: function (component, canClear) {
+        showState: function (componentEntity, canClear) {
             return $.ajax({
                 type: 'GET',
-                url: component.uri + '/state',
+                url: componentEntity.uri + '/state',
                 dataType: 'json'
             }).done(function (response) {
                 var componentState = response.componentState;
@@ -371,15 +357,18 @@ nf.ComponentState = (function () {
                 // load the table
                 loadComponentState(componentState.localState, componentState.clusterState);
 
-                // populate the name/description
-                $('#component-state-name').text(component.name);
-                $('#component-state-description').text(componentState.stateDescription).ellipsis();
-
-                // store the component
-                componentStateTable.data('component', component);
-
                 // show the dialog
                 $('#component-state-dialog').modal('show');
+
+                // populate the name/description
+                $('#component-state-name').text(componentEntity.component.name);
+                $('#component-state-description')
+                    .width($('#component-state-dialog').find('.dialog-content').innerWidth() - 1)
+                    .text(componentState.stateDescription)
+                    .ellipsis();
+
+                // store the component
+                componentStateTable.data('component', componentEntity);
 
                 // only activate the link when appropriate
                 if (canClear === false) {

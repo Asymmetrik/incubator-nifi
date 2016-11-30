@@ -30,7 +30,6 @@ public class LineageDTO {
 
     private String id;
     private String uri;
-    private String clusterNodeId;
 
     private Date submissionTime;
     private Date expiration;
@@ -69,25 +68,12 @@ public class LineageDTO {
     }
 
     /**
-     * @return id of the node in the cluster where this lineage originated
-     */
-    @ApiModelProperty(
-            value = "The id of the node where this lineage originated if clustered."
-    )
-    public String getClusterNodeId() {
-        return clusterNodeId;
-    }
-
-    public void setClusterNodeId(String clusterNodeId) {
-        this.clusterNodeId = clusterNodeId;
-    }
-
-    /**
      * @return submission time for this lineage
      */
     @XmlJavaTypeAdapter(TimestampAdapter.class)
     @ApiModelProperty(
-            value = "When the lineage query was submitted."
+            value = "When the lineage query was submitted.",
+            dataType = "string"
     )
     public Date getSubmissionTime() {
         return submissionTime;
@@ -102,7 +88,8 @@ public class LineageDTO {
      */
     @XmlJavaTypeAdapter(TimestampAdapter.class)
     @ApiModelProperty(
-            value = "When the lineage query will expire."
+            value = "When the lineage query will expire.",
+            dataType = "string"
     )
     public Date getExpiration() {
         return expiration;

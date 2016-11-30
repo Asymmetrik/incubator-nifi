@@ -41,13 +41,13 @@ import org.apache.nifi.processor.ProcessContext;
 import org.apache.nifi.processor.ProcessorInitializationContext;
 import org.apache.nifi.processor.exception.ProcessException;
 import org.apache.nifi.processor.util.StandardValidators;
-import org.apache.nifi.util.NiFiProperties;
 import org.apache.nifi.util.StringUtils;
 
 import javax.net.SocketFactory;
 
 import java.io.File;
 import java.io.IOException;
+import java.lang.ref.WeakReference;
 import java.net.InetSocketAddress;
 import java.net.Socket;
 import java.net.URI;
@@ -56,6 +56,8 @@ import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.List;
+import java.util.Map;
+import java.util.WeakHashMap;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicReference;
 
@@ -91,19 +93,44 @@ public abstract class AbstractHadoopProcessor extends AbstractProcessor {
     }
 
     // properties
-    public static final PropertyDescriptor HADOOP_CONFIGURATION_RESOURCES = new PropertyDescriptor.Builder().name("Hadoop Configuration Resources")
+    public static final PropertyDescriptor HADOOP_CONFIGURATION_RESOURCES = new PropertyDescriptor.Builder()
+            .name("Hadoop Configuration Resources")
             .description("A file or comma separated list of files which contains the Hadoop file system configuration. Without this, Hadoop "
                     + "will search the classpath for a 'core-site.xml' and 'hdfs-site.xml' file or will revert to a default configuration.")
-            .required(false).addValidator(createMultipleFilesExistValidator()).build();
+            .required(false)
+            .addValidator(createMultipleFilesExistValidator())
+            .build();
 
-    public static final String DIRECTORY_PROP_NAME = "Directory";
+    public static final PropertyDescriptor DIRECTORY = new PropertyDescriptor.Builder()
+            .name("Directory")
+            .description("The HDFS directory from which files should be read")
+            .required(true)
+            .addValidator(StandardValidators.ATTRIBUTE_EXPRESSION_LANGUAGE_VALIDATOR)
+            .expressionLanguageSupported(true)
+            .build();
 
-    public static final PropertyDescriptor COMPRESSION_CODEC = new PropertyDescriptor.Builder().name("Compression codec").required(true)
-            .allowableValues(CompressionType.values()).defaultValue(CompressionType.NONE.toString()).build();
+    public static final PropertyDescriptor COMPRESSION_CODEC = new PropertyDescriptor.Builder()
+            .name("Compression codec")
+            .required(true)
+            .allowableValues(CompressionType.values())
+            .defaultValue(CompressionType.NONE.toString())
+            .build();
 
-    public static final PropertyDescriptor KERBEROS_RELOGIN_PERIOD = new PropertyDescriptor.Builder().name("Kerberos Relogin Period").required(false)
-            .description("Period of time which should pass before attempting a kerberos relogin").defaultValue("4 hours")
-            .addValidator(StandardValidators.TIME_PERIOD_VALIDATOR).addValidator(StandardValidators.NON_EMPTY_VALIDATOR)
+    public static final PropertyDescriptor KERBEROS_RELOGIN_PERIOD = new PropertyDescriptor.Builder()
+            .name("Kerberos Relogin Period").required(false)
+            .description("Period of time which should pass before attempting a kerberos relogin")
+            .defaultValue("4 hours")
+            .addValidator(StandardValidators.TIME_PERIOD_VALIDATOR)
+            .addValidator(StandardValidators.NON_EMPTY_VALIDATOR)
+            .build();
+
+    public static final PropertyDescriptor ADDITIONAL_CLASSPATH_RESOURCES = new PropertyDescriptor.Builder()
+            .name("Additional Classpath Resources")
+            .description("A comma-separated list of paths to files and/or directories that will be added to the classpath. When specifying a " +
+                    "directory, all files with in the directory will be added to the classpath, but further sub-directories will not be included.")
+            .required(false)
+            .addValidator(StandardValidators.NON_EMPTY_VALIDATOR)
+            .dynamicallyModifiesClasspath(true)
             .build();
 
     private static final Object RESOURCES_LOCK = new Object();
@@ -112,6 +139,7 @@ public abstract class AbstractHadoopProcessor extends AbstractProcessor {
     private long lastKerberosReloginTime;
     protected KerberosProperties kerberosProperties;
     protected List<PropertyDescriptor> properties;
+    private volatile File kerberosConfigFile = null;
 
     // variables shared by all threads of this processor
     // Hadoop Configuration, Filesystem, and UserGroupInformation (optional)
@@ -123,18 +151,21 @@ public abstract class AbstractHadoopProcessor extends AbstractProcessor {
     @Override
     protected void init(ProcessorInitializationContext context) {
         hdfsResources.set(new HdfsResources(null, null, null));
-        kerberosProperties = getKerberosProperties();
+
+        kerberosConfigFile = context.getKerberosConfigurationFile();
+        kerberosProperties = getKerberosProperties(kerberosConfigFile);
 
         List<PropertyDescriptor> props = new ArrayList<>();
         props.add(HADOOP_CONFIGURATION_RESOURCES);
         props.add(kerberosProperties.getKerberosPrincipal());
         props.add(kerberosProperties.getKerberosKeytab());
         props.add(KERBEROS_RELOGIN_PERIOD);
+        props.add(ADDITIONAL_CLASSPATH_RESOURCES);
         properties = Collections.unmodifiableList(props);
     }
 
-    protected KerberosProperties getKerberosProperties() {
-        return KerberosProperties.create(NiFiProperties.getInstance());
+    protected KerberosProperties getKerberosProperties(File kerberosConfigFile) {
+        return new KerberosProperties(kerberosConfigFile);
     }
 
     @Override
@@ -191,10 +222,8 @@ public abstract class AbstractHadoopProcessor extends AbstractProcessor {
             }
             HdfsResources resources = hdfsResources.get();
             if (resources.getConfiguration() == null) {
-                String configResources = context.getProperty(HADOOP_CONFIGURATION_RESOURCES).getValue();
-                String dir = context.getProperty(DIRECTORY_PROP_NAME).getValue();
-                dir = dir == null ? "/" : dir;
-                resources = resetHDFSResources(configResources, dir, context);
+                final String configResources = context.getProperty(HADOOP_CONFIGURATION_RESOURCES).getValue();
+                resources = resetHDFSResources(configResources, context);
                 hdfsResources.set(resources);
             }
         } catch (IOException ex) {
@@ -211,7 +240,7 @@ public abstract class AbstractHadoopProcessor extends AbstractProcessor {
 
     private static Configuration getConfigurationFromResources(String configResources) throws IOException {
         boolean foundResources = false;
-        final Configuration config = new Configuration();
+        final Configuration config = new ExtendedConfiguration();
         if (null != configResources) {
             String[] resources = configResources.split(",");
             for (String resource : resources) {
@@ -240,50 +269,42 @@ public abstract class AbstractHadoopProcessor extends AbstractProcessor {
     /*
      * Reset Hadoop Configuration and FileSystem based on the supplied configuration resources.
      */
-    HdfsResources resetHDFSResources(String configResources, String dir, ProcessContext context) throws IOException {
-        // org.apache.hadoop.conf.Configuration saves its current thread context class loader to use for threads that it creates
-        // later to do I/O. We need this class loader to be the NarClassLoader instead of the magical
-        // NarThreadContextClassLoader.
-        ClassLoader savedClassLoader = Thread.currentThread().getContextClassLoader();
-        Thread.currentThread().setContextClassLoader(this.getClass().getClassLoader());
+    HdfsResources resetHDFSResources(String configResources, ProcessContext context) throws IOException {
+        Configuration config = getConfigurationFromResources(configResources);
+        config.setClassLoader(Thread.currentThread().getContextClassLoader()); // set the InstanceClassLoader
 
-        try {
-            Configuration config = getConfigurationFromResources(configResources);
+        // first check for timeout on HDFS connection, because FileSystem has a hard coded 15 minute timeout
+        checkHdfsUriForTimeout(config);
 
-            // first check for timeout on HDFS connection, because FileSystem has a hard coded 15 minute timeout
-            checkHdfsUriForTimeout(config);
+        // disable caching of Configuration and FileSystem objects, else we cannot reconfigure the processor without a complete
+        // restart
+        String disableCacheName = String.format("fs.%s.impl.disable.cache", FileSystem.getDefaultUri(config).getScheme());
+        config.set(disableCacheName, "true");
 
-            // disable caching of Configuration and FileSystem objects, else we cannot reconfigure the processor without a complete
-            // restart
-            String disableCacheName = String.format("fs.%s.impl.disable.cache", FileSystem.getDefaultUri(config).getScheme());
-            config.set(disableCacheName, "true");
-
-            // If kerberos is enabled, create the file system as the kerberos principal
-            // -- use RESOURCE_LOCK to guarantee UserGroupInformation is accessed by only a single thread at at time
-            FileSystem fs;
-            UserGroupInformation ugi;
-            synchronized (RESOURCES_LOCK) {
-                if (SecurityUtil.isSecurityEnabled(config)) {
-                    String principal = context.getProperty(kerberosProperties.getKerberosPrincipal()).getValue();
-                    String keyTab = context.getProperty(kerberosProperties.getKerberosKeytab()).getValue();
-                    ugi = SecurityUtil.loginKerberos(config, principal, keyTab);
-                    fs = getFileSystemAsUser(config, ugi);
-                    lastKerberosReloginTime = System.currentTimeMillis() / 1000;
-                } else {
-                    config.set("ipc.client.fallback-to-simple-auth-allowed", "true");
-                    config.set("hadoop.security.authentication", "simple");
-                    ugi = SecurityUtil.loginSimple(config);
-                    fs = getFileSystemAsUser(config, ugi);
-                }
+        // If kerberos is enabled, create the file system as the kerberos principal
+        // -- use RESOURCE_LOCK to guarantee UserGroupInformation is accessed by only a single thread at at time
+        FileSystem fs;
+        UserGroupInformation ugi;
+        synchronized (RESOURCES_LOCK) {
+            if (SecurityUtil.isSecurityEnabled(config)) {
+                String principal = context.getProperty(kerberosProperties.getKerberosPrincipal()).getValue();
+                String keyTab = context.getProperty(kerberosProperties.getKerberosKeytab()).getValue();
+                ugi = SecurityUtil.loginKerberos(config, principal, keyTab);
+                fs = getFileSystemAsUser(config, ugi);
+                lastKerberosReloginTime = System.currentTimeMillis() / 1000;
+            } else {
+                config.set("ipc.client.fallback-to-simple-auth-allowed", "true");
+                config.set("hadoop.security.authentication", "simple");
+                ugi = SecurityUtil.loginSimple(config);
+                fs = getFileSystemAsUser(config, ugi);
             }
-
-            getLogger().info("Initialized a new HDFS File System with working dir: {} default block size: {} default replication: {} config: {}",
-                    new Object[] { fs.getWorkingDirectory(), fs.getDefaultBlockSize(new Path(dir)), fs.getDefaultReplication(new Path(dir)), config.toString() });
-            return new HdfsResources(config, fs, ugi);
-
-        } finally {
-            Thread.currentThread().setContextClassLoader(savedClassLoader);
         }
+
+        final Path workingDir = fs.getWorkingDirectory();
+        getLogger().info("Initialized a new HDFS File System with working dir: {} default block size: {} default replication: {} config: {}",
+                new Object[]{workingDir, fs.getDefaultBlockSize(workingDir), fs.getDefaultReplication(workingDir), config.toString()});
+
+        return new HdfsResources(config, fs, ugi);
     }
 
     /**
@@ -490,6 +511,52 @@ public abstract class AbstractHadoopProcessor extends AbstractProcessor {
         public Configuration getConfiguration() {
             return configuration;
         }
+    }
+
+    /**
+     * Extending Hadoop Configuration to prevent it from caching classes that can't be found. Since users may be
+     * adding additional JARs to the classpath we don't want them to have to restart the JVM to be able to load
+     * something that was previously not found, but might now be available.
+     *
+     * Reference the original getClassByNameOrNull from Configuration.
+     */
+    static class ExtendedConfiguration extends Configuration {
+
+        private final Map<ClassLoader, Map<String, WeakReference<Class<?>>>> CACHE_CLASSES = new WeakHashMap<>();
+
+        public Class<?> getClassByNameOrNull(String name) {
+            Map<String, WeakReference<Class<?>>> map;
+
+            synchronized (CACHE_CLASSES) {
+                map = CACHE_CLASSES.get(getClassLoader());
+                if (map == null) {
+                    map = Collections.synchronizedMap(new WeakHashMap<>());
+                    CACHE_CLASSES.put(getClassLoader(), map);
+                }
+            }
+
+            Class<?> clazz = null;
+            WeakReference<Class<?>> ref = map.get(name);
+            if (ref != null) {
+                clazz = ref.get();
+            }
+
+            if (clazz == null) {
+                try {
+                    clazz = Class.forName(name, true, getClassLoader());
+                } catch (ClassNotFoundException e) {
+                    e.printStackTrace();
+                    return null;
+                }
+                // two putters can race here, but they'll put the same class
+                map.put(name, new WeakReference<>(clazz));
+                return clazz;
+            } else {
+                // cache hit
+                return clazz;
+            }
+        }
+
     }
 
 }

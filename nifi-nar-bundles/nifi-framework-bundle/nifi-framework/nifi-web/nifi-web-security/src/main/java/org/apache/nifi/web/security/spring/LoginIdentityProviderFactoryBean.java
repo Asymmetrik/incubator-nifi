@@ -17,6 +17,7 @@
 package org.apache.nifi.web.security.spring;
 
 import java.io.File;
+import java.io.IOException;
 import java.lang.reflect.Constructor;
 import java.lang.reflect.Field;
 import java.lang.reflect.InvocationTargetException;
@@ -39,13 +40,18 @@ import org.apache.nifi.authentication.LoginIdentityProviderConfigurationContext;
 import org.apache.nifi.authentication.LoginIdentityProviderInitializationContext;
 import org.apache.nifi.authentication.LoginIdentityProviderLookup;
 import org.apache.nifi.authentication.annotation.LoginIdentityProviderContext;
+import org.apache.nifi.authentication.exception.ProviderCreationException;
+import org.apache.nifi.authentication.exception.ProviderDestructionException;
 import org.apache.nifi.authentication.generated.LoginIdentityProviders;
 import org.apache.nifi.authentication.generated.Property;
 import org.apache.nifi.authentication.generated.Provider;
-import org.apache.nifi.authorization.exception.ProviderCreationException;
-import org.apache.nifi.authorization.exception.ProviderDestructionException;
 import org.apache.nifi.nar.ExtensionManager;
 import org.apache.nifi.nar.NarCloseable;
+import org.apache.nifi.properties.AESSensitivePropertyProviderFactory;
+import org.apache.nifi.properties.NiFiPropertiesLoader;
+import org.apache.nifi.properties.SensitivePropertyProtectionException;
+import org.apache.nifi.properties.SensitivePropertyProvider;
+import org.apache.nifi.properties.SensitivePropertyProviderFactory;
 import org.apache.nifi.util.NiFiProperties;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -62,6 +68,9 @@ public class LoginIdentityProviderFactoryBean implements FactoryBean, Disposable
     private static final String LOGIN_IDENTITY_PROVIDERS_XSD = "/login-identity-providers.xsd";
     private static final String JAXB_GENERATED_PATH = "org.apache.nifi.authentication.generated";
     private static final JAXBContext JAXB_CONTEXT = initializeJaxbContext();
+
+    private static SensitivePropertyProviderFactory SENSITIVE_PROPERTY_PROVIDER_FACTORY;
+    private static SensitivePropertyProvider SENSITIVE_PROPERTY_PROVIDER;
 
     /**
      * Load the JAXBContext.
@@ -118,7 +127,7 @@ public class LoginIdentityProviderFactoryBean implements FactoryBean, Disposable
     }
 
     private LoginIdentityProviders loadLoginIdentityProvidersConfiguration() throws Exception {
-        final File loginIdentityProvidersConfigurationFile = properties.getLoginIdentityProviderConfiguraitonFile();
+        final File loginIdentityProvidersConfigurationFile = properties.getLoginIdentityProviderConfigurationFile();
 
         // load the users from the specified file
         if (loginIdentityProvidersConfigurationFile.exists()) {
@@ -184,10 +193,37 @@ public class LoginIdentityProviderFactoryBean implements FactoryBean, Disposable
         final Map<String, String> providerProperties = new HashMap<>();
 
         for (final Property property : provider.getProperty()) {
-            providerProperties.put(property.getName(), property.getValue());
+            if (!StringUtils.isBlank(property.getEncryption())) {
+                String decryptedValue = decryptValue(property.getValue(), property.getEncryption());
+                providerProperties.put(property.getName(), decryptedValue);
+            } else {
+                providerProperties.put(property.getName(), property.getValue());
+            }
         }
 
         return new StandardLoginIdentityProviderConfigurationContext(provider.getIdentifier(), providerProperties);
+    }
+
+    private String decryptValue(String cipherText, String encryptionScheme) throws SensitivePropertyProtectionException {
+            initializeSensitivePropertyProvider(encryptionScheme);
+        return SENSITIVE_PROPERTY_PROVIDER.unprotect(cipherText);
+    }
+
+    private static void initializeSensitivePropertyProvider(String encryptionScheme) throws SensitivePropertyProtectionException {
+        if (SENSITIVE_PROPERTY_PROVIDER == null || !SENSITIVE_PROPERTY_PROVIDER.getIdentifierKey().equalsIgnoreCase(encryptionScheme)) {
+            try {
+                String keyHex = getMasterKey();
+                SENSITIVE_PROPERTY_PROVIDER_FACTORY = new AESSensitivePropertyProviderFactory(keyHex);
+                SENSITIVE_PROPERTY_PROVIDER = SENSITIVE_PROPERTY_PROVIDER_FACTORY.getProvider();
+            } catch (IOException e) {
+                logger.error("Error extracting master key from bootstrap.conf for login identity provider decryption", e);
+                throw new SensitivePropertyProtectionException("Could not read master key from bootstrap.conf");
+            }
+        }
+    }
+
+    private static String getMasterKey() throws IOException {
+        return NiFiPropertiesLoader.extractKeyFromBootstrapFile();
     }
 
     private void performMethodInjection(final LoginIdentityProvider instance, final Class loginIdentityProviderClass)

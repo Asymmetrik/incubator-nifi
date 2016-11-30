@@ -20,11 +20,13 @@ import org.apache.nifi.annotation.lifecycle.OnShutdown;
 import org.apache.nifi.components.ConfigurableComponent;
 import org.apache.nifi.documentation.ConfigurableComponentInitializer;
 import org.apache.nifi.documentation.mock.MockConfigurationContext;
-import org.apache.nifi.documentation.mock.MockProcessorLogger;
+import org.apache.nifi.documentation.mock.MockComponentLogger;
 import org.apache.nifi.documentation.mock.MockReportingInitializationContext;
 import org.apache.nifi.documentation.util.ReflectionUtils;
+import org.apache.nifi.nar.ExtensionManager;
 import org.apache.nifi.nar.NarCloseable;
 import org.apache.nifi.reporting.InitializationException;
+import org.apache.nifi.reporting.ReportingInitializationContext;
 import org.apache.nifi.reporting.ReportingTask;
 
 /**
@@ -37,18 +39,21 @@ public class ReportingTaskingInitializer implements ConfigurableComponentInitial
     @Override
     public void initialize(ConfigurableComponent component) throws InitializationException {
         ReportingTask reportingTask = (ReportingTask) component;
-        try (NarCloseable narCloseable = NarCloseable.withNarLoader()) {
-            reportingTask.initialize(new MockReportingInitializationContext());
+        ReportingInitializationContext context = new MockReportingInitializationContext();
+        try (NarCloseable narCloseable = NarCloseable.withComponentNarLoader(component.getClass(), context.getIdentifier())) {
+            reportingTask.initialize(context);
         }
     }
 
     @Override
     public void teardown(ConfigurableComponent component) {
         ReportingTask reportingTask = (ReportingTask) component;
-        try (NarCloseable narCloseable = NarCloseable.withNarLoader()) {
+        try (NarCloseable narCloseable = NarCloseable.withComponentNarLoader(component.getClass(), component.getIdentifier())) {
 
             final MockConfigurationContext context = new MockConfigurationContext();
-            ReflectionUtils.quietlyInvokeMethodsWithAnnotations(OnShutdown.class, org.apache.nifi.processor.annotation.OnShutdown.class, reportingTask, new MockProcessorLogger(), context);
+            ReflectionUtils.quietlyInvokeMethodsWithAnnotation(OnShutdown.class, reportingTask, new MockComponentLogger(), context);
+        } finally {
+            ExtensionManager.removeInstanceClassLoaderIfExists(component.getIdentifier());
         }
     }
 }

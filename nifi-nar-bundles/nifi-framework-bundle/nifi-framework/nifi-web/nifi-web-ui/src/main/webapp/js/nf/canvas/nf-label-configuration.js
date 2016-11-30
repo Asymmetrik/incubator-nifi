@@ -19,7 +19,7 @@
 
 nf.LabelConfiguration = (function () {
 
-    var labelUri = '';
+    var labelId = '';
 
     return {
         /**
@@ -28,56 +28,74 @@ nf.LabelConfiguration = (function () {
         init: function () {
             // make the new property dialog draggable
             $('#label-configuration').modal({
-                overlayBackground: true,
+                scrollableContentStyle: 'scrollable',
+                headerText: 'Configure Label',
                 buttons: [{
                     buttonText: 'Apply',
+                    color: {
+                        base: '#728E9B',
+                        hover: '#004849',
+                        text: '#ffffff'
+                    },
                     handler: {
                         click: function () {
-                            var revision = nf.Client.getRevision();
+                            // get the label data
+                            var labelData = d3.select('#id-' + labelId).datum();
 
                             // get the new values
                             var labelValue = $('#label-value').val();
                             var fontSize = $('#label-font-size').combo('getSelectedOption');
 
+                            // build the label entity
+                            var labelEntity = {
+                                'revision': nf.Client.getRevision(labelData),
+                                'component': {
+                                    'id': labelId,
+                                    'label': labelValue,
+                                    'style': {
+                                        'font-size': fontSize.value
+                                    }
+                                }
+                            };
+
                             // save the new label value
                             $.ajax({
                                 type: 'PUT',
-                                url: labelUri,
-                                data: {
-                                    'version': revision.version,
-                                    'clientId': revision.clientId,
-                                    'label': labelValue,
-                                    'style[font-size]': fontSize.value
-                                },
-                                dataType: 'json'
+                                url: labelData.uri,
+                                data: JSON.stringify(labelEntity),
+                                dataType: 'json',
+                                contentType: 'application/json'
                             }).done(function (response) {
-                                // update the revision
-                                nf.Client.setRevision(response.revision);
-
                                 // get the label out of the response
-                                nf.Label.set(response.label);
+                                nf.Label.set(response);
+
+                                // inform Angular app values have changed
+                                nf.ng.Bridge.digest();
                             }).fail(nf.Common.handleAjaxError);
 
                             // reset and hide the dialog
                             this.modal('hide');
                         }
                     }
-                }, {
-                    buttonText: 'Cancel',
-                    handler: {
-                        click: function () {
-                            this.modal('hide');
+                },
+                    {
+                        buttonText: 'Cancel',
+                        color: {
+                            base: '#E3E8EB',
+                            hover: '#C7D2D7',
+                            text: '#004849'
+                        },
+                        handler: {
+                            click: function () {
+                                this.modal('hide');
+                            }
                         }
-                    }
-                }],
+                    }],
                 handler: {
                     close: function () {
-                        labelUri = '';
+                        labelId = '';
                     }
                 }
-            }).draggable({
-                containment: 'parent',
-                cancel: 'textarea, .button, .combo'
             });
 
             // create the available sizes
@@ -107,10 +125,10 @@ nf.LabelConfiguration = (function () {
                 }
             });
         },
-        
+
         /**
          * Shows the configuration for the specified label.
-         * 
+         *
          * @argument {selection} selection      The selection
          */
         showConfiguration: function (selection) {
@@ -130,7 +148,7 @@ nf.LabelConfiguration = (function () {
                 }
 
                 // store the label uri
-                labelUri = selectionData.component.uri;
+                labelId = selectionData.id;
 
                 // populate the dialog
                 $('#label-value').val(labelValue);

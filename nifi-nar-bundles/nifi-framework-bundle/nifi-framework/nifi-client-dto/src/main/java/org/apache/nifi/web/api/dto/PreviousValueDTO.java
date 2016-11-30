@@ -17,10 +17,11 @@
 package org.apache.nifi.web.api.dto;
 
 import com.wordnik.swagger.annotations.ApiModelProperty;
-import java.util.Date;
+import org.apache.nifi.web.api.dto.util.DateTimeAdapter;
+
 import javax.xml.bind.annotation.XmlType;
 import javax.xml.bind.annotation.adapters.XmlJavaTypeAdapter;
-import org.apache.nifi.web.api.dto.util.DateTimeAdapter;
+import java.util.Date;
 
 /**
  * The previous value for a processor property.
@@ -30,7 +31,7 @@ public class PreviousValueDTO {
 
     private String previousValue;
     private Date timestamp;
-    private String userName;
+    private String userIdentity;
 
     /**
      * @return previous value
@@ -51,7 +52,8 @@ public class PreviousValueDTO {
      */
     @XmlJavaTypeAdapter(DateTimeAdapter.class)
     @ApiModelProperty(
-            value = "The timestamp when the value was modified."
+            value = "The timestamp when the value was modified.",
+            dataType = "string"
     )
     public Date getTimestamp() {
         return timestamp;
@@ -67,11 +69,11 @@ public class PreviousValueDTO {
     @ApiModelProperty(
             value = "The user who changed the previous value."
     )
-    public String getUserName() {
-        return userName;
+    public String getUserIdentity() {
+        return userIdentity;
     }
 
-    public void setUserName(String userName) {
-        this.userName = userName;
+    public void setUserIdentity(String userIdentity) {
+        this.userIdentity = userIdentity;
     }
 }

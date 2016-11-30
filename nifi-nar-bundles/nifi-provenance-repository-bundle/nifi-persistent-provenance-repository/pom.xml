@@ -17,7 +17,7 @@
     <parent>
         <groupId>org.apache.nifi</groupId>
         <artifactId>nifi-provenance-repository-bundle</artifactId>
-        <version>0.7.1-A4-SNAPSHOT</version>
+        <version>1.1.0-A1-SNAPSHOT</version>
     </parent>
     <artifactId>nifi-persistent-provenance-repository</artifactId>
     <packaging>jar</packaging>
@@ -28,7 +28,15 @@
         </dependency>
         <dependency>
             <groupId>org.apache.nifi</groupId>
+            <artifactId>nifi-framework-api</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.apache.nifi</groupId>
             <artifactId>nifi-data-provenance-utils</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.apache.nifi</groupId>
+            <artifactId>nifi-schema-utils</artifactId>
         </dependency>
         <dependency>
             <groupId>org.apache.nifi</groupId>

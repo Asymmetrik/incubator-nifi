@@ -23,246 +23,57 @@ nf.UsersTable = (function () {
      * Configuration object used to hold a number of configuration items.
      */
     var config = {
-        filterText: 'Filter',
-        styles: {
-            filterList: 'users-filter-list'
-        },
         urls: {
-            users: '../nifi-api/controller/users',
-            userGroups: '../nifi-api/controller/user-groups'
+            users: '../nifi-api/tenants/users',
+            userGroups: '../nifi-api/tenants/user-groups'
         }
-    };
-
-    /**
-     * Initializes the user details dialog.
-     */
-    var initUserDetailsDialog = function () {
-        $('#user-details-dialog').modal({
-            headerText: 'User Details',
-            overlayBackground: false,
-            buttons: [{
-                    buttonText: 'Ok',
-                    handler: {
-                        click: function () {
-                            $('#user-details-dialog').modal('hide');
-                        }
-                    }
-                }],
-            handler: {
-                close: function () {
-                    // clear the details
-                    $('#user-name-details-dialog').text('');
-                    $('#user-dn-details-dialog').text('');
-                    $('#user-created-details-dialog').text('');
-                    $('#user-verified-details-dialog').text('');
-                    $('#user-justification-details-dialog').text('');
-                }
-            }
-        });
-    };
-
-    /**
-     * Initializes the user roles dialog.
-     */
-    var initUserRolesDialog = function () {
-        $('#user-roles-dialog').modal({
-            headerText: 'User Roles',
-            overlayBackground: false,
-            buttons: [{
-                    buttonText: 'Apply',
-                    handler: {
-                        click: function () {
-                            var userId = $('#user-id-roles-dialog').val();
-                            var userRoles = [];
-
-                            // function for determining if a checkbox is checked
-                            var isChecked = function (domId) {
-                                return $('#' + domId).hasClass('checkbox-checked');
-                            };
-
-                            // determine the user roles
-                            if (isChecked('role-admin-checkbox')) {
-                                userRoles.push('ROLE_ADMIN');
-                            }
-                            if (isChecked('role-dfm-checkbox')) {
-                                userRoles.push('ROLE_DFM');
-                            }
-                            if (isChecked('role-provenance-checkbox')) {
-                                userRoles.push('ROLE_PROVENANCE');
-                            }
-                            if (isChecked('role-monitor-checkbox')) {
-                                userRoles.push('ROLE_MONITOR');
-                            }
-                            if (isChecked('role-nifi-checkbox')) {
-                                userRoles.push('ROLE_NIFI');
-                            }
-                            if (isChecked('role-proxy-checkbox')) {
-                                userRoles.push('ROLE_PROXY');
-                            }
-
-                            var userDto = {};
-                            userDto['id'] = userId;
-                            userDto['authorities'] = userRoles;
-
-                            // ensure the account is active
-                            userDto['status'] = 'ACTIVE';
-
-                            var userEntity = {};
-                            userEntity['user'] = userDto;
-
-                            // update the user
-                            $.ajax({
-                                type: 'PUT',
-                                url: config.urls.users + '/' + encodeURIComponent(userId),
-                                data: JSON.stringify(userEntity),
-                                contentType: 'application/json',
-                                dataType: 'json'
-                            }).done(function (response) {
-                                if (nf.Common.isDefinedAndNotNull(response.user)) {
-                                    var user = response.user;
-
-                                    // get the table and update the row accordingly
-                                    var usersGrid = $('#users-table').data('gridInstance');
-                                    var usersData = usersGrid.getData();
-                                    usersData.updateItem(user.id, user);
-                                }
-                            }).fail(nf.Common.handleAjaxError);
-
-                            // hide the dialog
-                            $('#user-roles-dialog').modal('hide');
-                        }
-                    }
-                }, {
-                    buttonText: 'Cancel',
-                    handler: {
-                        click: function () {
-                            $('#user-roles-dialog').modal('hide');
-                        }
-                    }
-                }],
-            handler: {
-                close: function () {
-                    // uncheck every box
-                    $('div.role-checkbox').removeClass('checkbox-checked').addClass('checkbox-unchecked');
-                    $('#user-id-roles-dialog').val('');
-                }
-            }
-        });
-    };
-
-    /**
-     * Initializes the group roles dialog.
-     */
-    var initGroupRolesDialog = function () {
-        $('#group-roles-dialog').modal({
-            headerText: 'Group Roles',
-            overlayBackground: false,
-            buttons: [{
-                    buttonText: 'Apply',
-                    handler: {
-                        click: function () {
-                            var group = $('#group-name-roles-dialog').text();
-                            var groupRoles = [];
-
-                            // function for determining if a checkbox is checked
-                            var isChecked = function (domId) {
-                                return $('#' + domId).hasClass('checkbox-checked');
-                            };
-
-                            // determine the user roles
-                            if (isChecked('group-role-admin-checkbox')) {
-                                groupRoles.push('ROLE_ADMIN');
-                            }
-                            if (isChecked('group-role-dfm-checkbox')) {
-                                groupRoles.push('ROLE_DFM');
-                            }
-                            if (isChecked('group-role-provenance-checkbox')) {
-                                groupRoles.push('ROLE_PROVENANCE');
-                            }
-                            if (isChecked('group-role-monitor-checkbox')) {
-                                groupRoles.push('ROLE_MONITOR');
-                            }
-                            if (isChecked('group-role-nifi-checkbox')) {
-                                groupRoles.push('ROLE_NIFI');
-                            }
-                            if (isChecked('group-role-proxy-checkbox')) {
-                                groupRoles.push('ROLE_PROXY');
-                            }
-
-                            var userGroupDto = {};
-                            userGroupDto['group'] = group;
-                            userGroupDto['authorities'] = groupRoles;
-
-                            // ensure the accounts are active
-                            userGroupDto['status'] = 'ACTIVE';
-
-                            var userGroupEntity = {};
-                            userGroupEntity['userGroup'] = userGroupDto;
-
-                            // update the user
-                            $.ajax({
-                                type: 'PUT',
-                                url: config.urls.userGroups + '/' + encodeURIComponent(group),
-                                data: JSON.stringify(userGroupEntity),
-                                contentType: 'application/json',
-                                dataType: 'json'
-                            }).done(function () {
-                                nf.UsersTable.loadUsersTable();
-                            }).fail(nf.Common.handleAjaxError);
-
-                            // hide the dialog
-                            $('#group-roles-dialog').modal('hide');
-                        }
-                    }
-                }, {
-                    buttonText: 'Cancel',
-                    handler: {
-                        click: function () {
-                            $('#group-roles-dialog').modal('hide');
-                        }
-                    }
-                }],
-            handler: {
-                close: function () {
-                    // uncheck every box
-                    $('div.role-checkbox').removeClass('checkbox-checked').addClass('checkbox-unchecked');
-                    $('#group-name-roles-dialog').text('');
-                }
-            }
-        });
     };
 
     var initUserDeleteDialog = function () {
         $('#user-delete-dialog').modal({
-            headerText: 'Delete User',
-            overlayBackground: false,
+            headerText: 'Delete Account',
             buttons: [{
-                    buttonText: 'Delete',
-                    handler: {
-                        click: function () {
-                            var userId = $('#user-id-delete-dialog').val();
+                buttonText: 'Delete',
+                color: {
+                    base: '#728E9B',
+                    hover: '#004849',
+                    text: '#ffffff'
+                },
+                handler: {
+                    click: function () {
+                        var userId = $('#user-id-delete-dialog').val();
 
-                            // update the user
-                            $.ajax({
-                                type: 'DELETE',
-                                url: config.urls.users + '/' + encodeURIComponent(userId),
-                                dataType: 'json'
-                            }).done(function () {
-                                nf.UsersTable.loadUsersTable();
-                            }).fail(nf.Common.handleAjaxError);
+                        // get the user
+                        var usersGrid = $('#users-table').data('gridInstance');
+                        var usersData = usersGrid.getData();
+                        var user = usersData.getItemById(userId);
 
-                            // hide the dialog
-                            $('#user-delete-dialog').modal('hide');
-                        }
+                        // update the user
+                        $.ajax({
+                            type: 'DELETE',
+                            url: user.uri + '?' + $.param(nf.Client.getRevision(user)),
+                            dataType: 'json'
+                        }).done(function () {
+                            nf.UsersTable.loadUsersTable();
+                        }).fail(nf.Common.handleAjaxError);
+
+                        // hide the dialog
+                        $('#user-delete-dialog').modal('hide');
                     }
-                }, {
-                    buttonText: 'Cancel',
-                    handler: {
-                        click: function () {
-                            $('#user-delete-dialog').modal('hide');
-                        }
+                }
+            }, {
+                buttonText: 'Cancel',
+                color: {
+                    base: '#E3E8EB',
+                    hover: '#C7D2D7',
+                    text: '#004849'
+                },
+                handler: {
+                    click: function () {
+                        $('#user-delete-dialog').modal('hide');
                     }
-                }],
+                }
+            }],
             handler: {
                 close: function () {
                     // clear the current user
@@ -274,170 +85,620 @@ nf.UsersTable = (function () {
     };
 
     /**
-     * Initializes the user revoke dialog.
+     * Gets the currently selected groups.
+     *
+     * @returns {Array} groups
      */
-    var initUserRevokeDialog = function () {
-        $('#user-revoke-dialog').modal({
-            headerText: 'Revoke Access',
-            overlayBackground: false,
-            buttons: [{
-                    buttonText: 'Revoke',
-                    handler: {
-                        click: function () {
-                            var userId = $('#user-id-revoke-dialog').val();
+    var getSelectedGroups = function () {
+        var selectedGroups = [];
+        $('#available-groups div.group-check').filter(function () {
+            return $(this).hasClass('checkbox-checked');
+        }).each(function () {
+            var id = $(this).next('span.group-id').text();
+            selectedGroups.push({
+                'id': id
+            });
+        });
+        return selectedGroups;
+    };
 
-                            // update the user
-                            $.ajax({
-                                type: 'PUT',
-                                url: config.urls.users + '/' + encodeURIComponent(userId),
-                                data: {
-                                    'status': 'DISABLED'
-                                },
-                                dataType: 'json'
-                            }).done(function (response) {
-                                if (nf.Common.isDefinedAndNotNull(response.user)) {
-                                    var user = response.user;
+    /**
+     * Gets the currently selected users.
+     *
+     * @returns {Array} users
+     */
+    var getSelectedUsers = function () {
+        var selectedUsers = [];
+        $('#available-users div.user-check').filter(function () {
+            return $(this).hasClass('checkbox-checked');
+        }).each(function () {
+            var id = $(this).next('span.user-id').text();
+            selectedUsers.push({
+                'id': id
+            });
+        });
+        return selectedUsers;
+    };
 
-                                    // get the table and update the row accordingly
-                                    var usersGrid = $('#users-table').data('gridInstance');
-                                    var usersData = usersGrid.getData();
-                                    usersData.updateItem(user.id, user);
-                                }
-                            }).fail(nf.Common.handleAjaxError);
+    /**
+     * Adds the specified user to the specified group.
+     *
+     * @param groupEntity
+     * @param userEntity
+     * @returns xhr
+     */
+    var addUserToGroup = function (groupEntity, userEntity) {
+        var groupMembers = [];
 
-                            // hide the dialog
-                            $('#user-revoke-dialog').modal('hide');
-                        }
-                    }
-                }, {
-                    buttonText: 'Cancel',
-                    handler: {
-                        click: function () {
-                            $('#user-revoke-dialog').modal('hide');
-                        }
-                    }
-                }],
-            handler: {
-                close: function () {
-                    // clear the current user
-                    $('#user-id-revoke-dialog').val('');
-                    $('#user-name-revoke-dialog').text('');
-                }
-            }
+        // get all the current users
+        $.each(groupEntity.component.users, function (_, member) {
+            groupMembers.push({
+                'id': member.id
+            });
+        });
+
+        // add the new user
+        groupMembers.push({
+            'id': userEntity.id
+        });
+
+        // build the request entity
+        var updatedGroupEntity = {
+            'revision': nf.Client.getRevision(groupEntity),
+            'component': $.extend({}, groupEntity.component, {
+                'users': groupMembers
+            })
+        };
+
+        // update the group
+        return $.ajax({
+            type: 'PUT',
+            url: groupEntity.uri,
+            data: JSON.stringify(updatedGroupEntity),
+            dataType: 'json',
+            contentType: 'application/json'
         });
     };
 
     /**
-     * Initializes the group revoke dialog.
+     * Adds the specified user to the specified group.
+     *
+     * @param groupEntity
+     * @param userEntity
+     * @returns xhr
      */
-    var initGroupRevokeDialog = function () {
-        $('#group-revoke-dialog').modal({
-            headerText: 'Revoke Access',
-            overlayBackground: false,
-            buttons: [{
-                    buttonText: 'Revoke',
-                    handler: {
-                        click: function () {
-                            var groupName = $('#group-name-revoke-dialog').text();
+    var removeUserFromGroup = function (groupEntity, userEntity) {
+        var groupMembers = [];
 
-                            // update the group
-                            $.ajax({
-                                type: 'PUT',
-                                url: config.urls.userGroups + '/' + encodeURIComponent(groupName),
-                                data: {
-                                    'status': 'DISABLED'
-                                },
-                                dataType: 'json'
-                            }).done(function () {
-                                nf.UsersTable.loadUsersTable();
-                            }).fail(nf.Common.handleAjaxError);
-
-                            // hide the dialog
-                            $('#group-revoke-dialog').modal('hide');
-                        }
-                    }
-                }, {
-                    buttonText: 'Cancel',
-                    handler: {
-                        click: function () {
-                            $('#group-revoke-dialog').modal('hide');
-                        }
-                    }
-                }],
-            handler: {
-                close: function () {
-                    // clear the current group
-                    $('#group-name-revoke-dialog').text('');
-                }
+        // get all the current users
+        $.each(groupEntity.component.users, function (_, member) {
+            // do not include the specified user
+            if (member.id !== userEntity.id) {
+                groupMembers.push({
+                    'id': member.id
+                });
             }
+        });
+
+        // build the request entity
+        var updatedGroupEntity = {
+            'revision': nf.Client.getRevision(groupEntity),
+            'component': $.extend({}, groupEntity.component, {
+                'users': groupMembers
+            })
+        };
+
+        // update the group
+        return $.ajax({
+            type: 'PUT',
+            url: groupEntity.uri,
+            data: JSON.stringify(updatedGroupEntity),
+            dataType: 'json',
+            contentType: 'application/json'
         });
     };
 
     /**
-     * Initializes the user revoke dialog.
+     * Creates the specified user.
+     *
+     * @param newUserEntity
+     * @param selectedGroups
      */
-    var initUserGroupDialog = function () {
-        $('#user-group-dialog').modal({
-            headerText: 'Set Users Group',
-            overlayBackground: false,
-            buttons: [{
-                    buttonText: 'Group',
-                    handler: {
-                        click: function () {
-                            var group = $.trim($('#group-name').val());
+    var createUser = function (newUserEntity, selectedGroups) {
+        // get the grid and data
+        var usersGrid = $('#users-table').data('gridInstance');
+        var usersData = usersGrid.getData();
+        
+        // create the user
+        var userXhr = $.ajax({
+            type: 'POST',
+            url: config.urls.users,
+            data: JSON.stringify(newUserEntity),
+            dataType: 'json',
+            contentType: 'application/json'
+        });
 
-                            // ensure a group name was specified
-                            if (group === '') {
-                                nf.Dialog.showOkDialog({
-                                    headerText: 'Group Users',
-                                    dialogContent: 'Group name cannot be blank.',
-                                    overlayBackground: false
-                                });
+        // if the user was successfully created
+        userXhr.done(function (userEntity) {
+            var xhrs = [];
+            $.each(selectedGroups, function (_, selectedGroup) {
+                var groupEntity = usersData.getItemById(selectedGroup.id)
+                xhrs.push(addUserToGroup(groupEntity, userEntity));
+            });
+            
+            $.when.apply(window, xhrs).always(function () {
+                nf.UsersTable.loadUsersTable().done(function () {
+                    // select the new user
+                    var row = usersData.getRowById(userEntity.id);
+                    usersGrid.setSelectedRows([row]);
+                    usersGrid.scrollRowIntoView(row);
+                });
+            }).fail(nf.Common.handleAjaxError);
+        }).fail(nf.Common.handleAjaxError);
+    };
+
+    /**
+     * Updates the specified user.
+     *
+     * @param userId
+     * @param userIdentity
+     * @param selectedGroups
+     */
+    var updateUser = function (userId, userIdentity, selectedGroups) {
+        // get the grid and data
+        var usersGrid = $('#users-table').data('gridInstance');
+        var usersData = usersGrid.getData();
+        var userEntity = usersData.getItemById(userId);
+
+        var updatedUserEntity = {
+            'revision': nf.Client.getRevision(userEntity),
+            'component': {
+                'id': userId,
+                'identity': userIdentity
+            }
+        };
+
+        // update the user
+        var userXhr = $.ajax({
+            type: 'PUT',
+            url: userEntity.uri,
+            data: JSON.stringify(updatedUserEntity),
+            dataType: 'json',
+            contentType: 'application/json'
+        });
+
+        userXhr.done(function (updatedUserEntity) {
+        
+            // determine what to add/remove
+            var groupsAdded = [];
+            var groupsRemoved = [];
+            $.each(updatedUserEntity.component.userGroups, function(_, currentGroup) {
+                var isSelected = $.grep(selectedGroups, function (group) {
+                    return group.id === currentGroup.id;
+                });
+
+                // if the current group is not selected, mark it for removed
+                if (isSelected.length === 0) {
+                    groupsRemoved.push(currentGroup);
+                }
+            });
+            $.each(selectedGroups, function(_, selectedGroup) {
+                var isSelected = $.grep(updatedUserEntity.component.userGroups, function (group) {
+                    return group.id === selectedGroup.id;
+                });
+
+                // if the selected group is not current, mark it for addition
+                if (isSelected.length === 0) {
+                    groupsAdded.push(selectedGroup);
+                }
+            });
+
+            // update each group
+            var xhrs = [];
+            $.each(groupsAdded, function (_, group) {
+                var groupEntity = usersData.getItemById(group.id);
+                xhrs.push(addUserToGroup(groupEntity, updatedUserEntity))
+            });
+            $.each(groupsRemoved, function (_, group) {
+                var groupEntity = usersData.getItemById(group.id);
+                xhrs.push(removeUserFromGroup(groupEntity, updatedUserEntity));
+            });
+
+            $.when.apply(window, xhrs).always(function () {
+                nf.UsersTable.loadUsersTable();
+            }).fail(nf.Common.handleAjaxError);
+        }).fail(nf.Common.handleAjaxError);
+    };
+
+    /**
+     * Creates the specified group.
+     *
+     * @param newGroupEntity
+     */
+    var createGroup = function (newGroupEntity) {
+        // create the group
+        $.ajax({
+            type: 'POST',
+            url: config.urls.userGroups,
+            data: JSON.stringify(newGroupEntity),
+            dataType: 'json',
+            contentType: 'application/json'
+        }).done(function (groupEntity) {
+            nf.UsersTable.loadUsersTable().done(function () {
+                // add the user
+                var usersGrid = $('#users-table').data('gridInstance');
+                var usersData = usersGrid.getData();
+
+                // select the new user
+                var row = usersData.getRowById(groupEntity.id);
+                usersGrid.setSelectedRows([row]);
+                usersGrid.scrollRowIntoView(row);
+            });
+        }).fail(nf.Common.handleAjaxError);
+    };
+
+    var updateGroup = function (groupId, groupIdentity, selectedUsers) {
+        // get the grid and data
+        var usersGrid = $('#users-table').data('gridInstance');
+        var usersData = usersGrid.getData();
+        var groupEntity = usersData.getItemById(groupId);
+
+        var updatedGroupoEntity = {
+            'revision': nf.Client.getRevision(groupEntity),
+            'component': {
+                'id': groupId,
+                'identity': groupIdentity,
+                'users': selectedUsers
+            }
+        };
+
+        // update the user
+        $.ajax({
+            type: 'PUT',
+            url: groupEntity.uri,
+            data: JSON.stringify(updatedGroupoEntity),
+            dataType: 'json',
+            contentType: 'application/json'
+        }).done(function (groupEntity) {
+            nf.UsersTable.loadUsersTable();
+        }).fail(nf.Common.handleAjaxError);
+    };
+
+    /**
+     * Initializes the user table.
+     */
+    var initUserDialog = function () {
+        $('#user-dialog').modal({
+            headerText: 'User/Group',
+            buttons: [{
+                buttonText: 'Ok',
+                color: {
+                    base: '#728E9B',
+                    hover: '#004849',
+                    text: '#ffffff'
+                },
+                handler: {
+                    click: function () {
+                        var userId = $('#user-id-edit-dialog').text();
+                        var userIdentity = $('#user-identity-edit-dialog').val();
+
+                        // see if we should create or update this user
+                        if ($.trim(userId) === '') {
+                            var tenantEntity = {
+                                'revision': nf.Client.getRevision({
+                                    'revision': {
+                                        'version': 0
+                                    }
+                                })
+                            };
+
+                            // handle whether it's a user or a group
+                            if ($('#individual-radio-button').is(':checked')) {
+                                // record the user groups
+                                tenantEntity['component'] = {
+                                    'identity': userIdentity
+                                };
+
+                                createUser(tenantEntity, getSelectedGroups());
                             } else {
-                                var userIds = $('#group-name').data('selected-user-ids');
+                                // record the users
+                                tenantEntity['component'] = {
+                                    'identity': userIdentity,
+                                    'users': getSelectedUsers()
+                                };
 
-                                var userGroupDto = {};
-                                userGroupDto['userIds'] = userIds;
-                                userGroupDto['group'] = group;
-
-                                var userGroupEntity = {};
-                                userGroupEntity['userGroup'] = userGroupDto;
-
-                                // update the user
-                                $.ajax({
-                                    type: 'PUT',
-                                    url: config.urls.userGroups + '/' + encodeURIComponent(group),
-                                    data: JSON.stringify(userGroupEntity),
-                                    contentType: 'application/json',
-                                    dataType: 'json'
-                                }).done(function () {
-                                    nf.UsersTable.loadUsersTable();
-                                }).fail(nf.Common.handleAjaxError);
+                                createGroup(tenantEntity);
                             }
 
-                            // hide the dialog
-                            $('#user-group-dialog').modal('hide');
+                            // update any selected policies
+                        } else {
+                            // handle whether it's a user or a group
+                            if ($('#individual-radio-button').is(':checked')) {
+                                updateUser(userId, userIdentity, getSelectedGroups());
+
+                                // update any selected policies
+                            } else {
+                                updateGroup(userId, userIdentity, getSelectedUsers());
+
+                                // update any selected policies
+                            }
                         }
+
+                        $('#user-dialog').modal('hide');
                     }
-                }, {
-                    buttonText: 'Cancel',
-                    handler: {
-                        click: function () {
-                            $('#user-group-dialog').modal('hide');
-                        }
+                }
+            }, {
+                buttonText: 'Cancel',
+                color: {
+                    base: '#E3E8EB',
+                    hover: '#C7D2D7',
+                    text: '#004849'
+                },
+                handler: {
+                    click: function () {
+                        $('#user-dialog').modal('hide');
                     }
-                }],
+                }
+            }],
             handler: {
                 close: function () {
-                    // clear the current configuration
-                    $('#group-name').removeData('selected-user-ids');
-                    $('#group-name').val('');
+                    // reset the radio button
+                    $('#user-dialog input[name="userOrGroup"]').attr('disabled', false);
+                    $('#individual-radio-button').prop('checked', true);
+                    $('#user-groups').show();
+                    $('#group-members').hide();
 
-                    // uncheck every box
-                    $('div.group-role-checkbox').removeClass('checkbox-checked').addClass('checkbox-unchecked');
+                    // clear the fields
+                    $('#user-id-edit-dialog').text('');
+                    $('#user-identity-edit-dialog').val('');
+                    $('#available-users').empty()
+                    $('#available-groups').empty()
                 }
             }
         });
+
+        // listen for changes to the user/group radio
+        $('#user-dialog input[name="userOrGroup"]').on('change', function () {
+            if ($(this).val() === 'individual') {
+                $('#user-groups').show();
+                $('#group-members').hide();
+            } else {
+                $('#user-groups').hide();
+                $('#group-members').show();
+            }
+        });
+    };
+
+    /**
+     * Initializes the user policies dialog.
+     */
+    var initUserPoliciesDialog = function () {
+        $('#user-policies-dialog').modal({
+            headerText: 'User Policies',
+            buttons: [{
+                buttonText: 'Close',
+                color: {
+                    base: '#728E9B',
+                    hover: '#004849',
+                    text: '#ffffff'
+                },
+                handler: {
+                    click: function () {
+                        $('#user-policies-dialog').modal('hide');
+                    }
+                }
+            }]
+        });
+    };
+
+    /**
+     * Generates a human readable global policy strung.
+     *
+     * @param dataContext
+     * @returns {string}
+     */
+    var globalResourceParser = function (dataContext) {
+        return 'Global policy to ' +
+            nf.Common.getPolicyTypeListing(nf.Common.substringAfterFirst(dataContext.component.resource, '/')).text;
+    };
+
+    /**
+     * Generates a human readable component policy string.
+     *
+     * @param dataContext
+     * @returns {string}
+     */
+    var componentResourceParser = function (dataContext) {
+        var resource = dataContext.component.resource;
+        var policyLabel = '';
+
+        //determine policy type
+        if (resource.startsWith('/policies')) {
+            resource = nf.Common.substringAfterFirst(resource, '/policies');
+            policyLabel += 'Admin policy for ';
+        } else if (resource.startsWith('/data-transfer')) {
+            resource = nf.Common.substringAfterFirst(resource, '/data-transfer');
+            policyLabel += 'Site to site policy for ';
+        } else if (resource.startsWith('/data')) {
+            resource = nf.Common.substringAfterFirst(resource, '/data');
+            policyLabel += 'Data policy for ';
+        } else {
+            policyLabel += 'Component policy for ';
+        }
+
+        if (resource.startsWith('/processors')) {
+            policyLabel += 'processor ';
+        } else if (resource.startsWith('/controller-services')) {
+            policyLabel += 'controller service ';
+        } else if (resource.startsWith('/funnels')) {
+            policyLabel += 'funnel ';
+        } else if (resource.startsWith('/input-ports')) {
+            policyLabel += 'input port ';
+        } else if (resource.startsWith('/labels')) {
+            policyLabel += 'label ';
+        } else if (resource.startsWith('/output-ports')) {
+            policyLabel += 'output port ';
+        } else if (resource.startsWith('/process-groups')) {
+            policyLabel += 'process group ';
+        } else if (resource.startsWith('/remote-process-groups')) {
+            policyLabel += 'remote process group ';
+        } else if (resource.startsWith('/reporting-tasks')) {
+            policyLabel += 'reporting task ';
+        } else if (resource.startsWith('/templates')) {
+            policyLabel += 'template ';
+        }
+
+        if (dataContext.component.componentReference.permissions.canRead === true) {
+            policyLabel += '<span style="font-weight: 500">' + dataContext.component.componentReference.component.name + '</span>';
+        } else {
+            policyLabel += '<span class="unset">' + dataContext.component.componentReference.id + '</span>'
+        }
+
+        return policyLabel;
+    };
+
+    /**
+     * Initializes the user policies table.
+     */
+    var initUserPoliciesTable = function () {
+
+        // function for formatting the human readable name of the policy
+        var policyDisplayNameFormatter = function (row, cell, value, columnDef, dataContext) {
+            // if the user has permission to the policy
+            if (dataContext.permissions.canRead === true) {
+                // check if Global policy
+                if (nf.Common.isUndefinedOrNull(dataContext.component.componentReference)) {
+                    return globalResourceParser(dataContext);
+                }
+                // not a global policy... check if user has access to the component reference
+                return componentResourceParser(dataContext);
+            } else {
+                return '<span class="unset">' + dataContext.id + '</span>';
+            }
+        };
+
+        // function for formatting the actions column
+        var actionsFormatter = function (row, cell, value, columnDef, dataContext) {
+            var markup = '';
+
+            if (dataContext.permissions.canRead === true) {
+                if (nf.Common.isDefinedAndNotNull(dataContext.component.componentReference)) {
+                    if (dataContext.component.resource.indexOf('/processors') >= 0) {
+                        markup += '<div title="Go To" class="pointer go-to-component fa fa-long-arrow-right" style="float: left;"></div>';
+                    } else if (dataContext.component.resource.indexOf('/controller-services') >= 0) {
+                        //TODO: implement go to for CS
+                    } else if (dataContext.component.resource.indexOf('/funnels') >= 0) {
+                        markup += '<div title="Go To" class="pointer go-to-component fa fa-long-arrow-right" style="float: left;"></div>';
+                    } else if (dataContext.component.resource.indexOf('/input-ports') >= 0) {
+                        markup += '<div title="Go To" class="pointer go-to-component fa fa-long-arrow-right" style="float: left;"></div>';
+                    } else if (dataContext.component.resource.indexOf('/labels') >= 0) {
+                        markup += '<div title="Go To" class="pointer go-to-component fa fa-long-arrow-right" style="float: left;"></div>';
+                    } else if (dataContext.component.resource.indexOf('/output-ports') >= 0) {
+                        markup += '<div title="Go To" class="pointer go-to-component fa fa-long-arrow-right" style="float: left;"></div>';
+                    } else if (dataContext.component.resource.indexOf('/process-groups') >= 0) {
+                        markup += '<div title="Go To" class="pointer go-to-process-group fa fa-long-arrow-right" style="float: left;"></div>';
+                    } else if (dataContext.component.resource.indexOf('/remote-process-groups') >= 0) {
+                        markup += '<div title="Go To" class="pointer go-to-component fa fa-long-arrow-right" style="float: left;"></div>';
+                    } else if (dataContext.component.resource.indexOf('/reporting-tasks') >= 0) {
+                        //TODO: implement go to for RT
+                    } else if (dataContext.component.resource.indexOf('/templates') >= 0) {
+                        //TODO: implement go to for Templates
+                    }
+                }
+            }
+
+            return markup;
+        };
+
+        // function for formatting the action column
+        var actionFormatter = function (row, cell, value, columnDef, dataContext) {
+            var markup = '';
+
+            if (dataContext.permissions.canRead === true) {
+                markup += dataContext.component.action;
+            }
+
+            return markup;
+        };
+
+        var userPoliciesColumns = [
+            {id: 'policy', name: 'Policy', sortable: true, resizable: true, formatter: policyDisplayNameFormatter, width: 150},
+            {id: 'action', name: 'Action', sortable: true, resizable: false, formatter: actionFormatter, width: 50}
+        ];
+
+        // add the actions if we're in the shell
+        if (top !== window) {
+            userPoliciesColumns.push({id: 'actions', name: '&nbsp;', sortable: false, resizable: false, formatter: actionsFormatter, width: 25});
+        }
+
+        var userPoliciesOptions = {
+            forceFitColumns: true,
+            enableTextSelectionOnCells: true,
+            enableCellNavigation: true,
+            enableColumnReorder: false,
+            autoEdit: false
+        };
+
+        // initialize the dataview
+        var userPoliciesData = new Slick.Data.DataView({
+            inlineFilters: false
+        });
+        userPoliciesData.setItems([]);
+
+        // initialize the sort
+        userPolicySort({
+            columnId: 'policy',
+            sortAsc: true
+        }, userPoliciesData);
+
+        // initialize the grid
+        var userPoliciesGrid = new Slick.Grid('#user-policies-table', userPoliciesData, userPoliciesColumns, userPoliciesOptions);
+        userPoliciesGrid.setSelectionModel(new Slick.RowSelectionModel());
+        userPoliciesGrid.registerPlugin(new Slick.AutoTooltips());
+        userPoliciesGrid.setSortColumn('policy', true);
+        userPoliciesGrid.onSort.subscribe(function (e, args) {
+            userPolicySort({
+                columnId: args.sortCol.id,
+                sortAsc: args.sortAsc
+            }, userPoliciesData);
+        });
+
+        // configure a click listener
+        userPoliciesGrid.onClick.subscribe(function (e, args) {
+            var target = $(e.target);
+
+            // get the node at this row
+            var item = userPoliciesData.getItem(args.row);
+
+            // determine the desired action
+            if (userPoliciesGrid.getColumns()[args.cell].id === 'actions') {
+                if (target.hasClass('go-to-component')) {
+                    parent.$('body').trigger('GoTo:Component', {
+                        id: item.component.componentReference.id,
+                        parentGroupId: item.component.componentReference.parentGroupId
+                    });
+                    parent.$('#shell-close-button').click();
+                } else if (target.hasClass('go-to-process-group')) {
+                    parent.$('body').trigger('GoTo:ProcessGroup', {
+                        id: item.component.componentReference.id
+                    });
+                    parent.$('#shell-close-button').click();
+                }
+            }
+        });
+
+        // wire up the dataview to the grid
+        userPoliciesData.onRowCountChanged.subscribe(function (e, args) {
+            userPoliciesGrid.updateRowCount();
+            userPoliciesGrid.render();
+        });
+        userPoliciesData.onRowsChanged.subscribe(function (e, args) {
+            userPoliciesGrid.invalidateRows(args.rows);
+            userPoliciesGrid.render();
+        });
+
+        // hold onto an instance of the grid
+        $('#user-policies-table').data('gridInstance', userPoliciesGrid);
     };
 
     /**
@@ -447,156 +708,65 @@ nf.UsersTable = (function () {
         // define the function for filtering the list
         $('#users-filter').keyup(function () {
             applyFilter();
-        }).focus(function () {
-            if ($(this).hasClass(config.styles.filterList)) {
-                $(this).removeClass(config.styles.filterList).val('');
-            }
-        }).blur(function () {
-            if ($(this).val() === '') {
-                $(this).addClass(config.styles.filterList).val(config.filterText);
-            }
-        }).addClass(config.styles.filterList).val(config.filterText);
+        });
 
         // filter type
         $('#users-filter-type').combo({
             options: [{
-                    text: 'by user',
-                    value: 'userName'
-                }, {
-                    text: 'by group',
-                    value: 'userGroup'
-                }, {
-                    text: 'by role',
-                    value: 'authorities'
-                }],
+                text: 'by user',
+                value: 'identity'
+            }],
             select: function (option) {
                 applyFilter();
             }
         });
 
-        // add hover effect and click handler for opening the group dialog
-        nf.Common.addHoverEffect('#group-button', 'button-normal', 'button-over').click(function () {
-            groupUsers();
-        });
-
-        // listen for browser resize events to update the page size
-        $(window).resize(function () {
-            nf.UsersTable.resetTableSize();
-        });
-
-        // define a custom formatter for the more details column
-        var moreDetailsFormatter = function (row, cell, value, columnDef, dataContext) {
-            return '<img src="images/iconDetails.png" title="View Details" class="pointer show-user-details" style="margin-top: 4px;"/>';
-        };
-
-        // function for formatting the last accessed time
-        var valueFormatter = function (row, cell, value, columnDef, dataContext) {
-            return nf.Common.formatValue(value);
-        };
-
-        // function for formatting the property name
-        var roleFormatter = function (row, cell, value, columnDef, dataContext) {
-            var grouped = $('#group-collaspe-checkbox').hasClass('checkbox-checked');
-
-            // function for converting roles into human readable role names
-            var convertRoleNames = function () {
-                var roleNames = [];
-                $.each(value, function (i, role) {
-                    var roleName = role;
-                    if (role === 'ROLE_ADMIN') {
-                        roleName = 'Administrator';
-                    } else if (role === 'ROLE_DFM') {
-                        roleName = 'Data Flow Manager';
-                    } else if (role === 'ROLE_PROVENANCE') {
-                        roleName = 'Provenance';
-                    } else if (role === 'ROLE_MONITOR') {
-                        roleName = 'Read Only';
-                    } else if (role === 'ROLE_NIFI') {
-                        roleName = 'NiFi';
-                    } else if (role === 'ROLE_PROXY') {
-                        roleName = 'Proxy';
-                    }
-                    roleNames.push(roleName);
-                });
-                return roleNames.join(', ');
-            };
-
-            // generate the roles as appropriate
-            if (grouped && nf.Common.isDefinedAndNotNull(dataContext.userGroup)) {
-                if (dataContext.status === 'PENDING') {
-                    return '<span style="color: #0081D7; font-weight: bold;">Authorization Pending</span>';
-                } else if (dataContext.status === 'DISABLED') {
-                    return '<span style="color: red; font-weight: bold;">Access Revoked</span>';
-                } else if (nf.Common.isDefinedAndNotNull(value)) {
-                    if (!nf.Common.isEmpty(value)) {
-                        return convertRoleNames();
-                    } else {
-                        return '<span class="unset">No roles set</span>';
-                    }
-                } else {
-                    return '<span class="unset">Multiple users with different roles</span>';
-                }
-            } else {
-                if (dataContext.status === 'PENDING') {
-                    return '<span style="color: #0081D7; font-weight: bold;">Authorization Pending</span>';
-                } else if (dataContext.status === 'DISABLED') {
-                    return '<span style="color: red; font-weight: bold;">Access Revoked</span>';
-                } else if (!nf.Common.isEmpty(value)) {
-                    return convertRoleNames();
-                } else {
-                    return '<span class="unset">No roles set</span>';
-                }
+        // function for formatting the user identity
+        var identityFormatter = function (row, cell, value, columnDef, dataContext) {
+            var markup = '';
+            if (dataContext.type === 'group') {
+                markup += '<div class="fa fa-users" style="margin-right: 5px;"></div>';
             }
+
+            markup += dataContext.component.identity;
+
+            return markup;
         };
 
-        // function for formatting the status
-        var statusFormatter = function (row, cell, value, columnDef, dataContext) {
-            var grouped = $('#group-collaspe-checkbox').hasClass('checkbox-checked');
-
-            // return the status as appropriate
-            if (nf.Common.isDefinedAndNotNull(value)) {
-                return value;
-            } else if (grouped && nf.Common.isDefinedAndNotNull(dataContext.userGroup)) {
-                return '<span class="unset">Multiple users with different status</span>';
+        // function for formatting the members/groups
+        var membersGroupsFormatter = function (row, cell, value, columnDef, dataContext) {
+            if (dataContext.type === 'group') {
+                return 'Members: <b>' + dataContext.component.users.map(function (user) {
+                    return user.component.identity;
+                }).join('</b>, <b>') + '</b>';
             } else {
-                return '<span class="unset">No status set</span>';
+                return 'Member of: <b>' + dataContext.component.userGroups.map(function (group) {
+                    return group.component.identity;
+                }).join('</b>, <b>') + '</b>';
             }
         };
 
         // function for formatting the actions column
         var actionFormatter = function (row, cell, value, columnDef, dataContext) {
-            var grouped = $('#group-collaspe-checkbox').hasClass('checkbox-checked');
+            var markup = '';
 
-            // if this represents a grouped row
-            if (nf.Common.isDefinedAndNotNull(dataContext.userGroup) && grouped) {
-                var actions = '<img src="images/iconEdit.png" title="Edit Access" class="pointer update-group-access" style="margin-top: 2px;"/>&nbsp;<img src="images/iconRevoke.png" title="Revoke Access" class="pointer revoke-group-access" style="margin-top: 2px;"/>&nbsp;&nbsp;<img src="images/ungroup.png" title="Ungroup" class="pointer ungroup"/>';
-            } else {
-                // return the appropriate markup for an individual user
-                var actions = '<img src="images/iconEdit.png" title="Edit Access" class="pointer update-user-access" style="margin-top: 2px;"/>';
-
-                if (dataContext.status === 'ACTIVE') {
-                    actions += '&nbsp;<img src="images/iconRevoke.png" title="Revoke Access" class="pointer revoke-user-access"/>';
-
-                    // add an ungroup active if appropriate
-                    if (nf.Common.isDefinedAndNotNull(dataContext.userGroup)) {
-                        actions += '&nbsp;&nbsp;<img src="images/ungroup.png" title="Ungroup" class="pointer ungroup-user" style="margin-top: 2px;"/>';
-                    }
-                } else {
-                    actions += '&nbsp;<img src="images/iconDelete.png" title="Delete Account" class="pointer delete-user-account"/>';
-                }
+            // ensure user can modify the user
+            if (nf.Common.canModifyTenants()) {
+                markup += '<div title="Edit" class="pointer edit-user fa fa-pencil" style="margin-right: 3px;"></div>';
+                markup += '<div title="Remove" class="pointer delete-user fa fa-trash"></div>';
             }
 
-            return actions;
+            if (!nf.Common.isEmpty(dataContext.component.accessPolicies)) {
+                markup += '<div title="View User Policies" class="pointer view-user-policies fa fa-key" style="margin-left: 3px;"></div>';
+            }
+
+            return markup;
         };
 
         // initialize the templates table
         var usersColumns = [
-            {id: 'moreDetails', name: '&nbsp;', sortable: false, resizable: false, formatter: moreDetailsFormatter, width: 50, maxWidth: 50},
-            {id: 'userName', name: 'User', field: 'userName', sortable: true, resizable: true},
-            {id: 'userGroup', name: 'Group', field: 'userGroup', sortable: true, resizable: true, formatter: valueFormatter},
-            {id: 'authorities', name: 'Roles', field: 'authorities', sortable: true, resizable: true, formatter: roleFormatter},
-            {id: 'lastAccessed', name: 'Last Accessed', field: 'lastAccessed', sortable: true, defaultSortAsc: false, resizable: true, formatter: valueFormatter},
-            {id: 'status', name: 'Status', field: 'status', sortable: true, resizable: false, formatter: statusFormatter},
+            {id: 'identity', name: 'User', sortable: true, resizable: true, formatter: identityFormatter},
+            {id: 'membersGroups', name: '&nbsp;', sortable: true, defaultSortAsc: false, resizable: true, formatter: membersGroupsFormatter},
             {id: 'actions', name: '&nbsp;', sortable: false, resizable: false, formatter: actionFormatter, width: 100, maxWidth: 100}
         ];
         var usersOptions = {
@@ -619,8 +789,8 @@ nf.UsersTable = (function () {
         usersData.setFilter(filter);
 
         // initialize the sort
-        sort({
-            columnId: 'userName',
+        userSort({
+            columnId: 'identity',
             sortAsc: true
         }, usersData);
 
@@ -628,14 +798,14 @@ nf.UsersTable = (function () {
         var usersGrid = new Slick.Grid('#users-table', usersData, usersColumns, usersOptions);
         usersGrid.setSelectionModel(new Slick.RowSelectionModel());
         usersGrid.registerPlugin(new Slick.AutoTooltips());
-        usersGrid.setSortColumn('userName', true);
+        usersGrid.setSortColumn('identity', true);
         usersGrid.onSort.subscribe(function (e, args) {
-            sort({
-                columnId: args.sortCol.field,
+            userSort({
+                columnId: args.sortCol.id,
                 sortAsc: args.sortAsc
             }, usersData);
         });
-        
+
         // configure a click listener
         usersGrid.onClick.subscribe(function (e, args) {
             var target = $(e.target);
@@ -645,24 +815,12 @@ nf.UsersTable = (function () {
 
             // determine the desired action
             if (usersGrid.getColumns()[args.cell].id === 'actions') {
-                if (target.hasClass('update-group-access')) {
-                    updateGroupAccess(item);
-                } else if (target.hasClass('revoke-group-access')) {
-                    revokeGroupAccess(item);
-                } else if (target.hasClass('ungroup')) {
-                    ungroup(item);
-                } else if (target.hasClass('update-user-access')) {
-                    updateUserAccess(item);
-                } else if (target.hasClass('revoke-user-access')) {
-                    revokeUserAccess(item);
-                } else if (target.hasClass('ungroup-user')) {
-                    ungroupUser(item);
-                } else if (target.hasClass('delete-user-account')) {
-                    deleteUserAccount(item);
-                }
-            } else if (usersGrid.getColumns()[args.cell].id === 'moreDetails') {
-                if (target.hasClass('show-user-details')) {
-                    showUserDetails(item);
+                if (target.hasClass('edit-user')) {
+                    editUser(item);
+                } else if (target.hasClass('view-user-policies')) {
+                    viewUserPolicies(item);
+                } else if (target.hasClass('delete-user')) {
+                    deleteUser(item);
                 }
             }
         });
@@ -689,21 +847,26 @@ nf.UsersTable = (function () {
 
     /**
      * Sorts the specified data using the specified sort details.
-     * 
+     *
      * @param {object} sortDetails
      * @param {object} data
      */
-    var sort = function (sortDetails, data) {
+    var userSort = function (sortDetails, data) {
         // defines a function for sorting
         var comparer = function (a, b) {
-            if (sortDetails.columnId === 'lastAccessed') {
-                var aDate = nf.Common.parseDateTime(a[sortDetails.columnId]);
-                var bDate = nf.Common.parseDateTime(b[sortDetails.columnId]);
-                return aDate.getTime() - bDate.getTime();
-            } else {
-                var aString = nf.Common.isDefinedAndNotNull(a[sortDetails.columnId]) ? a[sortDetails.columnId] : '';
-                var bString = nf.Common.isDefinedAndNotNull(b[sortDetails.columnId]) ? b[sortDetails.columnId] : '';
+            if(a.permissions.canRead && b.permissions.canRead) {
+                var aString = nf.Common.isDefinedAndNotNull(a.component[sortDetails.columnId]) ? a.component[sortDetails.columnId] : '';
+                var bString = nf.Common.isDefinedAndNotNull(b.component[sortDetails.columnId]) ? b.component[sortDetails.columnId] : '';
                 return aString === bString ? 0 : aString > bString ? 1 : -1;
+            } else {
+                if (!a.permissions.canRead && !b.permissions.canRead){
+                    return 0;
+                }
+                if(a.permissions.canRead){
+                    return 1;
+                } else {
+                    return -1;
+                }
             }
         };
 
@@ -712,39 +875,65 @@ nf.UsersTable = (function () {
     };
 
     /**
-     * Prompts to gather user group name.
+     * Sorts the specified data using the specified sort details.
+     *
+     * @param {object} sortDetails
+     * @param {object} data
      */
-    var groupUsers = function () {
-        // get the table and update the row accordingly
-        var usersGrid = $('#users-table').data('gridInstance');
-        var selectedIndices = usersGrid.getSelectedRows();
+    var userPolicySort = function (sortDetails, data) {
+        // defines a function for sorting
+        var comparer = function (a, b) {
+            if(a.permissions.canRead && b.permissions.canRead) {
+                if (sortDetails.columnId === 'action') {
+                    var aString = nf.Common.isDefinedAndNotNull(a.component[sortDetails.columnId]) ? a.component[sortDetails.columnId] : '';
+                    var bString = nf.Common.isDefinedAndNotNull(b.component[sortDetails.columnId]) ? b.component[sortDetails.columnId] : '';
+                    return aString === bString ? 0 : aString > bString ? 1 : -1;
+                } else if (sortDetails.columnId === 'policy') {
+                    var aString = '';
+                    var bString = '';
 
-        if ($.isArray(selectedIndices) && selectedIndices.length > 0) {
-            var usersData = usersGrid.getData();
+                    // if the user has permission to the policy
+                    if (a.permissions.canRead === true) {
+                        // check if Global policy
+                        if (nf.Common.isUndefinedOrNull(a.component.componentReference)) {
+                            aString = globalResourceParser(a);
+                        } else {
+                            // not a global policy... check if user has access to the component reference
+                            aString = componentResourceParser(a);
+                        }
+                    } else {
+                        aString = a.id;
+                    }
 
-            var userIds = [];
-            $.each(selectedIndices, function (_, index) {
-                var user = usersData.getItem(index);
+                    // if the user has permission to the policy
+                    if (b.permissions.canRead === true) {
+                        // check if Global policy
+                        if (nf.Common.isUndefinedOrNull(b.component.componentReference)) {
+                            bString = globalResourceParser(b);
+                        }else {
+                            // not a global policy... check if user has access to the component reference
+                            bString = componentResourceParser(b);
+                        }
+                    } else {
+                        bString = b.id;
+                    }
 
-                // groups have comma separated id's
-                userIds = userIds.concat(user['id'].split(','));
-            });
+                    return aString === bString ? 0 : aString > bString ? 1 : -1;
+                }
+            } else {
+                if (!a.permissions.canRead && !b.permissions.canRead){
+                    return 0;
+                }
+                if(a.permissions.canRead){
+                    return 1;
+                } else {
+                    return -1;
+                }
+            }
+        };
 
-            var groupNameField = $('#group-name');
-            groupNameField.data('selected-user-ids', userIds);
-
-            // show the dialog
-            $('#user-group-dialog').modal('show');
-
-            // set the focus
-            groupNameField.focus();
-        } else {
-            nf.Dialog.showOkDialog({
-                headerText: 'Group Users',
-                dialogContent: 'Select one or more users to group.',
-                overlayBackground: false
-            });
-        }
+        // perform the sort
+        data.sort(comparer, sortDetails.sortAsc);
     };
 
     /**
@@ -753,12 +942,7 @@ nf.UsersTable = (function () {
      * accounts for that.
      */
     var getFilterText = function () {
-        var filterText = '';
-        var filterField = $('#users-filter');
-        if (!filterField.hasClass(config.styles.filterList)) {
-            filterText = filterField.val();
-        }
-        return filterText;
+        return $('#users-filter').val();
     };
 
     /**
@@ -783,7 +967,7 @@ nf.UsersTable = (function () {
 
     /**
      * Performs the filtering.
-     * 
+     *
      * @param {object} item     The item subject to filtering
      * @param {object} args     Filter arguments
      * @returns {Boolean}       Whether or not to include the item
@@ -801,274 +985,263 @@ nf.UsersTable = (function () {
             return false;
         }
 
-        // handle searching appropriately
-        if (args.property === 'authorities') {
-            var roles = item[args.property];
+        return item.component[args.property].search(filterExp) >= 0;
+    };
 
-            var found = false;
-            for (var i = 0; i < roles.length; i++) {
-                var role = roles[i];
-                var roleName = role;
+    /**
+     * Builds a listing a users.
+     */
+    var buildUsersList = function () {
+        var usersGrid = $('#users-table').data('gridInstance');
+        var usersData = usersGrid.getData();
+        var usersList = $('#available-users');
 
-                // convert the role name accordingly
-                if (role === 'ROLE_ADMIN') {
-                    roleName = 'Administrator';
-                } else if (role === 'ROLE_DFM') {
-                    roleName = 'Data Flow Manager';
-                } else if (role === 'ROLE_PROVENANCE') {
-                    roleName = 'Provenance';
-                } else if (role === 'ROLE_MONITOR') {
-                    roleName = 'Read Only';
-                } else if (role === 'ROLE_NIFI') {
-                    roleName = 'NiFi';
-                } else if (role === 'ROLE_PROXY') {
-                    roleName = 'Proxy';
+        // add a row for each user
+        var count = 0;
+        $.each(usersData.getItems(), function(_, user) {
+            if (user.type === 'user') {
+                // checkbox
+                var checkbox = $('<div class="user-check nf-checkbox checkbox-unchecked"></div>').addClass('group-user-' + user.id);
+
+                // user id
+                var userId = $('<span class="user-id hidden"></span>').text(user.id);
+
+                // identity
+                var identity = $('<div class="available-identities"></div>').text(user.component.identity);
+
+                // clear
+                var clear = $('<div class="clear"></div>');
+
+                // list item
+                var li = $('<li></li>').append(checkbox).append(userId).append(identity).append(clear).appendTo(usersList);
+                if (count++ % 2 === 0) {
+                    li.addClass('even');
                 }
-
-                // see if the string was found
-                if (roleName.search(filterExp) >= 0) {
-                    found = true;
-                    break;
-                }
-            }
-
-            return found;
-        } else {
-            return item[args.property].search(filterExp) >= 0;
-        }
-    };
-
-    /**
-     * Shows details for the specified user.
-     * 
-     * @param {object} user
-     */
-    var showUserDetails = function (user) {
-        var grouped = $('#group-collaspe-checkbox').hasClass('checkbox-checked');
-
-        // update the dialog fields
-        $('#user-name-details-dialog').text(user.userName);
-        $('#user-dn-details-dialog').text(user.dn);
-
-        // handle fields that could vary for groups
-        if (nf.Common.isDefinedAndNotNull(user.creation)) {
-            $('#user-created-details-dialog').text(user.creation);
-        } else if (grouped && nf.Common.isDefinedAndNotNull(user.userGroup)) {
-            $('#user-created-details-dialog').html('<span class="unset">Multiple users with different creation timestamps.</span>');
-        } else {
-            $('#user-created-details-dialog').html('<span class="unset">No creation timestamp set</span>');
-        }
-
-        if (nf.Common.isDefinedAndNotNull(user.lastVerified)) {
-            $('#user-verified-details-dialog').text(user.lastVerified);
-        } else if (grouped && nf.Common.isDefinedAndNotNull(user.userGroup)) {
-            $('#user-verified-details-dialog').html('<span class="unset">Multiple users with different last verified timestamps.</span>');
-        } else {
-            $('#user-verified-details-dialog').html('<span class="unset">No last verified timestamp set.</span>');
-        }
-
-        if (nf.Common.isDefinedAndNotNull(user.justification)) {
-            $('#user-justification-details-dialog').text(user.justification);
-        } else if (grouped && nf.Common.isDefinedAndNotNull(user.userGroup)) {
-            $('#user-justification-details-dialog').html('<span class="unset">Multiple users with different justifications.</span>');
-        } else {
-            $('#user-justification-details-dialog').html('<span class="unset">No justification set.</span>');
-        }
-
-        // show the dialog
-        $('#user-details-dialog').modal('show');
-    };
-    
-    /**
-     * Updates the specified groups level of access.
-     * 
-     * @argument {object} item        The user item
-     */
-    var updateGroupAccess = function (item) {
-        // record the current group
-        $('#group-name-roles-dialog').text(item.userGroup);
-
-        // show the dialog
-        $('#group-roles-dialog').modal('show');
-    };
-    
-    /**
-     * Disables the specified group's account.
-     * 
-     * @argument {object} item        The user item
-     */
-    var revokeGroupAccess = function (item) {
-        // record the current group
-        $('#group-name-revoke-dialog').text(item.userGroup);
-
-        // show the dialog
-        $('#group-revoke-dialog').modal('show');
-    };
-
-    /**
-     * Ungroups the specified group.
-     * 
-     * @argument {object} item        The user item
-     */
-    var ungroup = function (item) {
-        // prompt for ungroup
-        nf.Dialog.showYesNoDialog({
-            dialogContent: 'Remove all users from group \'' + nf.Common.escapeHtml(item.userGroup) + '\'?',
-            overlayBackground: false,
-            yesHandler: function () {
-                $.ajax({
-                    type: 'DELETE',
-                    url: config.urls.userGroups + '/' + encodeURIComponent(item.userGroup),
-                    dataType: 'json'
-                }).done(function (response) {
-                    nf.UsersTable.loadUsersTable();
-                }).fail(nf.Common.handleAjaxError);
             }
         });
     };
-    
+
     /**
-     * Updates the specified users's level of access.
-     * 
-     * @argument {object} item        The user item
+     * Builds a listing a users.
      */
-    var updateUserAccess = function (item) {
-        // populate the user info
-        $('#user-id-roles-dialog').val(item.id);
-        $('#user-name-roles-dialog').attr('title', item.dn).text(item.userName);
-        $('#user-justification-roles-dialog').html(nf.Common.formatValue(item.justification));
+    var buildGroupsList = function () {
+        var usersGrid = $('#users-table').data('gridInstance');
+        var usersData = usersGrid.getData();
+        var groupsList = $('#available-groups');
 
-        // function for checking a checkbox
-        var check = function (domId) {
-            $('#' + domId).removeClass('checkbox-unchecked').addClass('checkbox-checked');
-        };
+        // add a row for each user
+        var count = 0;
+        $.each(usersData.getItems(), function(_, group) {
+            if (group.type === 'group') {
+                // checkbox
+                var checkbox = $('<div class="group-check nf-checkbox checkbox-unchecked"></div>').addClass('user-group-' + group.id);
 
-        // go through each user role
-        $.each(item.authorities, function (i, authority) {
-            if (authority === 'ROLE_ADMIN') {
-                check('role-admin-checkbox');
-            } else if (authority === 'ROLE_DFM') {
-                check('role-dfm-checkbox');
-            } else if (authority === 'ROLE_PROVENANCE') {
-                check('role-provenance-checkbox');
-            } else if (authority === 'ROLE_MONITOR') {
-                check('role-monitor-checkbox');
-            } else if (authority === 'ROLE_NIFI') {
-                check('role-nifi-checkbox');
-            } else if (authority === 'ROLE_PROXY') {
-                check('role-proxy-checkbox');
+                // group id
+                var groupId = $('<span class="group-id hidden"></span>').text(group.id);
+                
+                // icon
+                var groupIcon = $('<div class="fa fa-users" style="margin-top: 6px;"></div>');
+
+                // identity
+                var identity = $('<div class="available-identities"></div>').text(group.component.identity);
+
+                // clear
+                var clear = $('<div class="clear"></div>');
+
+                // list item
+                var li = $('<li></li>').append(checkbox).append(groupId).append(groupIcon).append(identity).append(clear).appendTo(groupsList);
+                if (count++ % 2 === 0) {
+                    li.addClass('even');
+                }
             }
         });
-
-        // show the dialog
-        $('#user-roles-dialog').modal('show');
     };
-    
+
     /**
-     * Disables the specified user's account.
-     * 
-     * @argument {object} item        The user item
+     * Edit's the specified user's account.
+     *
+     * @argument {object} user        The user item
      */
-    var revokeUserAccess = function (item) {
+    var editUser = function (user) {
         // populate the users info
-        $('#user-id-revoke-dialog').val(item.id);
-        $('#user-name-revoke-dialog').text(item.userName);
+        $('#user-id-edit-dialog').text(user.id);
+        $('#user-identity-edit-dialog').val(user.component.identity);
+
+        if (user.type === 'user') {
+            $('#individual-radio-button').prop('checked', true);
+            $('#user-groups').show();
+            $('#group-members').hide();
+
+            // list all the groups currently in the table
+            buildGroupsList();
+
+            // select each group this user belongs to
+            $.each(user.component.userGroups, function (_, userGroup) {
+                $('div.group-check.user-group-' + userGroup.id).removeClass('checkbox-unchecked').addClass('checkbox-checked');
+            });
+        } else {
+            $('#group-radio-button').prop('checked', true);
+            $('#user-groups').hide();
+            $('#group-members').show();
+
+            // list all the users currently in the table
+            buildUsersList();
+
+            // select each user that belongs to this group
+            $.each(user.component.users, function (_, member) {
+                $('div.user-check.group-user-' + member.id).removeClass('checkbox-unchecked').addClass('checkbox-checked');
+            });
+        }
+
+        // disable the type radio
+        $('#user-dialog input[name="userOrGroup"]').attr('disabled', true);
 
         // show the dialog
-        $('#user-revoke-dialog').modal('show');
-    };
-    
-    /**
-     * Prompts to verify group removal.
-     * 
-     * @argument {object} item        The user item
-     */
-    var ungroupUser = function (item) {
-        // prompt for ungroup
-        nf.Dialog.showYesNoDialog({
-            dialogContent: 'Remove user \'' + nf.Common.escapeHtml(item.userName) + '\' from group \'' + nf.Common.escapeHtml(item.userGroup) + '\'?',
-            overlayBackground: false,
-            yesHandler: function () {
-                $.ajax({
-                    type: 'DELETE',
-                    url: config.urls.userGroups + '/' + encodeURIComponent(item.userGroup) + '/users/' + encodeURIComponent(item.id),
-                    dataType: 'json'
-                }).done(function (response) {
-                    nf.UsersTable.loadUsersTable();
-                }).fail(nf.Common.handleAjaxError);
-            }
-        });
+        $('#user-dialog').modal('show');
     };
 
     /**
      * Delete's the specified user's account.
-     * 
-     * @argument {object} item        The user item
+     *
+     * @argument {object} user        The user item
      */
-    var deleteUserAccount = function (item) {
+    var deleteUser = function (user) {
         // populate the users info
-        $('#user-id-delete-dialog').val(item.id);
-        $('#user-name-delete-dialog').text(item.userName);
+        $('#user-id-delete-dialog').val(user.id);
+        $('#user-identity-delete-dialog').text(user.component.identity);
 
         // show the dialog
         $('#user-delete-dialog').modal('show');
     };
 
+    /**
+     * Open's a view of the specified user's policies.
+     *
+     * @argument {object} user        The user item
+     */
+    var viewUserPolicies = function (user) {
+        var userPoliciesGrid = $('#user-policies-table').data('gridInstance');
+        var userPoliciesData = userPoliciesGrid.getData();
+
+        // begin the update
+        userPoliciesData.beginUpdate();
+
+        // set the rows
+        if (nf.Common.isDefinedAndNotNull(user.component.accessPolicies)) {
+            userPoliciesData.setItems(user.component.accessPolicies);
+        }
+
+        $('#policies-dialog-user-name').text(user.component.identity);
+
+        // end the update
+        userPoliciesData.endUpdate();
+
+        // re-sort and clear selection after updating
+        userPoliciesData.reSort();
+        userPoliciesGrid.invalidate();
+        userPoliciesGrid.getSelectionModel().setSelectedRows([]);
+
+        // show the dialog
+        $('#user-policies-dialog').modal('show');
+        userPoliciesGrid.resizeCanvas();
+    };
+
     return {
         init: function () {
-            initUserDetailsDialog();
-            initUserRolesDialog();
-            initGroupRolesDialog();
-            initUserRevokeDialog();
+            initUserDialog();
+            initUserPoliciesDialog();
+            initUserPoliciesTable();
             initUserDeleteDialog();
-            initUserGroupDialog();
-            initGroupRevokeDialog();
             initUsersTable();
+
+            if (nf.Common.canModifyTenants()) {
+                $('#new-user-button').on('click', function () {
+                    buildUsersList();
+                    buildGroupsList();
+
+                    // show the dialog
+                    $('#user-dialog').modal('show');
+
+                    // set the focus automatically, only when adding a new user
+                    $('#user-identity-edit-dialog').focus();
+                });
+
+                $('#new-user-button').prop('disabled', false);
+            } else {
+                $('#new-user-button').prop('disabled', true);
+            }
         },
-        
+
         /**
          * Update the size of the grid based on its container's current size.
          */
         resetTableSize: function () {
-            var grid = $('#users-table').data('gridInstance');
-            if (nf.Common.isDefinedAndNotNull(grid)) {
-                grid.resizeCanvas();
+            var usersTable = $('#users-table');
+            if (usersTable.is(':visible')) {
+                var grid = usersTable.data('gridInstance');
+                if (nf.Common.isDefinedAndNotNull(grid)) {
+                    grid.resizeCanvas();
+                }
             }
         },
-        
+
         /**
-         * Load the processor status table.
+         * Load the users table.
          */
         loadUsersTable: function () {
-            return $.ajax({
+            var users = $.ajax({
                 type: 'GET',
                 url: config.urls.users,
-                data: {
-                    'grouped': $('#group-collaspe-checkbox').hasClass('checkbox-checked')
-                },
                 dataType: 'json'
-            }).done(function (response) {
-                // ensure there are users
-                if (nf.Common.isDefinedAndNotNull(response.users)) {
-                    var usersGrid = $('#users-table').data('gridInstance');
-                    var usersData = usersGrid.getData();
+            });
 
-                    // set the items
-                    usersData.setItems(response.users);
-                    usersData.reSort();
-                    usersGrid.invalidate();
+            var groups = $.ajax({
+                type: 'GET',
+                url: config.urls.userGroups,
+                dataType: 'json'
+            });
 
-                    // clear the current selection
-                    usersGrid.getSelectionModel().setSelectedRows([]);
+            return $.when(users, groups).done(function (usersResults, groupsResults) {
+                var usersResponse = usersResults[0];
+                var groupsResponse = groupsResults[0];
 
-                    // update the refresh timestamp
-                    $('#users-last-refreshed').text(response.generated);
+                // update the refresh timestamp
+                $('#users-last-refreshed').text(usersResponse.generated);
 
-                    // update the total number of processors
-                    $('#total-users').text(response.users.length);
-                } else {
-                    $('#total-users').text('0');
-                }
+                var usersGrid = $('#users-table').data('gridInstance');
+                var usersData = usersGrid.getData();
+
+                // begin the update
+                usersData.beginUpdate();
+
+                var users = [];
+
+                // add each user
+                $.each(usersResponse.users, function (_, user) {
+                    users.push($.extend({
+                        type: 'user'
+                    }, user));
+                });
+
+                // add each group
+                $.each(groupsResponse.userGroups, function (_, group) {
+                    users.push($.extend({
+                        type: 'group'
+                    }, group));
+                });
+
+                // set the rows
+                usersData.setItems(users);
+
+                // end the update
+                usersData.endUpdate();
+
+                // re-sort and clear selection after updating
+                usersData.reSort();
+                usersGrid.invalidate();
+                usersGrid.getSelectionModel().setSelectedRows([]);
+
+                $('#total-users').text(usersData.getLength());
             }).fail(nf.Common.handleAjaxError);
         }
     };

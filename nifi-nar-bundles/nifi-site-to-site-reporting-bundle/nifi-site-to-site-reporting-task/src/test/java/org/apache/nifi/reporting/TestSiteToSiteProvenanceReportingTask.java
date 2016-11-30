@@ -17,6 +17,7 @@
 
 package org.apache.nifi.reporting;
 
+
 import org.apache.nifi.components.PropertyDescriptor;
 import org.apache.nifi.components.PropertyValue;
 import org.apache.nifi.components.state.Scope;
@@ -27,7 +28,6 @@ import org.apache.nifi.provenance.ProvenanceEventRecord;
 import org.apache.nifi.provenance.ProvenanceEventRepository;
 import org.apache.nifi.provenance.ProvenanceEventType;
 import org.apache.nifi.provenance.StandardProvenanceEventRecord;
-import org.apache.nifi.registry.VariableRegistryUtils;
 import org.apache.nifi.remote.Transaction;
 import org.apache.nifi.remote.TransferDirection;
 import org.apache.nifi.remote.client.SiteToSiteClient;
@@ -48,10 +48,8 @@ import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.HashMap;
-import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.atomic.AtomicInteger;
 
@@ -70,10 +68,6 @@ public class TestSiteToSiteProvenanceReportingTask {
         final Map<String, String> prevAttrs = new HashMap<>();
         attributes.put("filename", "1234.xyz");
 
-        final Set<String> lineageIdentifiers = new HashSet<>();
-        lineageIdentifiers.add("123");
-        lineageIdentifiers.add("321");
-
         final ProvenanceEventBuilder builder = new StandardProvenanceEventRecord.Builder();
         builder.setEventTime(System.currentTimeMillis());
         builder.setEventType(ProvenanceEventType.RECEIVE);
@@ -83,7 +77,6 @@ public class TestSiteToSiteProvenanceReportingTask {
         builder.setAttributes(prevAttrs, attributes);
         builder.setComponentId("1234");
         builder.setComponentType("dummy processor");
-        builder.setLineageIdentifiers(lineageIdentifiers);
         final ProvenanceEventRecord event = builder.build();
 
         final MockSiteToSiteProvenanceReportingTask task = new MockSiteToSiteProvenanceReportingTask();
@@ -101,7 +94,7 @@ public class TestSiteToSiteProvenanceReportingTask {
             @Override
             public PropertyValue answer(final InvocationOnMock invocation) throws Throwable {
                 final PropertyDescriptor descriptor = invocation.getArgumentAt(0, PropertyDescriptor.class);
-                return new MockPropertyValue(properties.get(descriptor), null, VariableRegistryUtils.createVariableRegistry());
+                return new MockPropertyValue(properties.get(descriptor));
             }
         }).when(context).getProperty(Mockito.any(PropertyDescriptor.class));
 

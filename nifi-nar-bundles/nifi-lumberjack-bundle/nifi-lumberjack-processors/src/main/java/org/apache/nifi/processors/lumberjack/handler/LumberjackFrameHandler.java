@@ -17,8 +17,16 @@
 package org.apache.nifi.processors.lumberjack.handler;
 
 
-import com.google.gson.Gson;
-import org.apache.nifi.logging.ProcessorLog;
+import java.io.IOException;
+import java.nio.ByteBuffer;
+import java.nio.channels.SelectionKey;
+import java.nio.channels.SocketChannel;
+import java.nio.charset.Charset;
+import java.util.HashMap;
+import java.util.Map;
+import java.util.concurrent.BlockingQueue;
+
+import org.apache.nifi.logging.ComponentLog;
 import org.apache.nifi.processor.util.listen.dispatcher.AsyncChannelDispatcher;
 import org.apache.nifi.processor.util.listen.event.Event;
 import org.apache.nifi.processor.util.listen.event.EventFactory;
@@ -29,14 +37,7 @@ import org.apache.nifi.processors.lumberjack.event.LumberjackMetadata;
 import org.apache.nifi.processors.lumberjack.frame.LumberjackEncoder;
 import org.apache.nifi.processors.lumberjack.frame.LumberjackFrame;
 
-import java.io.IOException;
-import java.nio.ByteBuffer;
-import java.nio.channels.SelectionKey;
-import java.nio.channels.SocketChannel;
-import java.nio.charset.Charset;
-import java.util.HashMap;
-import java.util.Map;
-import java.util.concurrent.BlockingQueue;
+import com.google.gson.Gson;
 
 /**
  * Encapsulates the logic to handle a LumberjackFrame once it has been read from the channel.
@@ -49,14 +50,14 @@ public class LumberjackFrameHandler<E extends Event<SocketChannel>> {
     private final SelectionKey key;
     private final AsyncChannelDispatcher dispatcher;
     private final LumberjackEncoder encoder;
-    private final ProcessorLog logger;
+    private final ComponentLog logger;
 
     public LumberjackFrameHandler(final SelectionKey selectionKey,
                                   final Charset charset,
                                   final EventFactory<E> eventFactory,
                                   final BlockingQueue<E> events,
                                   final AsyncChannelDispatcher dispatcher,
-                                  final ProcessorLog logger) {
+                                  final ComponentLog logger) {
         this.key = selectionKey;
         this.charset = charset;
         this.eventFactory = eventFactory;

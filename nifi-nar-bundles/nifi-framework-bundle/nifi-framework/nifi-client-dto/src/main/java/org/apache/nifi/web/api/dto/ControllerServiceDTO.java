@@ -17,23 +17,25 @@
 package org.apache.nifi.web.api.dto;
 
 import com.wordnik.swagger.annotations.ApiModelProperty;
+import org.apache.nifi.web.api.entity.ControllerServiceReferencingComponentEntity;
+
+import javax.xml.bind.annotation.XmlType;
 import java.util.Collection;
 import java.util.Map;
 import java.util.Set;
-import javax.xml.bind.annotation.XmlType;
 
 /**
  * A Controller Service that can be shared by other components
  */
 @XmlType(name = "controllerService")
-public class ControllerServiceDTO extends NiFiComponentDTO {
+public class ControllerServiceDTO extends ComponentDTO {
 
     private String name;
     private String type;
     private String comments;
-    private String availability;
     private String state;
     private Boolean persistsState;
+    private Boolean restricted;
 
     private Map<String, String> properties;
     private Map<String, PropertyDescriptorDTO> descriptors;
@@ -41,7 +43,7 @@ public class ControllerServiceDTO extends NiFiComponentDTO {
     private String customUiUrl;
     private String annotationData;
 
-    private Set<ControllerServiceReferencingComponentDTO> referencingComponents;
+    private Set<ControllerServiceReferencingComponentEntity> referencingComponents;
 
     private Collection<String> validationErrors;
 
@@ -88,21 +90,6 @@ public class ControllerServiceDTO extends NiFiComponentDTO {
     }
 
     /**
-     * @return Where this service is available. Possible values are NCM, NODE
-     */
-    @ApiModelProperty(
-            value = "Where the servcie is available.",
-            allowableValues = "NCM, NODE"
-    )
-    public String getAvailability() {
-        return availability;
-    }
-
-    public void setAvailability(String availability) {
-        this.availability = availability;
-    }
-
-    /**
      * @return whether this controller service persists state
      */
     @ApiModelProperty(
@@ -114,6 +101,20 @@ public class ControllerServiceDTO extends NiFiComponentDTO {
 
     public void setPersistsState(Boolean persistsState) {
         this.persistsState = persistsState;
+    }
+
+    /**
+     * @return whether this controller service requires elevated privileges
+     */
+    @ApiModelProperty(
+            value = "Whether the controller service requires elevated privileges."
+    )
+    public Boolean getRestricted() {
+        return restricted;
+    }
+
+    public void setRestricted(Boolean restricted) {
+        this.restricted = restricted;
     }
 
     /**
@@ -177,7 +178,7 @@ public class ControllerServiceDTO extends NiFiComponentDTO {
      * @return annotation data for this controller service
      */
     @ApiModelProperty(
-            value = "The annontation for the controller service. This is how the custom UI relays configuration to the controller service."
+            value = "The annotation for the controller service. This is how the custom UI relays configuration to the controller service."
     )
     public String getAnnotationData() {
         return annotationData;
@@ -193,11 +194,11 @@ public class ControllerServiceDTO extends NiFiComponentDTO {
     @ApiModelProperty(
             value = "All components referencing this controller service."
     )
-    public Set<ControllerServiceReferencingComponentDTO> getReferencingComponents() {
+    public Set<ControllerServiceReferencingComponentEntity> getReferencingComponents() {
         return referencingComponents;
     }
 
-    public void setReferencingComponents(Set<ControllerServiceReferencingComponentDTO> referencingComponents) {
+    public void setReferencingComponents(Set<ControllerServiceReferencingComponentEntity> referencingComponents) {
         this.referencingComponents = referencingComponents;
     }
 

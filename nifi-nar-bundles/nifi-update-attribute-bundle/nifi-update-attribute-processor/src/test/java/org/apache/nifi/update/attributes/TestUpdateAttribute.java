@@ -16,7 +16,6 @@
  */
 package org.apache.nifi.update.attributes;
 
-
 import java.nio.charset.StandardCharsets;
 import java.util.Arrays;
 import java.util.Collection;
@@ -33,7 +32,6 @@ import org.apache.nifi.util.MockFlowFile;
 import org.apache.nifi.util.TestRunner;
 import org.apache.nifi.util.TestRunners;
 
-
 import org.junit.Test;
 
 import static org.junit.Assert.assertEquals;
@@ -44,7 +42,6 @@ import static org.junit.Assert.assertEquals;
 public class TestUpdateAttribute {
 
     final static private String TEST_CONTENT = "THIS IS TEST CONTENT";
-
 
     private Map<String, String> getMap(String... keyValues) {
         final Map<String, String> map = new HashMap<>();

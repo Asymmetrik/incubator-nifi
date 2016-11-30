@@ -41,6 +41,10 @@ public class MockValidationContext implements ValidationContext, ControllerServi
     private final StateManager stateManager;
     private final VariableRegistry variableRegistry;
 
+    public MockValidationContext(final MockProcessContext processContext) {
+        this(processContext, null, VariableRegistry.EMPTY_REGISTRY);
+    }
+
     public MockValidationContext(final MockProcessContext processContext, final StateManager stateManager, final VariableRegistry variableRegistry) {
         this.context = processContext;
         this.stateManager = stateManager;
@@ -90,7 +94,7 @@ public class MockValidationContext implements ValidationContext, ControllerServi
     }
 
     @Override
-    public Set<String> getControllerServiceIdentifiers(Class<? extends ControllerService> serviceType) {
+    public Set<String> getControllerServiceIdentifiers(final Class<? extends ControllerService> serviceType) {
         return context.getControllerServiceIdentifiers(serviceType);
     }
 
@@ -121,7 +125,7 @@ public class MockValidationContext implements ValidationContext, ControllerServi
     }
 
     @Override
-    public boolean isControllerServiceEnabling(String serviceIdentifier) {
+    public boolean isControllerServiceEnabling(final String serviceIdentifier) {
         return context.isControllerServiceEnabling(serviceIdentifier);
     }
 
@@ -139,6 +143,11 @@ public class MockValidationContext implements ValidationContext, ControllerServi
     public boolean isExpressionLanguageSupported(final String propertyName) {
         final Boolean supported = expressionLanguageSupported.get(propertyName);
         return Boolean.TRUE.equals(supported);
+    }
+
+    @Override
+    public String getProcessGroupIdentifier() {
+        return "unit test";
     }
 
 }

@@ -73,6 +73,11 @@ public class BatchingSessionFactory implements ProcessSessionFactory {
         }
 
         @Override
+        public void migrate(ProcessSession newOwner, Collection<FlowFile> flowFiles) {
+            session.migrate(newOwner, flowFiles);
+        }
+
+        @Override
         public void adjustCounter(String name, long delta, boolean immediate) {
             session.adjustCounter(name, delta, immediate);
         }
@@ -190,6 +195,11 @@ public class BatchingSessionFactory implements ProcessSessionFactory {
         @Override
         public void read(FlowFile source, boolean allowSessionStreamManagement, InputStreamCallback reader) {
             session.read(source, allowSessionStreamManagement, reader);
+        }
+
+        @Override
+        public InputStream read(FlowFile flowFile) {
+            return session.read(flowFile);
         }
 
         @Override

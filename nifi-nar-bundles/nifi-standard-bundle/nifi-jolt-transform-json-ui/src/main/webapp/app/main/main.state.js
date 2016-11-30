@@ -21,7 +21,7 @@ var MainState = function($stateProvider) {
 
     $stateProvider
         .state('main', {
-            url: "/main?id&processorId&revision&clientId&editable",
+            url: "/main?id&revision&clientId&editable",
             controller: 'MainController'
         })
 };

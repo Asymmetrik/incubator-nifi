@@ -19,8 +19,16 @@ package org.apache.nifi.web.controller;
 import org.apache.commons.collections4.CollectionUtils;
 import org.apache.commons.lang3.ClassUtils;
 import org.apache.commons.lang3.StringUtils;
-import org.apache.nifi.admin.service.UserService;
-import org.apache.nifi.authorization.DownloadAuthorization;
+import org.apache.nifi.authorization.AccessDeniedException;
+import org.apache.nifi.authorization.AuthorizationResult;
+import org.apache.nifi.authorization.AuthorizationResult.Result;
+import org.apache.nifi.authorization.Authorizer;
+import org.apache.nifi.authorization.RequestAction;
+import org.apache.nifi.authorization.Resource;
+import org.apache.nifi.authorization.resource.Authorizable;
+import org.apache.nifi.authorization.resource.ResourceFactory;
+import org.apache.nifi.authorization.user.NiFiUser;
+import org.apache.nifi.authorization.user.NiFiUserUtils;
 import org.apache.nifi.cluster.protocol.NodeIdentifier;
 import org.apache.nifi.components.PropertyDescriptor;
 import org.apache.nifi.connectable.Connectable;
@@ -32,12 +40,23 @@ import org.apache.nifi.controller.ControllerService;
 import org.apache.nifi.controller.Counter;
 import org.apache.nifi.controller.FlowController;
 import org.apache.nifi.controller.ProcessorNode;
+import org.apache.nifi.controller.ReportingTaskNode;
 import org.apache.nifi.controller.ScheduledState;
+import org.apache.nifi.controller.Template;
+import org.apache.nifi.controller.exception.ProcessorInstantiationException;
+import org.apache.nifi.controller.label.Label;
 import org.apache.nifi.controller.queue.FlowFileQueue;
 import org.apache.nifi.controller.queue.QueueSize;
+import org.apache.nifi.controller.reporting.ReportingTaskInstantiationException;
 import org.apache.nifi.controller.repository.ContentNotFoundException;
 import org.apache.nifi.controller.repository.claim.ContentDirection;
+import org.apache.nifi.controller.service.ControllerServiceNode;
+import org.apache.nifi.controller.status.ConnectionStatus;
+import org.apache.nifi.controller.status.PortStatus;
 import org.apache.nifi.controller.status.ProcessGroupStatus;
+import org.apache.nifi.controller.status.ProcessorStatus;
+import org.apache.nifi.controller.status.RemoteProcessGroupStatus;
+import org.apache.nifi.controller.status.history.ComponentStatusRepository;
 import org.apache.nifi.diagnostics.SystemDiagnostics;
 import org.apache.nifi.flowfile.FlowFilePrioritizer;
 import org.apache.nifi.flowfile.attributes.CoreAttributes;
@@ -50,7 +69,7 @@ import org.apache.nifi.processor.DataUnit;
 import org.apache.nifi.processor.Processor;
 import org.apache.nifi.processor.Relationship;
 import org.apache.nifi.provenance.ProvenanceEventRecord;
-import org.apache.nifi.provenance.ProvenanceEventRepository;
+import org.apache.nifi.provenance.ProvenanceRepository;
 import org.apache.nifi.provenance.SearchableFields;
 import org.apache.nifi.provenance.lineage.ComputeLineageSubmission;
 import org.apache.nifi.provenance.search.Query;
@@ -59,17 +78,15 @@ import org.apache.nifi.provenance.search.QuerySubmission;
 import org.apache.nifi.provenance.search.SearchTerm;
 import org.apache.nifi.provenance.search.SearchTerms;
 import org.apache.nifi.provenance.search.SearchableField;
+import org.apache.nifi.registry.VariableRegistry;
 import org.apache.nifi.remote.RootGroupPort;
-import org.apache.nifi.reporting.BulletinQuery;
-import org.apache.nifi.reporting.BulletinRepository;
-import org.apache.nifi.reporting.ComponentType;
 import org.apache.nifi.reporting.ReportingTask;
+import org.apache.nifi.scheduling.ExecutionNode;
 import org.apache.nifi.scheduling.SchedulingStrategy;
 import org.apache.nifi.search.SearchContext;
 import org.apache.nifi.search.SearchResult;
 import org.apache.nifi.search.Searchable;
 import org.apache.nifi.services.FlowService;
-import org.apache.nifi.user.NiFiUser;
 import org.apache.nifi.util.FormatUtils;
 import org.apache.nifi.util.NiFiProperties;
 import org.apache.nifi.web.DownloadableContent;
@@ -90,13 +107,9 @@ import org.apache.nifi.web.api.dto.provenance.lineage.LineageRequestDTO.LineageR
 import org.apache.nifi.web.api.dto.search.ComponentSearchResultDTO;
 import org.apache.nifi.web.api.dto.search.SearchResultsDTO;
 import org.apache.nifi.web.api.dto.status.ControllerStatusDTO;
-import org.apache.nifi.web.api.dto.status.ProcessGroupStatusDTO;
 import org.apache.nifi.web.api.dto.status.StatusHistoryDTO;
-import org.apache.nifi.web.security.ProxiedEntitiesUtils;
-import org.apache.nifi.web.security.user.NiFiUserUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.security.access.AccessDeniedException;
 
 import javax.ws.rs.WebApplicationException;
 import java.io.IOException;
@@ -116,27 +129,26 @@ import java.util.Set;
 import java.util.SortedSet;
 import java.util.TimeZone;
 import java.util.TreeSet;
+import java.util.UUID;
 import java.util.concurrent.TimeUnit;
+import java.util.function.Consumer;
+import java.util.stream.Collectors;
 
-public class ControllerFacade {
+import static org.apache.nifi.controller.FlowController.ROOT_GROUP_ID_ALIAS;
+
+public class ControllerFacade implements Authorizable {
 
     private static final Logger logger = LoggerFactory.getLogger(ControllerFacade.class);
 
     // nifi components
     private FlowController flowController;
     private FlowService flowService;
-    private UserService userService;
+    private Authorizer authorizer;
 
     // properties
     private NiFiProperties properties;
     private DtoFactory dtoFactory;
-
-    /**
-     * Creates an archive of the current flow.
-     */
-    public void createArchive() {
-        flowService.saveFlowChanges(TimeUnit.SECONDS, 0, true);
-    }
+    private VariableRegistry variableRegistry;
 
     /**
      * Returns the group id that contains the specified processor.
@@ -163,6 +175,16 @@ public class ControllerFacade {
         flowController.setName(name);
     }
 
+    @Override
+    public Authorizable getParentAuthorizable() {
+        return flowController.getParentAuthorizable();
+    }
+
+    @Override
+    public Resource getResource() {
+        return flowController.getResource();
+    }
+
     /**
      * Sets the comments of this controller.
      *
@@ -170,6 +192,38 @@ public class ControllerFacade {
      */
     public void setComments(String comments) {
         flowController.setComments(comments);
+    }
+
+    /**
+     * Create a temporary Processor used for extracting PropertyDescriptor's for ControllerService reference authorization.
+     *
+     * @param type type of processor
+     * @return processor
+     * @throws ProcessorInstantiationException when unable to instantiate the processor
+     */
+    public ProcessorNode createTemporaryProcessor(String type) throws ProcessorInstantiationException {
+        return flowController.createProcessor(type, UUID.randomUUID().toString(), false);
+    }
+
+    /**
+     * Create a temporary ReportingTask used for extracting PropertyDescriptor's for ControllerService reference authorization.
+     *
+     * @param type type of reporting task
+     * @return reporting task
+     * @throws ReportingTaskInstantiationException when unable to instantiate the reporting task
+     */
+    public ReportingTaskNode createTemporaryReportingTask(String type) throws ReportingTaskInstantiationException {
+        return flowController.createReportingTask(type, UUID.randomUUID().toString(), false, false);
+    }
+
+    /**
+     * Create a temporary ControllerService used for extracting PropertyDescriptor's for ControllerService reference authorization.
+     *
+     * @param type type of controller service
+     * @return controller service
+     */
+    public ControllerServiceNode createTemporaryControllerService(String type) {
+        return flowController.createControllerService(type, UUID.randomUUID().toString(), false);
     }
 
     /**
@@ -234,23 +288,54 @@ public class ControllerFacade {
     /**
      * Returns the status history for the specified processor.
      *
-     * @param groupId group id
      * @param processorId processor id
      * @return status history
      */
-    public StatusHistoryDTO getProcessorStatusHistory(final String groupId, final String processorId) {
-        return flowController.getProcessorStatusHistory(processorId);
+    public StatusHistoryDTO getProcessorStatusHistory(final String processorId) {
+        final ProcessGroup root = flowController.getGroup(flowController.getRootGroupId());
+        final ProcessorNode processor = root.findProcessor(processorId);
+
+        // ensure the processor was found
+        if (processor == null) {
+            throw new ResourceNotFoundException(String.format("Unable to locate processor with id '%s'.", processorId));
+        }
+
+        final StatusHistoryDTO statusHistory = flowController.getProcessorStatusHistory(processorId);
+
+        // if not authorized
+        if (!processor.isAuthorized(authorizer, RequestAction.READ, NiFiUserUtils.getNiFiUser())) {
+            statusHistory.getComponentDetails().put(ComponentStatusRepository.COMPONENT_DETAIL_NAME, processorId);
+            statusHistory.getComponentDetails().put(ComponentStatusRepository.COMPONENT_DETAIL_TYPE, "Processor");
+        }
+
+        return statusHistory;
     }
 
     /**
      * Returns the status history for the specified connection.
      *
-     * @param groupId group id
      * @param connectionId connection id
      * @return status history
      */
-    public StatusHistoryDTO getConnectionStatusHistory(final String groupId, final String connectionId) {
-        return flowController.getConnectionStatusHistory(connectionId);
+    public StatusHistoryDTO getConnectionStatusHistory(final String connectionId) {
+        final ProcessGroup root = flowController.getGroup(flowController.getRootGroupId());
+        final Connection connection = root.findConnection(connectionId);
+
+        // ensure the connection was found
+        if (connection == null) {
+            throw new ResourceNotFoundException(String.format("Unable to locate connection with id '%s'.", connectionId));
+        }
+
+        final StatusHistoryDTO statusHistory = flowController.getConnectionStatusHistory(connectionId);
+
+        // if not authorized
+        if (!connection.isAuthorized(authorizer, RequestAction.READ, NiFiUserUtils.getNiFiUser())) {
+            statusHistory.getComponentDetails().put(ComponentStatusRepository.COMPONENT_DETAIL_NAME, connectionId);
+            statusHistory.getComponentDetails().put(ComponentStatusRepository.COMPONENT_DETAIL_SOURCE_NAME, connection.getSource().getIdentifier());
+            statusHistory.getComponentDetails().put(ComponentStatusRepository.COMPONENT_DETAIL_DESTINATION_NAME, connection.getDestination().getIdentifier());
+        }
+
+        return statusHistory;
     }
 
     /**
@@ -260,18 +345,49 @@ public class ControllerFacade {
      * @return status history
      */
     public StatusHistoryDTO getProcessGroupStatusHistory(final String groupId) {
-        return flowController.getProcessGroupStatusHistory(groupId);
+        final String searchId = groupId.equals(ROOT_GROUP_ID_ALIAS) ? flowController.getRootGroupId() : groupId;
+        final ProcessGroup root = flowController.getGroup(flowController.getRootGroupId());
+        final ProcessGroup group = root.findProcessGroup(searchId);
+
+        // ensure the processor was found
+        if (group == null) {
+            throw new ResourceNotFoundException(String.format("Unable to locate process group with id '%s'.", groupId));
+        }
+
+        final StatusHistoryDTO statusHistory = flowController.getProcessGroupStatusHistory(groupId);
+
+        // if not authorized
+        if (!group.isAuthorized(authorizer, RequestAction.READ, NiFiUserUtils.getNiFiUser())) {
+            statusHistory.getComponentDetails().put(ComponentStatusRepository.COMPONENT_DETAIL_NAME, groupId);
+        }
+
+        return statusHistory;
     }
 
     /**
      * Returns the status history for the specified remote process group.
      *
-     * @param groupId group id
      * @param remoteProcessGroupId remote process group id
      * @return status history
      */
-    public StatusHistoryDTO getRemoteProcessGroupStatusHistory(final String groupId, final String remoteProcessGroupId) {
-        return flowController.getRemoteProcessGroupStatusHistory(remoteProcessGroupId);
+    public StatusHistoryDTO getRemoteProcessGroupStatusHistory(final String remoteProcessGroupId) {
+        final ProcessGroup root = flowController.getGroup(flowController.getRootGroupId());
+        final RemoteProcessGroup remoteProcessGroup = root.findRemoteProcessGroup(remoteProcessGroupId);
+
+        // ensure the output port was found
+        if (remoteProcessGroup == null) {
+            throw new ResourceNotFoundException(String.format("Unable to locate remote process group with id '%s'.", remoteProcessGroupId));
+        }
+
+        final StatusHistoryDTO statusHistory = flowController.getRemoteProcessGroupStatusHistory(remoteProcessGroupId);
+
+        // if not authorized
+        if (!remoteProcessGroup.isAuthorized(authorizer, RequestAction.READ, NiFiUserUtils.getNiFiUser())) {
+            statusHistory.getComponentDetails().put(ComponentStatusRepository.COMPONENT_DETAIL_NAME, remoteProcessGroupId);
+            statusHistory.getComponentDetails().remove(ComponentStatusRepository.COMPONENT_DETAIL_URI);
+        }
+
+        return statusHistory;
     }
 
     /**
@@ -439,17 +555,8 @@ public class ControllerFacade {
         final ControllerStatusDTO controllerStatus = new ControllerStatusDTO();
         controllerStatus.setActiveThreadCount(flowController.getActiveThreadCount());
         controllerStatus.setQueued(FormatUtils.formatCount(controllerQueueSize.getObjectCount()) + " / " + FormatUtils.formatDataSize(controllerQueueSize.getByteCount()));
-
-        final BulletinRepository bulletinRepository = getBulletinRepository();
-        controllerStatus.setBulletins(dtoFactory.createBulletinDtos(bulletinRepository.findBulletinsForController()));
-
-        // get the controller service bulletins
-        final BulletinQuery controllerServiceQuery = new BulletinQuery.Builder().sourceType(ComponentType.CONTROLLER_SERVICE).build();
-        controllerStatus.setControllerServiceBulletins(dtoFactory.createBulletinDtos(bulletinRepository.findBulletins(controllerServiceQuery)));
-
-        // get the reporting task bulletins
-        final BulletinQuery reportingTaskQuery = new BulletinQuery.Builder().sourceType(ComponentType.REPORTING_TASK).build();
-        controllerStatus.setReportingTaskBulletins(dtoFactory.createBulletinDtos(bulletinRepository.findBulletins(reportingTaskQuery)));
+        controllerStatus.setBytesQueued(controllerQueueSize.getByteCount());
+        controllerStatus.setFlowFilesQueued(controllerQueueSize.getObjectCount());
 
         final ProcessGroupCounts counts = rootGroup.getCounts();
         controllerStatus.setRunningCount(counts.getRunningCount());
@@ -468,21 +575,160 @@ public class ControllerFacade {
      * @param groupId group id
      * @return the status for the specified process group
      */
-    public ProcessGroupStatusDTO getProcessGroupStatus(final String groupId) {
-        final ProcessGroupStatus processGroupStatus = flowController.getGroupStatus(groupId);
+    public ProcessGroupStatus getProcessGroupStatus(final String groupId) {
+        final ProcessGroupStatus processGroupStatus = flowController.getGroupStatus(groupId, NiFiUserUtils.getNiFiUser());
         if (processGroupStatus == null) {
             throw new ResourceNotFoundException(String.format("Unable to locate group with id '%s'.", groupId));
         }
-        return dtoFactory.createProcessGroupStatusDto(flowController.getBulletinRepository(), processGroupStatus);
+
+        return processGroupStatus;
     }
 
     /**
-     * Gets the BulletinRepository.
+     * Gets the status for the specified processor.
      *
-     * @return the BulletinRepository
+     * @param processorId processor id
+     * @return the status for the specified processor
      */
-    public BulletinRepository getBulletinRepository() {
-        return flowController.getBulletinRepository();
+    public ProcessorStatus getProcessorStatus(final String processorId) {
+        final ProcessGroup root = flowController.getGroup(flowController.getRootGroupId());
+        final ProcessorNode processor = root.findProcessor(processorId);
+
+        // ensure the processor was found
+        if (processor == null) {
+            throw new ResourceNotFoundException(String.format("Unable to locate processor with id '%s'.", processorId));
+        }
+
+        // calculate the process group status
+        final String groupId = processor.getProcessGroup().getIdentifier();
+        final ProcessGroupStatus processGroupStatus = flowController.getGroupStatus(groupId, NiFiUserUtils.getNiFiUser());
+        if (processGroupStatus == null) {
+            throw new ResourceNotFoundException(String.format("Unable to locate group with id '%s'.", groupId));
+        }
+
+        final ProcessorStatus status = processGroupStatus.getProcessorStatus().stream().filter(processorStatus -> processorId.equals(processorStatus.getId())).findFirst().orElse(null);
+        if (status == null) {
+            throw new ResourceNotFoundException(String.format("Unable to locate processor with id '%s'.", processorId));
+        }
+
+        return status;
+    }
+
+    /**
+     * Gets the status for the specified connection.
+     *
+     * @param connectionId connection id
+     * @return the status for the specified connection
+     */
+    public ConnectionStatus getConnectionStatus(final String connectionId) {
+        final ProcessGroup root = flowController.getGroup(flowController.getRootGroupId());
+        final Connection connection = root.findConnection(connectionId);
+
+        // ensure the connection was found
+        if (connection == null) {
+            throw new ResourceNotFoundException(String.format("Unable to locate connection with id '%s'.", connectionId));
+        }
+
+        // calculate the process group status
+        final String groupId = connection.getProcessGroup().getIdentifier();
+        final ProcessGroupStatus processGroupStatus = flowController.getGroupStatus(groupId, NiFiUserUtils.getNiFiUser());
+        if (processGroupStatus == null) {
+            throw new ResourceNotFoundException(String.format("Unable to locate group with id '%s'.", groupId));
+        }
+
+        final ConnectionStatus status = processGroupStatus.getConnectionStatus().stream().filter(connectionStatus -> connectionId.equals(connectionStatus.getId())).findFirst().orElse(null);
+        if (status == null) {
+            throw new ResourceNotFoundException(String.format("Unable to locate connection with id '%s'.", connectionId));
+        }
+
+        return status;
+    }
+
+    /**
+     * Gets the status for the specified input port.
+     *
+     * @param portId input port id
+     * @return the status for the specified input port
+     */
+    public PortStatus getInputPortStatus(final String portId) {
+        final ProcessGroup root = flowController.getGroup(flowController.getRootGroupId());
+        final Port port = root.findInputPort(portId);
+
+        // ensure the input port was found
+        if (port == null) {
+            throw new ResourceNotFoundException(String.format("Unable to locate input port with id '%s'.", portId));
+        }
+
+        final String groupId = port.getProcessGroup().getIdentifier();
+        final ProcessGroupStatus processGroupStatus = flowController.getGroupStatus(groupId, NiFiUserUtils.getNiFiUser());
+        if (processGroupStatus == null) {
+            throw new ResourceNotFoundException(String.format("Unable to locate group with id '%s'.", groupId));
+        }
+
+        final PortStatus status = processGroupStatus.getInputPortStatus().stream().filter(portStatus -> portId.equals(portStatus.getId())).findFirst().orElse(null);
+        if (status == null) {
+            throw new ResourceNotFoundException(String.format("Unable to locate input port with id '%s'.", portId));
+        }
+
+        return status;
+    }
+
+    /**
+     * Gets the status for the specified output port.
+     *
+     * @param portId output port id
+     * @return the status for the specified output port
+     */
+    public PortStatus getOutputPortStatus(final String portId) {
+        final ProcessGroup root = flowController.getGroup(flowController.getRootGroupId());
+        final Port port = root.findOutputPort(portId);
+
+        // ensure the output port was found
+        if (port == null) {
+            throw new ResourceNotFoundException(String.format("Unable to locate output port with id '%s'.", portId));
+        }
+
+        final String groupId = port.getProcessGroup().getIdentifier();
+        final ProcessGroupStatus processGroupStatus = flowController.getGroupStatus(groupId, NiFiUserUtils.getNiFiUser());
+        if (processGroupStatus == null) {
+            throw new ResourceNotFoundException(String.format("Unable to locate group with id '%s'.", groupId));
+        }
+
+        final PortStatus status = processGroupStatus.getOutputPortStatus().stream().filter(portStatus -> portId.equals(portStatus.getId())).findFirst().orElse(null);
+        if (status == null) {
+            throw new ResourceNotFoundException(String.format("Unable to locate output port with id '%s'.", portId));
+        }
+
+        return status;
+    }
+
+    /**
+     * Gets the status for the specified remote process group.
+     *
+     * @param remoteProcessGroupId remote process group id
+     * @return the status for the specified remote process group
+     */
+    public RemoteProcessGroupStatus getRemoteProcessGroupStatus(final String remoteProcessGroupId) {
+        final ProcessGroup root = flowController.getGroup(flowController.getRootGroupId());
+        final RemoteProcessGroup remoteProcessGroup = root.findRemoteProcessGroup(remoteProcessGroupId);
+
+        // ensure the output port was found
+        if (remoteProcessGroup == null) {
+            throw new ResourceNotFoundException(String.format("Unable to locate remote process group with id '%s'.", remoteProcessGroupId));
+        }
+
+        final String groupId = remoteProcessGroup.getProcessGroup().getIdentifier();
+        final ProcessGroupStatus groupStatus = flowController.getGroupStatus(groupId, NiFiUserUtils.getNiFiUser());
+        if (groupStatus == null) {
+            throw new ResourceNotFoundException(String.format("Unable to locate group with id '%s'.", groupId));
+        }
+
+        final RemoteProcessGroupStatus status = groupStatus.getRemoteProcessGroupStatus().stream().filter(rpgStatus -> remoteProcessGroupId.equals(rpgStatus.getId())).findFirst().orElse(null);
+        if (status == null) {
+            throw new ResourceNotFoundException(String.format("Unable to locate remote process group with id '%s'.", remoteProcessGroupId));
+        }
+
+        return status;
     }
 
     /**
@@ -497,28 +743,6 @@ public class ControllerFacade {
     }
 
     /**
-     * Returns the socket port that the Cluster Manager is listening on for
-     * Site-to-Site communications
-     *
-     * @return the socket port that the Cluster Manager is listening on for
-     *         Site-to-Site communications
-     */
-    public Integer getClusterManagerRemoteSiteListeningPort() {
-        return flowController.getClusterManagerRemoteSiteListeningPort();
-    }
-
-    /**
-     * Indicates whether or not Site-to-Site communications with the Cluster
-     * Manager are secure
-     *
-     * @return whether or not Site-to-Site communications with the Cluster
-     *         Manager are secure
-     */
-    public Boolean isClusterManagerRemoteSiteCommsSecure() {
-        return flowController.isClusterManagerRemoteSiteCommsSecure();
-    }
-
-    /**
      * Returns the socket port that the local instance is listening on for
      * Site-to-Site communications
      *
@@ -527,6 +751,17 @@ public class ControllerFacade {
      */
     public Integer getRemoteSiteListeningPort() {
         return flowController.getRemoteSiteListeningPort();
+    }
+
+    /**
+     * Returns the http(s) port that the local instance is listening on for
+     * Site-to-Site communications
+     *
+     * @return the socket port that the local instance is listening on for
+     *         Site-to-Site communications
+     */
+    public Integer getRemoteSiteListeningHttpPort() {
+        return flowController.getRemoteSiteListeningHttpPort();
     }
 
     /**
@@ -549,13 +784,116 @@ public class ControllerFacade {
         return flowController.getSystemDiagnostics();
     }
 
+    public List<Resource> getResources() {
+        final List<Resource> resources = new ArrayList<>();
+        resources.add(ResourceFactory.getFlowResource());
+        resources.add(ResourceFactory.getSystemResource());
+        resources.add(ResourceFactory.getRestrictedComponentsResource());
+        resources.add(ResourceFactory.getControllerResource());
+        resources.add(ResourceFactory.getCountersResource());
+        resources.add(ResourceFactory.getProvenanceResource());
+        resources.add(ResourceFactory.getPoliciesResource());
+        resources.add(ResourceFactory.getTenantResource());
+        resources.add(ResourceFactory.getProxyResource());
+        resources.add(ResourceFactory.getResourceResource());
+        resources.add(ResourceFactory.getSiteToSiteResource());
+
+        final ProcessGroup root = flowController.getGroup(flowController.getRootGroupId());
+
+        // include the root group
+        final Resource rootResource = root.getResource();
+        resources.add(rootResource);
+        resources.add(ResourceFactory.getDataResource(rootResource));
+        resources.add(ResourceFactory.getPolicyResource(rootResource));
+
+        // add each processor
+        for (final ProcessorNode processor : root.findAllProcessors()) {
+            final Resource processorResource = processor.getResource();
+            resources.add(processorResource);
+            resources.add(ResourceFactory.getDataResource(processorResource));
+            resources.add(ResourceFactory.getPolicyResource(processorResource));
+        }
+
+        // add each label
+        for (final Label label : root.findAllLabels()) {
+            final Resource labelResource = label.getResource();
+            resources.add(labelResource);
+            resources.add(ResourceFactory.getPolicyResource(labelResource));
+        }
+
+        // add each process group
+        for (final ProcessGroup processGroup : root.findAllProcessGroups()) {
+            final Resource processGroupResource = processGroup.getResource();
+            resources.add(processGroupResource);
+            resources.add(ResourceFactory.getDataResource(processGroupResource));
+            resources.add(ResourceFactory.getPolicyResource(processGroupResource));
+        }
+
+        // add each remote process group
+        for (final RemoteProcessGroup remoteProcessGroup : root.findAllRemoteProcessGroups()) {
+            final Resource remoteProcessGroupResource = remoteProcessGroup.getResource();
+            resources.add(remoteProcessGroupResource);
+            resources.add(ResourceFactory.getDataResource(remoteProcessGroupResource));
+            resources.add(ResourceFactory.getPolicyResource(remoteProcessGroupResource));
+        }
+
+        // add each input port
+        for (final Port inputPort : root.findAllInputPorts()) {
+            final Resource inputPortResource = inputPort.getResource();
+            resources.add(inputPortResource);
+            resources.add(ResourceFactory.getDataResource(inputPortResource));
+            resources.add(ResourceFactory.getPolicyResource(inputPortResource));
+            if (inputPort instanceof RootGroupPort) {
+                resources.add(ResourceFactory.getDataTransferResource(inputPortResource));
+            }
+        }
+
+        // add each output port
+        for (final Port outputPort : root.findAllOutputPorts()) {
+            final Resource outputPortResource = outputPort.getResource();
+            resources.add(outputPortResource);
+            resources.add(ResourceFactory.getDataResource(outputPortResource));
+            resources.add(ResourceFactory.getPolicyResource(outputPortResource));
+            if (outputPort instanceof RootGroupPort) {
+                resources.add(ResourceFactory.getDataTransferResource(outputPortResource));
+            }
+        }
+
+        // add each controller service
+        final Consumer<ControllerServiceNode> csConsumer = controllerService -> {
+            final Resource controllerServiceResource = controllerService.getResource();
+            resources.add(controllerServiceResource);
+            resources.add(ResourceFactory.getPolicyResource(controllerServiceResource));
+        };
+
+        flowController.getAllControllerServices().forEach(csConsumer);
+        root.findAllControllerServices().forEach(csConsumer);
+
+
+        // add each reporting task
+        for (final ReportingTaskNode reportingTask : flowController.getAllReportingTasks()) {
+            final Resource reportingTaskResource = reportingTask.getResource();
+            resources.add(reportingTaskResource);
+            resources.add(ResourceFactory.getPolicyResource(reportingTaskResource));
+        }
+
+        // add each template
+        for (final Template template : root.findAllTemplates()) {
+            final Resource templateResource = template.getResource();
+            resources.add(templateResource);
+            resources.add(ResourceFactory.getPolicyResource(templateResource));
+        }
+
+        return resources;
+    }
+
     /**
      * Gets the available options for searching provenance.
      *
      * @return the available options for searching provenance
      */
     public ProvenanceOptionsDTO getProvenanceSearchOptions() {
-        final ProvenanceEventRepository provenanceRepository = flowController.getProvenanceRepository();
+        final ProvenanceRepository provenanceRepository = flowController.getProvenanceRepository();
 
         // create the search options dto
         final ProvenanceOptionsDTO searchOptions = new ProvenanceOptionsDTO();
@@ -629,8 +967,8 @@ public class ControllerFacade {
         }
 
         // submit the query to the provenance repository
-        final ProvenanceEventRepository provenanceRepository = flowController.getProvenanceRepository();
-        final QuerySubmission querySubmission = provenanceRepository.submitQuery(query);
+        final ProvenanceRepository provenanceRepository = flowController.getProvenanceRepository();
+        final QuerySubmission querySubmission = provenanceRepository.submitQuery(query, NiFiUserUtils.getNiFiUser());
 
         // return the query with the results populated at this point
         return getProvenanceQuery(querySubmission.getQueryIdentifier());
@@ -645,8 +983,8 @@ public class ControllerFacade {
     public ProvenanceDTO getProvenanceQuery(String provenanceId) {
         try {
             // get the query to the provenance repository
-            final ProvenanceEventRepository provenanceRepository = flowController.getProvenanceRepository();
-            final QuerySubmission querySubmission = provenanceRepository.retrieveQuerySubmission(provenanceId);
+            final ProvenanceRepository provenanceRepository = flowController.getProvenanceRepository();
+            final QuerySubmission querySubmission = provenanceRepository.retrieveQuerySubmission(provenanceId, NiFiUserUtils.getNiFiUser());
 
             // ensure the query results could be found
             if (querySubmission == null) {
@@ -693,8 +1031,14 @@ public class ControllerFacade {
                 events.add(createProvenanceEventDto(record));
             }
             resultsDto.setProvenanceEvents(events);
-            resultsDto.setTotalCount(queryResult.getTotalHitCount());
-            resultsDto.setTotal(FormatUtils.formatCount(queryResult.getTotalHitCount()));
+
+            if (requestDto.getMaxResults() != null && queryResult.getTotalHitCount() >= requestDto.getMaxResults()) {
+                resultsDto.setTotalCount(requestDto.getMaxResults().longValue());
+                resultsDto.setTotal(FormatUtils.formatCount(requestDto.getMaxResults().longValue()) + "+");
+            } else {
+                resultsDto.setTotalCount(queryResult.getTotalHitCount());
+                resultsDto.setTotal(FormatUtils.formatCount(queryResult.getTotalHitCount()));
+            }
 
             // include any errors
             if (queryResult.getError() != null) {
@@ -717,7 +1061,7 @@ public class ControllerFacade {
             provenanceDto.setResults(resultsDto);
             return provenanceDto;
         } catch (final IOException ioe) {
-            throw new NiFiCoreException("An error occured while searching the provenance events.", ioe);
+            throw new NiFiCoreException("An error occurred while searching the provenance events.", ioe);
         }
     }
 
@@ -731,19 +1075,23 @@ public class ControllerFacade {
         final LineageRequestDTO requestDto = lineageDto.getRequest();
 
         // get the provenance repo
-        final ProvenanceEventRepository provenanceRepository = flowController.getProvenanceRepository();
+        final ProvenanceRepository provenanceRepository = flowController.getProvenanceRepository();
         final ComputeLineageSubmission result;
 
         // submit the event
         if (LineageRequestType.FLOWFILE.equals(requestDto.getLineageRequestType())) {
             // submit uuid
-            result = provenanceRepository.submitLineageComputation(requestDto.getUuid());
+            if (requestDto.getEventId() == null) {
+                result = provenanceRepository.submitLineageComputation(requestDto.getUuid(), NiFiUserUtils.getNiFiUser());
+            } else {
+                result = provenanceRepository.submitLineageComputation(requestDto.getEventId(), NiFiUserUtils.getNiFiUser());
+            }
         } else {
             // submit event... (parents or children)
             if (LineageRequestType.PARENTS.equals(requestDto.getLineageRequestType())) {
-                result = provenanceRepository.submitExpandParents(requestDto.getEventId());
+                result = provenanceRepository.submitExpandParents(requestDto.getEventId(), NiFiUserUtils.getNiFiUser());
             } else {
-                result = provenanceRepository.submitExpandChildren(requestDto.getEventId());
+                result = provenanceRepository.submitExpandChildren(requestDto.getEventId(), NiFiUserUtils.getNiFiUser());
             }
         }
 
@@ -758,8 +1106,8 @@ public class ControllerFacade {
      */
     public LineageDTO getLineage(final String lineageId) {
         // get the query to the provenance repository
-        final ProvenanceEventRepository provenanceRepository = flowController.getProvenanceRepository();
-        final ComputeLineageSubmission computeLineageSubmission = provenanceRepository.retrieveLineageSubmission(lineageId);
+        final ProvenanceRepository provenanceRepository = flowController.getProvenanceRepository();
+        final ComputeLineageSubmission computeLineageSubmission = provenanceRepository.retrieveLineageSubmission(lineageId, NiFiUserUtils.getNiFiUser());
 
         // ensure the submission was found
         if (computeLineageSubmission == null) {
@@ -776,8 +1124,8 @@ public class ControllerFacade {
      */
     public void deleteProvenanceQuery(final String provenanceId) {
         // get the query to the provenance repository
-        final ProvenanceEventRepository provenanceRepository = flowController.getProvenanceRepository();
-        final QuerySubmission querySubmission = provenanceRepository.retrieveQuerySubmission(provenanceId);
+        final ProvenanceRepository provenanceRepository = flowController.getProvenanceRepository();
+        final QuerySubmission querySubmission = provenanceRepository.retrieveQuerySubmission(provenanceId, NiFiUserUtils.getNiFiUser());
         if (querySubmission != null) {
             querySubmission.cancel();
         }
@@ -790,8 +1138,8 @@ public class ControllerFacade {
      */
     public void deleteLineage(final String lineageId) {
         // get the query to the provenance repository
-        final ProvenanceEventRepository provenanceRepository = flowController.getProvenanceRepository();
-        final ComputeLineageSubmission computeLineageSubmission = provenanceRepository.retrieveLineageSubmission(lineageId);
+        final ProvenanceRepository provenanceRepository = flowController.getProvenanceRepository();
+        final ComputeLineageSubmission computeLineageSubmission = provenanceRepository.retrieveLineageSubmission(lineageId, NiFiUserUtils.getNiFiUser());
         if (computeLineageSubmission != null) {
             computeLineageSubmission.cancel();
         }
@@ -808,9 +1156,6 @@ public class ControllerFacade {
     public DownloadableContent getContent(final Long eventId, final String uri, final ContentDirection contentDirection) {
         try {
             final NiFiUser user = NiFiUserUtils.getNiFiUser();
-            if (user == null) {
-                throw new WebApplicationException(new Throwable("Unable to access details for current user."));
-            }
 
             // get the event in order to get the filename
             final ProvenanceEventRecord event = flowController.getProvenanceRepository().getEvent(eventId);
@@ -826,14 +1171,9 @@ public class ControllerFacade {
                 attributes = event.getAttributes();
             }
 
-            // calculate the dn chain
-            final List<String> dnChain = ProxiedEntitiesUtils.buildProxiedEntitiesChain(user);
-
-            // ensure the users in this chain are allowed to download this content
-            final DownloadAuthorization downloadAuthorization = userService.authorizeDownload(dnChain, attributes);
-            if (!downloadAuthorization.isApproved()) {
-                throw new AccessDeniedException(downloadAuthorization.getExplanation());
-            }
+            // authorize the event
+            final Authorizable dataAuthorizable = flowController.createDataAuthorizable(event.getComponentId());
+            dataAuthorizable.authorize(authorizer, RequestAction.READ, user, attributes);
 
             // get the filename and fall back to the identifier (should never happen)
             String filename = attributes.get(CoreAttributes.FILENAME.key());
@@ -874,14 +1214,64 @@ public class ControllerFacade {
                 throw new ResourceNotFoundException("Unable to find the specified event.");
             }
 
+            // authorize the replay
+            authorizeReplay(originalEvent.getComponentId(), originalEvent.getAttributes(), originalEvent.getSourceQueueIdentifier());
+
             // replay the flow file
-            final ProvenanceEventRecord event = flowController.replayFlowFile(originalEvent, user.getIdentity());
+            final ProvenanceEventRecord event = flowController.replayFlowFile(originalEvent, user);
 
             // convert the event record
             return createProvenanceEventDto(event);
         } catch (final IOException ioe) {
-            throw new NiFiCoreException("An error occured while getting the specified event.", ioe);
+            throw new NiFiCoreException("An error occurred while getting the specified event.", ioe);
         }
+    }
+
+    /**
+     * Authorizes access to replay a specified provenance event.
+     *
+     * @param componentId component id
+     * @param eventAttributes event attributes
+     * @param connectionId connection id
+     */
+    private AuthorizationResult checkAuthorizationForReplay(final String componentId, final Map<String, String> eventAttributes, final String connectionId) {
+        // if the connection id isn't specified, then the replay wouldn't be available anyways and we have nothing to authorize against so deny it`
+        if (connectionId == null) {
+            return AuthorizationResult.denied();
+        }
+
+        final NiFiUser user = NiFiUserUtils.getNiFiUser();
+        final Authorizable dataAuthorizable = flowController.createDataAuthorizable(componentId);
+
+        // ensure we can read the data
+        final AuthorizationResult result = dataAuthorizable.checkAuthorization(authorizer, RequestAction.READ, user, eventAttributes);
+        if (!Result.Approved.equals(result.getResult())) {
+            return result;
+        }
+
+        // ensure we can write the data
+        return dataAuthorizable.checkAuthorization(authorizer, RequestAction.WRITE, user, eventAttributes);
+    }
+
+    /**
+     * Authorizes access to replay a specified provenance event.
+     *
+     * @param componentId component id
+     * @param eventAttributes event attributes
+     * @param connectionId connection id
+     */
+    private void authorizeReplay(final String componentId, final Map<String, String> eventAttributes, final String connectionId) {
+        // if the connection id isn't specified, then the replay wouldn't be available anyways and we have nothing to authorize against so deny it`
+        if (connectionId == null) {
+            throw new AccessDeniedException("The connection id is unknown.");
+        }
+
+        final NiFiUser user = NiFiUserUtils.getNiFiUser();
+        final Authorizable dataAuthorizable = flowController.createDataAuthorizable(componentId);
+
+        // ensure we can read and write the data
+        dataAuthorizable.authorize(authorizer, RequestAction.READ, user, eventAttributes);
+        dataAuthorizable.authorize(authorizer, RequestAction.WRITE, user, eventAttributes);
     }
 
     /**
@@ -897,11 +1287,26 @@ public class ControllerFacade {
                 throw new ResourceNotFoundException("Unable to find the specified event.");
             }
 
+            // get the flowfile attributes and authorize the event
+            final Map<String, String> attributes = event.getAttributes();
+            final Authorizable dataAuthorizable = flowController.createDataAuthorizable(event.getComponentId());
+            dataAuthorizable.authorize(authorizer, RequestAction.READ, NiFiUserUtils.getNiFiUser(), attributes);
+
             // convert the event
             return createProvenanceEventDto(event);
         } catch (final IOException ioe) {
-            throw new NiFiCoreException("An error occured while getting the specified event.", ioe);
+            throw new NiFiCoreException("An error occurred while getting the specified event.", ioe);
         }
+    }
+
+    /**
+     * Gets an authorizable for proveance events for a given component id.
+     *
+     * @param componentId component id
+     * @return authorizable
+     */
+    public Authorizable getDataAuthorizable(final String componentId) {
+        return flowController.createDataAuthorizable(componentId);
     }
 
     /**
@@ -988,9 +1393,13 @@ public class ControllerFacade {
             dto.setInputContentClaimFileSize(FormatUtils.formatDataSize(event.getPreviousFileSize()));
         }
 
+        // determine if authorized for event replay
+        final AuthorizationResult replayAuthorized = checkAuthorizationForReplay(event.getComponentId(), event.getAttributes(), event.getSourceQueueIdentifier());
+
         // replay
-        dto.setReplayAvailable(contentAvailability.isReplayable());
-        dto.setReplayExplanation(contentAvailability.getReasonNotReplayable());
+        dto.setReplayAvailable(contentAvailability.isReplayable() && Result.Approved.equals(replayAuthorized.getResult()));
+        dto.setReplayExplanation(contentAvailability.isReplayable()
+                && !Result.Approved.equals(replayAuthorized.getResult()) ? replayAuthorized.getExplanation() : contentAvailability.getReasonNotReplayable());
         dto.setSourceConnectionIdentifier(event.getSourceQueueIdentifier());
 
         // sets the component details if it can find the component still in the flow
@@ -1027,6 +1436,21 @@ public class ControllerFacade {
         if (connectable != null) {
             dto.setGroupId(connectable.getProcessGroup().getIdentifier());
             dto.setComponentName(connectable.getName());
+            return;
+        }
+
+        final Connection connection = root.findConnection(dto.getComponentId());
+        if (connection != null) {
+            dto.setGroupId(connection.getProcessGroup().getIdentifier());
+
+            String name = connection.getName();
+            final Collection<Relationship> relationships = connection.getRelationships();
+            if (StringUtils.isBlank(name) && CollectionUtils.isNotEmpty(relationships)) {
+                name = StringUtils.join(relationships.stream().map(relationship -> relationship.getName()).collect(Collectors.toSet()), ", ");
+            }
+            dto.setComponentName(name);
+
+            return;
         }
     }
 
@@ -1046,56 +1470,72 @@ public class ControllerFacade {
     }
 
     private void search(final SearchResultsDTO results, final String search, final ProcessGroup group) {
-        final ComponentSearchResultDTO groupMatch = search(search, group);
-        if (groupMatch != null) {
-            results.getProcessGroupResults().add(groupMatch);
+        final NiFiUser user = NiFiUserUtils.getNiFiUser();
+
+        if (group.isAuthorized(authorizer, RequestAction.READ, user)) {
+            final ComponentSearchResultDTO groupMatch = search(search, group);
+            if (groupMatch != null) {
+                results.getProcessGroupResults().add(groupMatch);
+            }
         }
 
         for (final ProcessorNode procNode : group.getProcessors()) {
-            final ComponentSearchResultDTO match = search(search, procNode);
-            if (match != null) {
-                match.setGroupId(group.getIdentifier());
-                results.getProcessorResults().add(match);
+            if (procNode.isAuthorized(authorizer, RequestAction.READ, user)) {
+                final ComponentSearchResultDTO match = search(search, procNode);
+                if (match != null) {
+                    match.setGroupId(group.getIdentifier());
+                    results.getProcessorResults().add(match);
+                }
             }
         }
 
         for (final Connection connection : group.getConnections()) {
-            final ComponentSearchResultDTO match = search(search, connection);
-            if (match != null) {
-                match.setGroupId(group.getIdentifier());
-                results.getConnectionResults().add(match);
+            if (connection.isAuthorized(authorizer, RequestAction.READ, user)) {
+                final ComponentSearchResultDTO match = search(search, connection);
+                if (match != null) {
+                    match.setGroupId(group.getIdentifier());
+                    results.getConnectionResults().add(match);
+                }
             }
         }
 
         for (final RemoteProcessGroup remoteGroup : group.getRemoteProcessGroups()) {
-            final ComponentSearchResultDTO match = search(search, remoteGroup);
-            if (match != null) {
-                match.setGroupId(group.getIdentifier());
-                results.getRemoteProcessGroupResults().add(match);
+            if (remoteGroup.isAuthorized(authorizer, RequestAction.READ, user)) {
+                final ComponentSearchResultDTO match = search(search, remoteGroup);
+                if (match != null) {
+                    match.setGroupId(group.getIdentifier());
+                    results.getRemoteProcessGroupResults().add(match);
+                }
             }
         }
 
         for (final Port port : group.getInputPorts()) {
-            final ComponentSearchResultDTO match = search(search, port);
-            if (match != null) {
-                match.setGroupId(group.getIdentifier());
-                results.getInputPortResults().add(match);
+            if (port.isAuthorized(authorizer, RequestAction.READ, user)) {
+                final ComponentSearchResultDTO match = search(search, port);
+                if (match != null) {
+                    match.setGroupId(group.getIdentifier());
+                    results.getInputPortResults().add(match);
+                }
             }
         }
 
         for (final Port port : group.getOutputPorts()) {
-            final ComponentSearchResultDTO match = search(search, port);
-            if (match != null) {
-                match.setGroupId(group.getIdentifier());
-                results.getOutputPortResults().add(match);
+            if (port.isAuthorized(authorizer, RequestAction.READ, user)) {
+                final ComponentSearchResultDTO match = search(search, port);
+                if (match != null) {
+                    match.setGroupId(group.getIdentifier());
+                    results.getOutputPortResults().add(match);
+                }
             }
         }
 
         for (final Funnel funnel : group.getFunnels()) {
-            final ComponentSearchResultDTO match = search(search, funnel);
-            if (match != null) {
-                match.setGroupId(group.getIdentifier());
-                results.getFunnelResults().add(match);
+            if (funnel.isAuthorized(authorizer, RequestAction.READ, user)) {
+                final ComponentSearchResultDTO match = search(search, funnel);
+                if (match != null) {
+                    match.setGroupId(group.getIdentifier());
+                    results.getFunnelResults().add(match);
+                }
             }
         }
 
@@ -1151,6 +1591,8 @@ public class ControllerFacade {
         return dto;
     }
 
+
+
     private ComponentSearchResultDTO search(final String searchStr, final ProcessorNode procNode) {
         final List<String> matches = new ArrayList<>();
         final Processor processor = procNode.getProcessor();
@@ -1165,7 +1607,13 @@ public class ControllerFacade {
         } else if (SchedulingStrategy.TIMER_DRIVEN.equals(procNode.getSchedulingStrategy()) && StringUtils.containsIgnoreCase("timer", searchStr)) {
             matches.add("Scheduling strategy: Timer driven");
         } else if (SchedulingStrategy.PRIMARY_NODE_ONLY.equals(procNode.getSchedulingStrategy()) && StringUtils.containsIgnoreCase("primary", searchStr)) {
+            // PRIMARY_NODE_ONLY has been deprecated as a SchedulingStrategy and replaced by PRIMARY as an ExecutionNode.
             matches.add("Scheduling strategy: On primary node");
+        }
+
+        // consider execution node
+        if (ExecutionNode.PRIMARY.equals(procNode.getExecutionNode()) && StringUtils.containsIgnoreCase("primary", searchStr)) {
+            matches.add("Execution node: primary");
         }
 
         // consider scheduled state
@@ -1186,7 +1634,11 @@ public class ControllerFacade {
         for (final Relationship relationship : procNode.getRelationships()) {
             addIfAppropriate(searchStr, relationship.getName(), "Relationship", matches);
         }
+
+        // Add both the actual class name and the component type. This allows us to search for 'Ghost'
+        // to search for components that could not be instantiated.
         addIfAppropriate(searchStr, processor.getClass().getSimpleName(), "Type", matches);
+        addIfAppropriate(searchStr, procNode.getComponentType(), "Type", matches);
 
         for (final Map.Entry<PropertyDescriptor, String> entry : procNode.getProperties().entrySet()) {
             final PropertyDescriptor descriptor = entry.getKey();
@@ -1216,11 +1668,10 @@ public class ControllerFacade {
         if (processor instanceof Searchable) {
             final Searchable searchable = (Searchable) processor;
 
-            // prepare the search context
-            final SearchContext context = new StandardSearchContext(searchStr, procNode, flowController);
+            final SearchContext context = new StandardSearchContext(searchStr, procNode, flowController, variableRegistry);
 
             // search the processor using the appropriate thread context classloader
-            try (final NarCloseable x = NarCloseable.withNarLoader()) {
+            try (final NarCloseable x = NarCloseable.withComponentNarLoader(processor.getClass(), processor.getIdentifier())) {
                 final Collection<SearchResult> searchResults = searchable.search(context);
                 if (CollectionUtils.isNotEmpty(searchResults)) {
                     for (final SearchResult searchResult : searchResults) {
@@ -1406,8 +1857,8 @@ public class ControllerFacade {
         this.properties = properties;
     }
 
-    public void setUserService(UserService userService) {
-        this.userService = userService;
+    public void setAuthorizer(Authorizer authorizer) {
+        this.authorizer = authorizer;
     }
 
     public void setFlowService(FlowService flowService) {
@@ -1416,5 +1867,9 @@ public class ControllerFacade {
 
     public void setDtoFactory(DtoFactory dtoFactory) {
         this.dtoFactory = dtoFactory;
+    }
+
+    public void setVariableRegistry(VariableRegistry variableRegistry) {
+        this.variableRegistry = variableRegistry;
     }
 }

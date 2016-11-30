@@ -34,7 +34,12 @@ import org.apache.nifi.processor.Relationship;
 import org.apache.nifi.processor.util.StandardValidators;
 import org.apache.nifi.stream.io.DataOutputStream;
 
-import javax.json.*;
+import javax.json.Json;
+import javax.json.JsonArrayBuilder;
+import javax.json.JsonObject;
+import javax.json.JsonObjectBuilder;
+import javax.json.JsonReader;
+import javax.json.JsonWriter;
 import javax.json.stream.JsonParsingException;
 import java.io.IOException;
 import java.io.StringReader;
@@ -42,12 +47,20 @@ import java.io.StringWriter;
 import java.net.HttpURLConnection;
 import java.net.URL;
 import java.net.URLEncoder;
-import java.util.*;
+import java.util.Arrays;
+import java.util.Collections;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
+import java.util.SortedSet;
+import java.util.TreeSet;
 
 @Tags({"put", "slack", "notify"})
 @CapabilityDescription("Sends a message to your team on slack.com")
 @InputRequirement(InputRequirement.Requirement.INPUT_REQUIRED)
-@DynamicProperty(name = "A JSON object to add to Slack's \"attachments\" JSON payload.", value = "JSON-formatted string to add to Slack's payload JSON appended to the \"attachments\" JSON array.", supportsExpressionLanguage = true,
+@DynamicProperty(name = "A JSON object to add to Slack's \"attachments\" JSON payload.", value = "JSON-formatted string to add to Slack's payload JSON appended to the \"attachments\" JSON array.",
+        supportsExpressionLanguage = true,
         description = "Converts the contents of each value specified by the Dynamic Property's value to JSON and appends it to the payload being send to Slack.")
 public class PutSlack extends AbstractProcessor {
 
@@ -175,7 +188,7 @@ public class PutSlack extends AbstractProcessor {
     @Override
     public void onTrigger(final ProcessContext context, final ProcessSession session) {
         FlowFile flowFile = session.get();
-        if (flowFile == null) {
+        if ( flowFile == null ) {
             return;
         }
 
@@ -220,8 +233,7 @@ public class PutSlack extends AbstractProcessor {
         }
 
         try {
-
-//      Get Attachments Array
+            // Get Attachments Array
             if (!attachments.isEmpty()) {
                 JsonArrayBuilder jsonArrayBuiler = Json.createArrayBuilder();
                 for (PropertyDescriptor attachment : attachments) {
@@ -243,7 +255,7 @@ public class PutSlack extends AbstractProcessor {
             HttpURLConnection conn = (HttpURLConnection) url.openConnection();
             conn.setRequestMethod("POST");
             conn.setDoOutput(true);
-            DataOutputStream outputStream = new DataOutputStream(conn.getOutputStream());
+            DataOutputStream outputStream  = new DataOutputStream(conn.getOutputStream());
             String payload = "payload=" + URLEncoder.encode(stringWriter.getBuffer().toString(), "UTF-8");
             outputStream.writeBytes(payload);
             outputStream.close();

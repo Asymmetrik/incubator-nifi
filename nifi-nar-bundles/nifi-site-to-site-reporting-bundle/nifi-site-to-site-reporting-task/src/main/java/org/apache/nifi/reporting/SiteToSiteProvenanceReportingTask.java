@@ -17,6 +17,7 @@
 
 package org.apache.nifi.reporting;
 
+import org.apache.nifi.annotation.behavior.Restricted;
 import org.apache.nifi.annotation.behavior.Stateful;
 import org.apache.nifi.annotation.documentation.CapabilityDescription;
 import org.apache.nifi.annotation.documentation.Tags;
@@ -49,17 +50,16 @@ import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.HashMap;
-import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
 import java.util.TimeZone;
 import java.util.UUID;
 import java.util.concurrent.TimeUnit;
 
-@Tags({"provenance", "lineage", "tracking", "site", "site to site"})
+@Tags({"provenance", "lineage", "tracking", "site", "site to site", "restricted"})
 @CapabilityDescription("Publishes Provenance events using the Site To Site protocol.")
 @Stateful(scopes = Scope.LOCAL, description = "Stores the Reporting Task's last event Id so that on restart the task knows where it left off.")
+@Restricted("Provides operator the ability send sensitive details contained in Provenance events to any external system.")
 public class SiteToSiteProvenanceReportingTask extends AbstractSiteToSiteReportingTask {
 
     static final String TIMESTAMP_FORMAT = "yyyy-MM-dd'T'HH:mm:ss.SSS'Z'";
@@ -115,6 +115,14 @@ public class SiteToSiteProvenanceReportingTask extends AbstractSiteToSiteReporti
 
     @Override
     public void onTrigger(final ReportingContext context) {
+        final boolean isClustered = context.isClustered();
+        final String nodeId = context.getClusterNodeIdentifier();
+        if (nodeId == null && isClustered) {
+            getLogger().debug("This instance of NiFi is configured for clustering, but the Cluster Node Identifier is not yet available. "
+                + "Will wait for Node Identifier to be established.");
+            return;
+        }
+
         final ProcessGroupStatus procGroupStatus = context.getEventAccess().getControllerStatus();
         final String rootGroupName = procGroupStatus == null ? null : procGroupStatus.getName();
         final Map<String,String> componentMap = createComponentMap(procGroupStatus);
@@ -189,7 +197,7 @@ public class SiteToSiteProvenanceReportingTask extends AbstractSiteToSiteReporti
             final JsonArrayBuilder arrayBuilder = factory.createArrayBuilder();
             for (final ProvenanceEventRecord event : events) {
                 final String componentName = componentMap.get(event.getComponentId());
-                arrayBuilder.add(serialize(factory, builder, event, df, componentName, hostname, url, rootGroupName, platform));
+                arrayBuilder.add(serialize(factory, builder, event, df, componentName, hostname, url, rootGroupName, platform, nodeId));
             }
             final JsonArray jsonArray = arrayBuilder.build();
 
@@ -244,24 +252,14 @@ public class SiteToSiteProvenanceReportingTask extends AbstractSiteToSiteReporti
     }
 
     static JsonObject serialize(final JsonBuilderFactory factory, final JsonObjectBuilder builder, final ProvenanceEventRecord event, final DateFormat df,
-        final String componentName, final String hostname, final URL nifiUrl, final String applicationName, final String platform) {
+        final String componentName, final String hostname, final URL nifiUrl, final String applicationName, final String platform, final String nodeIdentifier) {
         addField(builder, "eventId", UUID.randomUUID().toString());
         addField(builder, "eventOrdinal", event.getEventId());
         addField(builder, "eventType", event.getEventType().name());
         addField(builder, "timestampMillis", event.getEventTime());
-
-
         addField(builder, "timestamp", df.format(event.getEventTime()));
-
         addField(builder, "durationMillis", event.getEventDuration());
         addField(builder, "lineageStart", event.getLineageStartDate());
-
-        final Set<String> lineageIdentifiers = new HashSet<>();
-        if (event.getLineageIdentifiers() != null) {
-            lineageIdentifiers.addAll(event.getLineageIdentifiers());
-        }
-        lineageIdentifiers.add(event.getFlowFileUuid());
-        addField(builder, factory, "lineageIdentifiers", lineageIdentifiers);
         addField(builder, "details", event.getDetails());
         addField(builder, "componentId", event.getComponentId());
         addField(builder, "componentType", event.getComponentType());
@@ -275,10 +273,15 @@ public class SiteToSiteProvenanceReportingTask extends AbstractSiteToSiteReporti
 
         addField(builder, "actorHostname", hostname);
         if (nifiUrl != null) {
-            final String urlPrefix = nifiUrl.toString().replace(nifiUrl.getPath(), "");
-            final String contentUriBase = urlPrefix + "/nifi-api/controller/provenance/events/" + event.getEventId() + "/content/";
-            addField(builder, "contentURI", contentUriBase + "output");
-            addField(builder, "previousContentURI", contentUriBase + "input");
+            // TO get URL Prefix, we just remove the /nifi from the end of the URL. We know that the URL ends with
+            // "/nifi" because the Property Validator enforces it
+            final String urlString = nifiUrl.toString();
+            final String urlPrefix = urlString.substring(0, urlString.length() - DESTINATION_URL_PATH.length());
+
+            final String contentUriBase = urlPrefix + "/nifi-api/provenance-events/" + event.getEventId() + "/content/";
+            final String nodeIdSuffix = nodeIdentifier == null ? "" : "?clusterNodeId=" + nodeIdentifier;
+            addField(builder, "contentURI", contentUriBase + "output" + nodeIdSuffix);
+            addField(builder, "previousContentURI", contentUriBase + "input" + nodeIdSuffix);
         }
 
         addField(builder, factory, "parentIds", event.getParentUuids());

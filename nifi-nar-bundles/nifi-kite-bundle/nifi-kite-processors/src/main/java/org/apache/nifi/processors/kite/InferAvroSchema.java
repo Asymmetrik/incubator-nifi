@@ -57,6 +57,7 @@ import java.util.Set;
 import java.util.HashSet;
 import java.util.Collections;
 import java.util.concurrent.atomic.AtomicReference;
+import java.util.regex.Pattern;
 
 @Tags({"kite", "avro", "infer", "schema", "csv", "json"})
 @InputRequirement(InputRequirement.Requirement.INPUT_REQUIRED)
@@ -95,7 +96,7 @@ public class InferAvroSchema
                 .subject(subject)
                 .input(input)
                 .explanation("Only non-null single characters are supported")
-                .valid(input.length() == 1 && input.charAt(0) != 0)
+                .valid(input.length() == 1 && input.charAt(0) != 0 || context.isExpressionLanguagePresent(input))
                 .build();
         }
     };
@@ -111,6 +112,7 @@ public class InferAvroSchema
     public static final String CSV_MIME_TYPE = "text/csv";
     public static final String AVRO_MIME_TYPE = "application/avro-binary";
     public static final String AVRO_FILE_EXTENSION = ".avro";
+    public static final Pattern AVRO_RECORD_NAME_PATTERN = Pattern.compile("[A-Za-z_]+[A-Za-z0-9_.]*[^.]");
 
     public static final PropertyDescriptor SCHEMA_DESTINATION = new PropertyDescriptor.Builder()
             .name("Schema Output Destination")
@@ -175,6 +177,7 @@ public class InferAvroSchema
     public static final PropertyDescriptor DELIMITER = new PropertyDescriptor.Builder()
             .name("CSV delimiter")
             .description("Delimiter character for CSV records")
+            .expressionLanguageSupported(true)
             .addValidator(CHAR_VALIDATOR)
             .defaultValue(",")
             .build();
@@ -201,10 +204,11 @@ public class InferAvroSchema
 
     public static final PropertyDescriptor RECORD_NAME = new PropertyDescriptor.Builder()
             .name("Avro Record Name")
-            .description("Value to be placed in the Avro record schema \"name\" field.")
+            .description("Value to be placed in the Avro record schema \"name\" field. The value must adhere to the Avro naming "
+                    + "rules for fullname. If Expression Language is present then the evaluated value must adhere to the Avro naming rules.")
             .required(true)
             .expressionLanguageSupported(true)
-            .addValidator(StandardValidators.NON_EMPTY_VALIDATOR)
+            .addValidator(StandardValidators.createRegexMatchingValidator(AVRO_RECORD_NAME_PATTERN))
             .build();
 
     public static final PropertyDescriptor CHARSET = new PropertyDescriptor.Builder()
@@ -212,6 +216,7 @@ public class InferAvroSchema
             .description("Character encoding of CSV data.")
             .required(true)
             .defaultValue("UTF-8")
+            .expressionLanguageSupported(true)
             .addValidator(StandardValidators.CHARACTER_SET_VALIDATOR)
             .build();
 
@@ -391,14 +396,14 @@ public class InferAvroSchema
         }
 
         //Prepares the CSVProperties for kite
-        final CSVProperties props = new CSVProperties.Builder()
-                .delimiter(context.getProperty(DELIMITER).getValue())
-                .escape(context.getProperty(ESCAPE_STRING).evaluateAttributeExpressions().getValue())
-                .quote(context.getProperty(QUOTE_STRING).evaluateAttributeExpressions().getValue())
+        CSVProperties props = new CSVProperties.Builder()
+                .charset(context.getProperty(CHARSET).evaluateAttributeExpressions(inputFlowFile).getValue())
+                .delimiter(context.getProperty(DELIMITER).evaluateAttributeExpressions(inputFlowFile).getValue())
+                .quote(context.getProperty(QUOTE_STRING).evaluateAttributeExpressions(inputFlowFile).getValue())
+                .escape(context.getProperty(ESCAPE_STRING).evaluateAttributeExpressions(inputFlowFile).getValue())
+                .linesToSkip(context.getProperty(HEADER_LINE_SKIP_COUNT).evaluateAttributeExpressions(inputFlowFile).asInteger())
                 .header(header.get())
                 .hasHeader(hasHeader.get())
-                .linesToSkip(context.getProperty(HEADER_LINE_SKIP_COUNT).evaluateAttributeExpressions().asInteger())
-                .charset(context.getProperty(CHARSET).getValue())
                 .build();
 
         final AtomicReference<String> avroSchema = new AtomicReference<>();
@@ -408,7 +413,7 @@ public class InferAvroSchema
             public void process(InputStream in) throws IOException {
                 avroSchema.set(CSVUtil
                         .inferSchema(
-                                context.getProperty(RECORD_NAME).evaluateAttributeExpressions().getValue(), in, props)
+                                context.getProperty(RECORD_NAME).evaluateAttributeExpressions(inputFlowFile).getValue(), in, props)
                         .toString(context.getProperty(PRETTY_AVRO_OUTPUT).asBoolean()));
             }
         });
@@ -435,8 +440,8 @@ public class InferAvroSchema
             @Override
             public void process(InputStream in) throws IOException {
                 Schema as = JsonUtil.inferSchema(
-                        in, context.getProperty(RECORD_NAME).evaluateAttributeExpressions().getValue(),
-                        context.getProperty(NUM_RECORDS_TO_ANALYZE).evaluateAttributeExpressions().asInteger());
+                        in, context.getProperty(RECORD_NAME).evaluateAttributeExpressions(inputFlowFile).getValue(),
+                        context.getProperty(NUM_RECORDS_TO_ANALYZE).evaluateAttributeExpressions(inputFlowFile).asInteger());
                 avroSchema.set(as.toString(context.getProperty(PRETTY_AVRO_OUTPUT).asBoolean()));
 
             }

@@ -16,12 +16,6 @@
  */
 package org.apache.nifi.documentation.html;
 
-import static org.apache.nifi.documentation.html.XmlValidator.assertContains;
-import static org.apache.nifi.documentation.html.XmlValidator.assertNotContains;
-
-import java.io.ByteArrayOutputStream;
-import java.io.IOException;
-
 import org.apache.nifi.annotation.documentation.CapabilityDescription;
 import org.apache.nifi.documentation.DocumentationWriter;
 import org.apache.nifi.documentation.example.FullyDocumentedProcessor;
@@ -30,6 +24,12 @@ import org.apache.nifi.documentation.example.ProcessorWithLogger;
 import org.apache.nifi.documentation.init.ProcessorInitializer;
 import org.junit.Assert;
 import org.junit.Test;
+
+import java.io.ByteArrayOutputStream;
+import java.io.IOException;
+
+import static org.apache.nifi.documentation.html.XmlValidator.assertContains;
+import static org.apache.nifi.documentation.html.XmlValidator.assertNotContains;
 
 public class ProcessorDocumentationWriterTest {
 
@@ -65,6 +65,11 @@ public class ProcessorDocumentationWriterTest {
         assertContains(results, FullyDocumentedProcessor.REL_FAILURE.getDescription());
         assertContains(results, "Controller Service API: ");
         assertContains(results, "SampleService");
+
+        assertContains(results, "CLUSTER, LOCAL");
+        assertContains(results, "state management description");
+
+        assertContains(results, "processor restriction description");
 
         assertNotContains(results, "iconSecure.png");
         assertContains(results, FullyDocumentedProcessor.class.getAnnotation(CapabilityDescription.class)
@@ -109,6 +114,9 @@ public class ProcessorDocumentationWriterTest {
 
         // relationships
         assertContains(results, "This processor has no relationships.");
+
+        // state management
+        assertContains(results, "This processor has no state management.");
 
     }
 

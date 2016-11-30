@@ -80,7 +80,7 @@ import org.apache.nifi.components.state.StateMap;
 import org.apache.nifi.expression.AttributeExpression;
 import org.apache.nifi.flowfile.FlowFile;
 import org.apache.nifi.flowfile.attributes.CoreAttributes;
-import org.apache.nifi.logging.ProcessorLog;
+import org.apache.nifi.logging.ComponentLog;
 import org.apache.nifi.processor.AbstractSessionFactoryProcessor;
 import org.apache.nifi.processor.ProcessContext;
 import org.apache.nifi.processor.ProcessSession;
@@ -88,6 +88,7 @@ import org.apache.nifi.processor.ProcessSessionFactory;
 import org.apache.nifi.processor.ProcessorInitializationContext;
 import org.apache.nifi.processor.Relationship;
 import org.apache.nifi.processor.exception.ProcessException;
+import org.apache.nifi.security.util.KeyStoreUtils;
 import org.apache.nifi.processor.util.StandardValidators;
 import org.apache.nifi.ssl.SSLContextService;
 import org.apache.nifi.ssl.SSLContextService.ClientAuth;
@@ -311,7 +312,7 @@ public class GetHTTP extends AbstractSessionFactoryProcessor {
         final SSLContextBuilder sslContextBuilder = new SSLContextBuilder();
 
         if (StringUtils.isNotBlank(service.getTrustStoreFile())) {
-            final KeyStore truststore = KeyStore.getInstance(service.getTrustStoreType());
+            final KeyStore truststore = KeyStoreUtils.getTrustStore(service.getTrustStoreType());
             try (final InputStream in = new FileInputStream(new File(service.getTrustStoreFile()))) {
                 truststore.load(in, service.getTrustStorePassword().toCharArray());
             }
@@ -319,7 +320,7 @@ public class GetHTTP extends AbstractSessionFactoryProcessor {
         }
 
         if (StringUtils.isNotBlank(service.getKeyStoreFile())){
-            final KeyStore keystore = KeyStore.getInstance(service.getKeyStoreType());
+            final KeyStore keystore = KeyStoreUtils.getKeyStore(service.getKeyStoreType());
             try (final InputStream in = new FileInputStream(new File(service.getKeyStoreFile()))) {
                 keystore.load(in, service.getKeyStorePassword().toCharArray());
             }
@@ -333,7 +334,7 @@ public class GetHTTP extends AbstractSessionFactoryProcessor {
 
     @Override
     public void onTrigger(final ProcessContext context, final ProcessSessionFactory sessionFactory) throws ProcessException {
-        final ProcessorLog logger = getLogger();
+        final ComponentLog logger = getLogger();
 
         final ProcessSession session = sessionFactory.createSession();
         final FlowFile incomingFlowFile = session.get();

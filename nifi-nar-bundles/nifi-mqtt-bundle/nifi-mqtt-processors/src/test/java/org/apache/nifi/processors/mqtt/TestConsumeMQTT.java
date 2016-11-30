@@ -34,9 +34,7 @@ import org.junit.Test;
 import java.io.File;
 import java.io.FilenameFilter;
 import java.io.IOException;
-import java.lang.reflect.InvocationHandler;
 import java.lang.reflect.InvocationTargetException;
-import java.lang.reflect.Method;
 import java.lang.reflect.Proxy;
 import java.util.concurrent.BlockingQueue;
 
@@ -88,16 +86,13 @@ public class TestConsumeMQTT extends TestConsumeMqttCommon {
         BlockingQueue<MQTTQueueMessage> mqttQueue = getMqttQueue(processor);
         mqttQueue.add(mock);
         try {
-            final ProcessSession session = testRunner.getProcessSessionFactory().createSession();
+            ProcessSession session = testRunner.getProcessSessionFactory().createSession();
             transferQueue(processor,
-                    (ProcessSession) Proxy.newProxyInstance(getClass().getClassLoader(), new Class[] { ProcessSession.class }, new InvocationHandler() {
-                        @Override
-                        public Object invoke(Object proxy, Method method, Object[] args) throws Throwable {
-                            if (method.getName().equals("commit")) {
-                                throw new RuntimeException();
-                            } else {
-                                return method.invoke(session, args);
-                            }
+                    (ProcessSession) Proxy.newProxyInstance(getClass().getClassLoader(), new Class[] { ProcessSession.class }, (proxy, method, args) -> {
+                        if (method.getName().equals("commit")) {
+                            throw new RuntimeException();
+                        } else {
+                            return method.invoke(session, args);
                         }
                     }));
             fail("Expected runtime exception");

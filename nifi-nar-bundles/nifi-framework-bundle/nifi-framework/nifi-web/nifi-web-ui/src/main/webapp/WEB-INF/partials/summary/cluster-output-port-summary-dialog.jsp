@@ -15,11 +15,11 @@
   limitations under the License.
 --%>
 <%@ page contentType="text/html" pageEncoding="UTF-8" session="false" %>
-<div id="cluster-output-port-summary-dialog">
+<div id="cluster-output-port-summary-dialog" class="hidden large-dialog">
     <div class="dialog-content">
         <div id="cluster-output-port-summary-header">
-            <div id="cluster-output-port-refresh-button" class="summary-refresh pointer" title="Refresh"></div>
-            <div id="cluster-output-port-summary-last-refreshed-container">
+            <button id="cluster-output-port-refresh-button" class="refresh-button pointer fa fa-refresh" title="Refresh"></button>
+            <div id="cluster-output-port-summary-last-refreshed-container" class="last-refreshed-container">
                 Last updated:&nbsp;<span id="cluster-output-port-summary-last-refreshed"></span>
             </div>
             <div id="cluster-output-port-summary-loading-container" class="loading-container"></div>
@@ -27,8 +27,10 @@
                 <div id="cluster-output-port-icon"></div>
                 <div id="cluster-output-port-details">
                     <div id="cluster-output-port-name"></div>
-                    <div id="cluster-output-port-id"></div>
+                    <div id="cluster-output-port-type"></div>
+                    <div id="cluster-output-port-group-id" class="hidden"></div>
                 </div>
+                <div id="cluster-output-port-id"></div>
             </div>
         </div>
         <div id="cluster-output-port-summary-table"></div>

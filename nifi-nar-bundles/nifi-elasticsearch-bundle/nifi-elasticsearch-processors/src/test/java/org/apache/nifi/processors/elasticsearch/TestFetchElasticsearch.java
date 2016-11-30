@@ -18,8 +18,6 @@ package org.apache.nifi.processors.elasticsearch;
 
 import org.apache.nifi.processor.ProcessContext;
 import org.apache.nifi.processor.exception.ProcessException;
-import org.apache.nifi.registry.VariableRegistry;
-import org.apache.nifi.registry.VariableRegistryUtils;
 import org.apache.nifi.ssl.SSLContextService;
 import org.apache.nifi.util.MockFlowFile;
 import org.apache.nifi.util.MockProcessContext;
@@ -64,13 +62,11 @@ public class TestFetchElasticsearch {
 
     private InputStream docExample;
     private TestRunner runner;
-    private VariableRegistry variableRegistry;
 
     @Before
     public void setUp() throws IOException {
         ClassLoader classloader = Thread.currentThread().getContextClassLoader();
         docExample = classloader.getResourceAsStream("DocumentExample.json");
-        variableRegistry = VariableRegistryUtils.createVariableRegistry();
 
     }
 
@@ -82,10 +78,10 @@ public class TestFetchElasticsearch {
     @Test
     public void testHostnameExpressionLanguage() throws IOException {
         runner = TestRunners.newTestRunner(new FetchElasticsearchTestProcessor(true)); // all docs are found
-        runner.setProperty(AbstractElasticsearchProcessor.CLUSTER_NAME, "elasticsearch");
-        runner.setProperty(AbstractElasticsearchProcessor.HOSTS, "${xxx}");
-        runner.setProperty(AbstractElasticsearchProcessor.PING_TIMEOUT, "5s");
-        runner.setProperty(AbstractElasticsearchProcessor.SAMPLER_INTERVAL, "5s");
+        runner.setProperty(AbstractElasticsearchTransportClientProcessor.CLUSTER_NAME, "elasticsearch");
+        runner.setProperty(AbstractElasticsearchTransportClientProcessor.HOSTS, "${xxx}");
+        runner.setProperty(AbstractElasticsearchTransportClientProcessor.PING_TIMEOUT, "5s");
+        runner.setProperty(AbstractElasticsearchTransportClientProcessor.SAMPLER_INTERVAL, "5s");
 
         runner.setProperty(FetchElasticsearch.INDEX, "doc");
         runner.setProperty(FetchElasticsearch.TYPE, "status");
@@ -98,10 +94,10 @@ public class TestFetchElasticsearch {
     public void testFetchElasticsearchOnTrigger() throws IOException {
         runner = TestRunners.newTestRunner(new FetchElasticsearchTestProcessor(true)); // all docs are found
         runner.setValidateExpressionUsage(false);
-        runner.setProperty(AbstractElasticsearchProcessor.CLUSTER_NAME, "elasticsearch");
-        runner.setProperty(AbstractElasticsearchProcessor.HOSTS, "127.0.0.1:9300");
-        runner.setProperty(AbstractElasticsearchProcessor.PING_TIMEOUT, "5s");
-        runner.setProperty(AbstractElasticsearchProcessor.SAMPLER_INTERVAL, "5s");
+        runner.setProperty(AbstractElasticsearchTransportClientProcessor.CLUSTER_NAME, "elasticsearch");
+        runner.setProperty(AbstractElasticsearchTransportClientProcessor.HOSTS, "127.0.0.1:9300");
+        runner.setProperty(AbstractElasticsearchTransportClientProcessor.PING_TIMEOUT, "5s");
+        runner.setProperty(AbstractElasticsearchTransportClientProcessor.SAMPLER_INTERVAL, "5s");
 
         runner.setProperty(FetchElasticsearch.INDEX, "doc");
         runner.assertNotValid();
@@ -124,10 +120,10 @@ public class TestFetchElasticsearch {
     @Test
     public void testFetchElasticsearchOnTriggerWithFailures() throws IOException {
         runner = TestRunners.newTestRunner(new FetchElasticsearchTestProcessor(false)); // simulate doc not found
-        runner.setProperty(AbstractElasticsearchProcessor.CLUSTER_NAME, "elasticsearch");
-        runner.setProperty(AbstractElasticsearchProcessor.HOSTS, "127.0.0.1:9300");
-        runner.setProperty(AbstractElasticsearchProcessor.PING_TIMEOUT, "5s");
-        runner.setProperty(AbstractElasticsearchProcessor.SAMPLER_INTERVAL, "5s");
+        runner.setProperty(AbstractElasticsearchTransportClientProcessor.CLUSTER_NAME, "elasticsearch");
+        runner.setProperty(AbstractElasticsearchTransportClientProcessor.HOSTS, "127.0.0.1:9300");
+        runner.setProperty(AbstractElasticsearchTransportClientProcessor.PING_TIMEOUT, "5s");
+        runner.setProperty(AbstractElasticsearchTransportClientProcessor.SAMPLER_INTERVAL, "5s");
         runner.setProperty(FetchElasticsearch.INDEX, "doc");
         runner.setProperty(FetchElasticsearch.TYPE, "status");
         runner.setValidateExpressionUsage(false);
@@ -148,10 +144,10 @@ public class TestFetchElasticsearch {
     @Test
     public void testFetchElasticsearchWithBadHosts() throws IOException {
         runner = TestRunners.newTestRunner(new FetchElasticsearchTestProcessor(false)); // simulate doc not found
-        runner.setProperty(AbstractElasticsearchProcessor.CLUSTER_NAME, "elasticsearch");
-        runner.setProperty(AbstractElasticsearchProcessor.HOSTS, "http://127.0.0.1:9300,127.0.0.2:9300");
-        runner.setProperty(AbstractElasticsearchProcessor.PING_TIMEOUT, "5s");
-        runner.setProperty(AbstractElasticsearchProcessor.SAMPLER_INTERVAL, "5s");
+        runner.setProperty(AbstractElasticsearchTransportClientProcessor.CLUSTER_NAME, "elasticsearch");
+        runner.setProperty(AbstractElasticsearchTransportClientProcessor.HOSTS, "http://127.0.0.1:9300,127.0.0.2:9300");
+        runner.setProperty(AbstractElasticsearchTransportClientProcessor.PING_TIMEOUT, "5s");
+        runner.setProperty(AbstractElasticsearchTransportClientProcessor.SAMPLER_INTERVAL, "5s");
         runner.setProperty(FetchElasticsearch.INDEX, "doc");
         runner.setProperty(FetchElasticsearch.TYPE, "status");
         runner.setValidateExpressionUsage(false);
@@ -164,10 +160,10 @@ public class TestFetchElasticsearch {
     public void testFetchElasticsearchOnTriggerWithExceptions() throws IOException {
         FetchElasticsearchTestProcessor processor = new FetchElasticsearchTestProcessor(true);
         runner = TestRunners.newTestRunner(processor);
-        runner.setProperty(AbstractElasticsearchProcessor.CLUSTER_NAME, "elasticsearch");
-        runner.setProperty(AbstractElasticsearchProcessor.HOSTS, "127.0.0.1:9300");
-        runner.setProperty(AbstractElasticsearchProcessor.PING_TIMEOUT, "5s");
-        runner.setProperty(AbstractElasticsearchProcessor.SAMPLER_INTERVAL, "5s");
+        runner.setProperty(AbstractElasticsearchTransportClientProcessor.CLUSTER_NAME, "elasticsearch");
+        runner.setProperty(AbstractElasticsearchTransportClientProcessor.HOSTS, "127.0.0.1:9300");
+        runner.setProperty(AbstractElasticsearchTransportClientProcessor.PING_TIMEOUT, "5s");
+        runner.setProperty(AbstractElasticsearchTransportClientProcessor.SAMPLER_INTERVAL, "5s");
         runner.setProperty(FetchElasticsearch.INDEX, "doc");
         runner.setProperty(FetchElasticsearch.TYPE, "status");
         runner.setValidateExpressionUsage(false);
@@ -235,7 +231,7 @@ public class TestFetchElasticsearch {
             }
         };
 
-        MockProcessContext context = new MockProcessContext(processor, variableRegistry);
+        MockProcessContext context = new MockProcessContext(processor);
         processor.initialize(new MockProcessorInitializationContext(processor, context));
         processor.callCreateElasticsearchClient(context);
     }
@@ -249,10 +245,10 @@ public class TestFetchElasticsearch {
         runner.addControllerService("ssl-context", sslService);
         runner.enableControllerService(sslService);
         runner.setProperty(FetchElasticsearch.PROP_SSL_CONTEXT_SERVICE, "ssl-context");
-        runner.setProperty(AbstractElasticsearchProcessor.CLUSTER_NAME, "elasticsearch");
-        runner.setProperty(AbstractElasticsearchProcessor.HOSTS, "127.0.0.1:9300");
-        runner.setProperty(AbstractElasticsearchProcessor.PING_TIMEOUT, "5s");
-        runner.setProperty(AbstractElasticsearchProcessor.SAMPLER_INTERVAL, "5s");
+        runner.setProperty(AbstractElasticsearchTransportClientProcessor.CLUSTER_NAME, "elasticsearch");
+        runner.setProperty(AbstractElasticsearchTransportClientProcessor.HOSTS, "127.0.0.1:9300");
+        runner.setProperty(AbstractElasticsearchTransportClientProcessor.PING_TIMEOUT, "5s");
+        runner.setProperty(AbstractElasticsearchTransportClientProcessor.SAMPLER_INTERVAL, "5s");
         runner.setProperty(FetchElasticsearch.INDEX, "doc");
         runner.setProperty(FetchElasticsearch.TYPE, "status");
         runner.setValidateExpressionUsage(false);
@@ -363,13 +359,13 @@ public class TestFetchElasticsearch {
         System.out.println("Starting test " + new Object() {
         }.getClass().getEnclosingMethod().getName());
         final TestRunner runner = TestRunners.newTestRunner(new FetchElasticsearch());
-        runner.setValidateExpressionUsage(true);
+        runner.setValidateExpressionUsage(false);
 
         //Local Cluster - Mac pulled from brew
-        runner.setProperty(AbstractElasticsearchProcessor.CLUSTER_NAME, "elasticsearch_brew");
-        runner.setProperty(AbstractElasticsearchProcessor.HOSTS, "127.0.0.1:9300");
-        runner.setProperty(AbstractElasticsearchProcessor.PING_TIMEOUT, "5s");
-        runner.setProperty(AbstractElasticsearchProcessor.SAMPLER_INTERVAL, "5s");
+        runner.setProperty(AbstractElasticsearchTransportClientProcessor.CLUSTER_NAME, "elasticsearch_brew");
+        runner.setProperty(AbstractElasticsearchTransportClientProcessor.HOSTS, "127.0.0.1:9300");
+        runner.setProperty(AbstractElasticsearchTransportClientProcessor.PING_TIMEOUT, "5s");
+        runner.setProperty(AbstractElasticsearchTransportClientProcessor.SAMPLER_INTERVAL, "5s");
 
         runner.setProperty(FetchElasticsearch.INDEX, "doc");
 
@@ -394,13 +390,13 @@ public class TestFetchElasticsearch {
         System.out.println("Starting test " + new Object() {
         }.getClass().getEnclosingMethod().getName());
         final TestRunner runner = TestRunners.newTestRunner(new FetchElasticsearch());
-        runner.setValidateExpressionUsage(true);
+        runner.setValidateExpressionUsage(false);
 
         //Local Cluster - Mac pulled from brew
-        runner.setProperty(AbstractElasticsearchProcessor.CLUSTER_NAME, "elasticsearch_brew");
-        runner.setProperty(AbstractElasticsearchProcessor.HOSTS, "127.0.0.1:9300");
-        runner.setProperty(AbstractElasticsearchProcessor.PING_TIMEOUT, "5s");
-        runner.setProperty(AbstractElasticsearchProcessor.SAMPLER_INTERVAL, "5s");
+        runner.setProperty(AbstractElasticsearchTransportClientProcessor.CLUSTER_NAME, "elasticsearch_brew");
+        runner.setProperty(AbstractElasticsearchTransportClientProcessor.HOSTS, "127.0.0.1:9300");
+        runner.setProperty(AbstractElasticsearchTransportClientProcessor.PING_TIMEOUT, "5s");
+        runner.setProperty(AbstractElasticsearchTransportClientProcessor.SAMPLER_INTERVAL, "5s");
         runner.setProperty(FetchElasticsearch.INDEX, "doc");
 
         runner.setProperty(FetchElasticsearch.TYPE, "status");

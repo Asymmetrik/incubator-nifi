@@ -14,50 +14,30 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package org.apache.nifi.web.api.dto.status;
 
 import com.wordnik.swagger.annotations.ApiModelProperty;
-import java.util.List;
+import org.apache.nifi.web.api.dto.util.TimeAdapter;
+
 import javax.xml.bind.annotation.XmlType;
+import javax.xml.bind.annotation.adapters.XmlJavaTypeAdapter;
+import java.util.Date;
+import java.util.List;
 
-/**
- * The status of a remote process group in this NiFi.
- */
 @XmlType(name = "remoteProcessGroupStatus")
-public class RemoteProcessGroupStatusDTO extends StatusDTO {
-
-    private String id;
+public class RemoteProcessGroupStatusDTO {
     private String groupId;
+    private String id;
     private String name;
     private String targetUri;
     private String transmissionStatus;
-    private Integer activeThreadCount;
+    private Date statsLastRefreshed;
 
-    private List<String> authorizationIssues;
+    private RemoteProcessGroupStatusSnapshotDTO aggregateSnapshot;
+    private List<NodeRemoteProcessGroupStatusSnapshotDTO> nodeSnapshots;
 
-    private String sent;
-    private String received;
-
-    /**
-     * @return The id for the remote process group
-     */
-    @ApiModelProperty(
-            value = "The id of the remote process group."
-    )
-    public String getId() {
-        return id;
-    }
-
-    public void setId(String id) {
-        this.id = id;
-    }
-
-    /**
-     * @return id of the group this remote process group is in
-     */
-    @ApiModelProperty(
-            value = "The id of the parent process group the remote process group resides in."
-    )
+    @ApiModelProperty("The unique ID of the process group that the Processor belongs to")
     public String getGroupId() {
         return groupId;
     }
@@ -66,26 +46,16 @@ public class RemoteProcessGroupStatusDTO extends StatusDTO {
         this.groupId = groupId;
     }
 
-    /**
-     * @return URI of the target system
-     */
-    @ApiModelProperty(
-            value = "The URI of the target system."
-    )
-    public String getTargetUri() {
-        return targetUri;
+    @ApiModelProperty("The unique ID of the Processor")
+    public String getId() {
+        return id;
     }
 
-    public void setTargetUri(String targetUri) {
-        this.targetUri = targetUri;
+    public void setId(String id) {
+        this.id = id;
     }
 
-    /**
-     * @return name of this remote process group
-     */
-    @ApiModelProperty(
-            value = "The name of the remote process group."
-    )
+    @ApiModelProperty("The name of the remote process group.")
     public String getName() {
         return name;
     }
@@ -94,12 +64,7 @@ public class RemoteProcessGroupStatusDTO extends StatusDTO {
         this.name = name;
     }
 
-    /**
-     * @return transmission status of this remote process group
-     */
-    @ApiModelProperty(
-            value = "The transmission status of the remote process group."
-    )
+    @ApiModelProperty("The transmission status of the remote process group.")
     public String getTransmissionStatus() {
         return transmissionStatus;
     }
@@ -108,60 +73,50 @@ public class RemoteProcessGroupStatusDTO extends StatusDTO {
         this.transmissionStatus = transmissionStatus;
     }
 
-    /**
-     * @return number of active threads
-     */
-    @ApiModelProperty(
-            value = "The number of active threads for the remote process group."
-    )
-    public Integer getActiveThreadCount() {
-        return activeThreadCount;
+    @ApiModelProperty("The URI of the target system.")
+    public String getTargetUri() {
+        return targetUri;
     }
 
-    public void setActiveThreadCount(Integer activeThreadCount) {
-        this.activeThreadCount = activeThreadCount;
+    public void setTargetUri(String targetUri) {
+        this.targetUri = targetUri;
     }
 
-    /**
-     * @return any remote authorization issues for this remote process group
-     */
-    @ApiModelProperty(
-            value = "Any remote authorization issues for the remote process group."
-    )
-    public List<String> getAuthorizationIssues() {
-        return authorizationIssues;
+    @ApiModelProperty("A status snapshot that represents the aggregate stats of all nodes in the cluster. If the NiFi instance is "
+        + "a standalone instance, rather than a cluster, this represents the stats of the single instance.")
+    public RemoteProcessGroupStatusSnapshotDTO getAggregateSnapshot() {
+        return aggregateSnapshot;
     }
 
-    public void setAuthorizationIssues(List<String> authorizationIssues) {
-        this.authorizationIssues = authorizationIssues;
+    public void setAggregateSnapshot(RemoteProcessGroupStatusSnapshotDTO aggregateSnapshot) {
+        this.aggregateSnapshot = aggregateSnapshot;
     }
 
-    /**
-     * @return Formatted description of the amount of data sent to this remote process group
-     */
-    @ApiModelProperty(
-            value = "The count/size of the flowfiles sent to the remote process group in the last 5 minutes."
-    )
-    public String getSent() {
-        return sent;
+    @ApiModelProperty("A status snapshot for each node in the cluster. If the NiFi instance is a standalone instance, rather than "
+        + "a cluster, this may be null.")
+    public List<NodeRemoteProcessGroupStatusSnapshotDTO> getNodeSnapshots() {
+        return nodeSnapshots;
     }
 
-    public void setSent(String sent) {
-        this.sent = sent;
+    public void setNodeSnapshots(List<NodeRemoteProcessGroupStatusSnapshotDTO> nodeSnapshots) {
+        this.nodeSnapshots = nodeSnapshots;
     }
 
     /**
-     * @return Formatted description of the amount of data received from this remote process group
+     * When the status for this process group was calculated.
+     *
+     * @return The the status was calculated
      */
+    @XmlJavaTypeAdapter(TimeAdapter.class)
     @ApiModelProperty(
-            value = "The count/size of the flowfiles received from the remote process group in the last 5 minutes."
+        value = "The time the status for the process group was last refreshed.",
+        dataType = "string"
     )
-    public String getReceived() {
-        return received;
+    public Date getStatsLastRefreshed() {
+        return statsLastRefreshed;
     }
 
-    public void setReceived(String received) {
-        this.received = received;
+    public void setStatsLastRefreshed(Date statsLastRefreshed) {
+        this.statsLastRefreshed = statsLastRefreshed;
     }
-
 }

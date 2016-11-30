@@ -67,6 +67,14 @@ public interface HBaseClientService extends ControllerService {
             .defaultValue("1")
             .build();
 
+    PropertyDescriptor PHOENIX_CLIENT_JAR_LOCATION = new PropertyDescriptor.Builder()
+            .name("Phoenix Client JAR Location")
+            .description("The full path to the Phoenix client JAR. Required if Phoenix is installed on top of HBase.")
+            .addValidator(StandardValidators.FILE_EXISTS_VALIDATOR)
+            .expressionLanguageSupported(true)
+            .dynamicallyModifiesClasspath(true)
+            .build();
+
     /**
      * Puts a batch of mutations to the given table.
      *
@@ -84,7 +92,7 @@ public interface HBaseClientService extends ControllerService {
      * @param columns the columns of the row to put
      * @throws IOException thrown when there are communication errors with HBase
      */
-    void put(String tableName, String rowId, Collection<PutColumn> columns) throws IOException;
+    void put(String tableName, byte[] rowId, Collection<PutColumn> columns) throws IOException;
 
     /**
      * Scans the given table using the optional filter criteria and passing each result to the provided handler.
@@ -129,5 +137,12 @@ public interface HBaseClientService extends ControllerService {
      * @return the string represented as bytes
      */
     byte[] toBytes(String s);
+
+    /**
+     * Converts the given binary formatted string to a byte representation
+     * @param s a binary encoded string
+     * @return the string represented as bytes
+     */
+    byte[] toBytesBinary(String s);
 
 }

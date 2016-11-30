@@ -13,10 +13,11 @@
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
  * limitations under the License.
- */package org.apache.nifi.processor.util.put.sender;
+ */
+package org.apache.nifi.processor.util.put.sender;
 
 import org.apache.commons.io.IOUtils;
-import org.apache.nifi.logging.ProcessorLog;
+import org.apache.nifi.logging.ComponentLog;
 import org.apache.nifi.remote.io.socket.SocketChannelOutputStream;
 
 import java.io.IOException;
@@ -34,7 +35,7 @@ public class SocketChannelSender extends ChannelSender {
     protected SocketChannel channel;
     protected SocketChannelOutputStream socketChannelOutput;
 
-    public SocketChannelSender(final String host, final int port, final int maxSendBufferSize, final ProcessorLog logger) {
+    public SocketChannelSender(final String host, final int port, final int maxSendBufferSize, final ComponentLog logger) {
         super(host, port, maxSendBufferSize, logger);
     }
 

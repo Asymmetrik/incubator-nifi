@@ -16,6 +16,40 @@
  */
 package org.apache.nifi.processors.standard;
 
+import org.apache.commons.io.IOUtils;
+import org.apache.commons.lang3.StringUtils;
+import org.apache.nifi.annotation.behavior.DynamicProperty;
+import org.apache.nifi.annotation.behavior.EventDriven;
+import org.apache.nifi.annotation.behavior.InputRequirement;
+import org.apache.nifi.annotation.behavior.InputRequirement.Requirement;
+import org.apache.nifi.annotation.behavior.Restricted;
+import org.apache.nifi.annotation.behavior.SupportsBatching;
+import org.apache.nifi.annotation.behavior.WritesAttribute;
+import org.apache.nifi.annotation.behavior.WritesAttributes;
+import org.apache.nifi.annotation.documentation.CapabilityDescription;
+import org.apache.nifi.annotation.documentation.Tags;
+import org.apache.nifi.components.PropertyDescriptor;
+import org.apache.nifi.components.ValidationContext;
+import org.apache.nifi.components.ValidationResult;
+import org.apache.nifi.components.Validator;
+import org.apache.nifi.expression.AttributeExpression.ResultType;
+import org.apache.nifi.flowfile.FlowFile;
+import org.apache.nifi.logging.ComponentLog;
+import org.apache.nifi.processor.AbstractProcessor;
+import org.apache.nifi.processor.ProcessContext;
+import org.apache.nifi.processor.ProcessSession;
+import org.apache.nifi.processor.ProcessorInitializationContext;
+import org.apache.nifi.processor.Relationship;
+import org.apache.nifi.processor.exception.ProcessException;
+import org.apache.nifi.processor.io.InputStreamCallback;
+import org.apache.nifi.processor.io.OutputStreamCallback;
+import org.apache.nifi.processor.util.StandardValidators;
+import org.apache.nifi.processors.standard.util.ArgumentUtils;
+import org.apache.nifi.processors.standard.util.SoftLimitBoundedByteArrayOutputStream;
+import org.apache.nifi.stream.io.BufferedInputStream;
+import org.apache.nifi.stream.io.BufferedOutputStream;
+import org.apache.nifi.stream.io.StreamUtils;
+
 import java.io.BufferedReader;
 import java.io.File;
 import java.io.IOException;
@@ -31,39 +65,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.atomic.AtomicReference;
-
-import org.apache.commons.io.IOUtils;
-import org.apache.commons.lang3.StringUtils;
-import org.apache.nifi.annotation.behavior.DynamicProperty;
-import org.apache.nifi.annotation.behavior.EventDriven;
-import org.apache.nifi.annotation.behavior.InputRequirement;
-import org.apache.nifi.annotation.behavior.InputRequirement.Requirement;
-import org.apache.nifi.annotation.behavior.SupportsBatching;
-import org.apache.nifi.annotation.behavior.WritesAttribute;
-import org.apache.nifi.annotation.behavior.WritesAttributes;
-import org.apache.nifi.annotation.documentation.CapabilityDescription;
-import org.apache.nifi.annotation.documentation.Tags;
-import org.apache.nifi.components.PropertyDescriptor;
-import org.apache.nifi.components.ValidationContext;
-import org.apache.nifi.components.ValidationResult;
-import org.apache.nifi.components.Validator;
-import org.apache.nifi.expression.AttributeExpression.ResultType;
-import org.apache.nifi.flowfile.FlowFile;
-import org.apache.nifi.logging.ProcessorLog;
-import org.apache.nifi.processor.AbstractProcessor;
-import org.apache.nifi.processor.ProcessContext;
-import org.apache.nifi.processor.ProcessSession;
-import org.apache.nifi.processor.ProcessorInitializationContext;
-import org.apache.nifi.processor.Relationship;
-import org.apache.nifi.processor.exception.ProcessException;
-import org.apache.nifi.processor.io.InputStreamCallback;
-import org.apache.nifi.processor.io.OutputStreamCallback;
-import org.apache.nifi.processor.util.StandardValidators;
-import org.apache.nifi.processors.standard.util.ArgumentUtils;
-import org.apache.nifi.processors.standard.util.SoftLimitBoundedByteArrayOutputStream;
-import org.apache.nifi.stream.io.BufferedInputStream;
-import org.apache.nifi.stream.io.BufferedOutputStream;
-import org.apache.nifi.stream.io.StreamUtils;
 
 /**
  * <p>
@@ -124,7 +125,7 @@ import org.apache.nifi.stream.io.StreamUtils;
 @EventDriven
 @SupportsBatching
 @InputRequirement(Requirement.INPUT_REQUIRED)
-@Tags({"command execution", "command", "stream", "execute"})
+@Tags({"command execution", "command", "stream", "execute", "restricted"})
 @CapabilityDescription("Executes an external command on the contents of a flow file, and creates a new flow file with the results of the command.")
 @DynamicProperty(name = "An environment variable name", value = "An environment variable value", description = "These environment variables are passed to the process spawned by this Processor")
 @WritesAttributes({
@@ -132,6 +133,7 @@ import org.apache.nifi.stream.io.StreamUtils;
     @WritesAttribute(attribute = "execution.command.args", description = "The semi-colon delimited list of arguments"),
     @WritesAttribute(attribute = "execution.status", description = "The exit status code returned from executing the command"),
     @WritesAttribute(attribute = "execution.error", description = "Any error messages returned from executing the command")})
+@Restricted("Provides operator the ability to execute arbitrary code assuming all permissions that NiFi has.")
 public class ExecuteStreamCommand extends AbstractProcessor {
 
     public static final Relationship ORIGINAL_RELATIONSHIP = new Relationship.Builder()
@@ -245,7 +247,7 @@ public class ExecuteStreamCommand extends AbstractProcessor {
         ATTRIBUTE_RELATIONSHIP_SET = Collections.unmodifiableSet(attributeRelationships);
     }
 
-    private ProcessorLog logger;
+    private ComponentLog logger;
 
     @Override
     public Set<Relationship> getRelationships() {
@@ -408,7 +410,7 @@ public class ExecuteStreamCommand extends AbstractProcessor {
         final boolean ignoreStdin;
         final OutputStream stdinWritable;
         final InputStream stdoutReadable;
-        final ProcessorLog logger;
+        final ComponentLog logger;
         final ProcessSession session;
         final Process process;
         FlowFile outputFlowFile;
@@ -420,7 +422,7 @@ public class ExecuteStreamCommand extends AbstractProcessor {
         byte[] outputBuffer;
         int size;
 
-        public ProcessStreamWriterCallback(boolean ignoreStdin, OutputStream stdinWritable, InputStream stdoutReadable,ProcessorLog logger, String attributeName,
+        public ProcessStreamWriterCallback(boolean ignoreStdin, OutputStream stdinWritable, InputStream stdoutReadable,ComponentLog logger, String attributeName,
                                            ProcessSession session, FlowFile outputFlowFile, Process process, boolean putToAttribute, int attributeSize) {
             this.ignoreStdin = ignoreStdin;
             this.stdinWritable = stdinWritable;
@@ -477,7 +479,7 @@ public class ExecuteStreamCommand extends AbstractProcessor {
     }
 
     private static void readStdoutReadable(final boolean ignoreStdin, final OutputStream stdinWritable,
-                                           final ProcessorLog logger, final InputStream incomingFlowFileIS) throws IOException {
+                                           final ComponentLog logger, final InputStream incomingFlowFileIS) throws IOException {
         Thread writerThread = new Thread(new Runnable() {
 
             @Override

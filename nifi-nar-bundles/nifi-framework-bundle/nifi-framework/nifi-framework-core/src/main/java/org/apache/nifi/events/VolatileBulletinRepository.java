@@ -16,20 +16,19 @@
  */
 package org.apache.nifi.events;
 
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.List;
-import java.util.Objects;
-import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.ConcurrentMap;
-import java.util.concurrent.TimeUnit;
-
 import org.apache.nifi.reporting.Bulletin;
 import org.apache.nifi.reporting.BulletinQuery;
 import org.apache.nifi.reporting.BulletinRepository;
 import org.apache.nifi.reporting.ComponentType;
 import org.apache.nifi.util.RingBuffer;
 import org.apache.nifi.util.RingBuffer.Filter;
+
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.List;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ConcurrentMap;
+import java.util.concurrent.TimeUnit;
 
 public class VolatileBulletinRepository implements BulletinRepository {
 
@@ -137,6 +136,11 @@ public class VolatileBulletinRepository implements BulletinRepository {
     }
 
     @Override
+    public List<Bulletin> findBulletinsForSource(String sourceId) {
+        return findBulletins(new BulletinQuery.Builder().sourceIdMatches(sourceId).limit(COMPONENT_BUFFER_SIZE).build());
+    }
+
+    @Override
     public List<Bulletin> findBulletinsForGroupBySource(String groupId) {
         return findBulletinsForGroupBySource(groupId, COMPONENT_BUFFER_SIZE);
     }
@@ -189,15 +193,6 @@ public class VolatileBulletinRepository implements BulletinRepository {
             }
         }
 
-        for (final String key : new String[] { SERVICE_BULLETIN_STORE_KEY, REPORTING_TASK_BULLETIN_STORE_KEY }) {
-            final ConcurrentMap<String, RingBuffer<Bulletin>> bulletinMap = bulletinStoreMap.get(key);
-            if (bulletinMap != null) {
-                for (final RingBuffer<Bulletin> buffer : bulletinMap.values()) {
-                    controllerBulletins.addAll(buffer.getSelectedElements(filter, max));
-                }
-            }
-        }
-
         // We only want the newest bulletin, so we sort based on time and take the top 'max' entries
         Collections.sort(controllerBulletins);
         if (controllerBulletins.size() > max) {
@@ -205,25 +200,6 @@ public class VolatileBulletinRepository implements BulletinRepository {
         }
 
         return controllerBulletins;
-    }
-
-    /**
-     * Overrides the default bulletin processing strategy. When a custom
-     * bulletin strategy is employed, bulletins will not be persisted in this
-     * repository and will sent to the specified strategy instead.
-     *
-     * @param strategy bulletin strategy
-     */
-    public void overrideDefaultBulletinProcessing(final BulletinProcessingStrategy strategy) {
-        Objects.requireNonNull(strategy);
-        this.processingStrategy = strategy;
-    }
-
-    /**
-     * Restores the default bulletin processing strategy.
-     */
-    public void restoreDefaultBulletinProcessing() {
-        this.processingStrategy = new DefaultBulletinProcessingStrategy();
     }
 
     private List<RingBuffer<Bulletin>> getBulletinBuffers(final Bulletin bulletin) {

@@ -136,7 +136,7 @@ The following binary components are provided under the Apache Software License v
   (ASLv2) Apache Commons IO
     The following NOTICE information applies:
       Apache Commons IO
-      Copyright 2002-2012 The Apache Software Foundation
+      Copyright 2002-2016 The Apache Software Foundation
 
   (ASLv2) Apache Commons Net
     The following NOTICE information applies:
@@ -252,6 +252,14 @@ The following binary components are provided under the Apache Software License v
         - voluntary contributions made by Paul Eng on behalf of the 
           Apache Software Foundation that were originally developed at iClick, Inc.,
           software copyright (c) 1999.
+
+  (ASLv2) Apache HTrace Core
+    The following NOTICE information applies:
+      Copyright 2016 The Apache Software Foundation
+
+      Apache HTrace includes an Apache Thrift connector to Zipkin. Zipkin
+      is a distributed tracing system that is Apache 2.0 Licensed.
+      Copyright 2012 Twitter, Inc.
 
   (ASLv2) Apache Tomcat
     The following NOTICE information applies:

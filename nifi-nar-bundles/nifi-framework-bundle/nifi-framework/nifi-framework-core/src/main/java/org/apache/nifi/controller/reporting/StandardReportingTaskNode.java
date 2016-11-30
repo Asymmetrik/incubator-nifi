@@ -16,10 +16,16 @@
  */
 package org.apache.nifi.controller.reporting;
 
+import org.apache.nifi.annotation.behavior.Restricted;
+import org.apache.nifi.authorization.Resource;
+import org.apache.nifi.authorization.resource.Authorizable;
+import org.apache.nifi.authorization.resource.ResourceFactory;
+import org.apache.nifi.authorization.resource.ResourceType;
 import org.apache.nifi.controller.FlowController;
 import org.apache.nifi.controller.ProcessScheduler;
 import org.apache.nifi.controller.ReportingTaskNode;
 import org.apache.nifi.controller.ValidationContextFactory;
+import org.apache.nifi.logging.ComponentLog;
 import org.apache.nifi.registry.VariableRegistry;
 import org.apache.nifi.reporting.ReportingContext;
 import org.apache.nifi.reporting.ReportingTask;
@@ -30,13 +36,35 @@ public class StandardReportingTaskNode extends AbstractReportingTaskNode impleme
 
     public StandardReportingTaskNode(final ReportingTask reportingTask, final String id, final FlowController controller,
                                      final ProcessScheduler processScheduler, final ValidationContextFactory validationContextFactory,
-                                     final VariableRegistry variableRegistry) {
-        super(reportingTask, id, controller, processScheduler, validationContextFactory, variableRegistry);
+                                     final VariableRegistry variableRegistry, final ComponentLog logger) {
+        super(reportingTask, id, controller, processScheduler, validationContextFactory, variableRegistry, logger);
+        this.flowController = controller;
+    }
+
+    public StandardReportingTaskNode(final ReportingTask reportingTask, final String id, final FlowController controller,
+        final ProcessScheduler processScheduler, final ValidationContextFactory validationContextFactory,
+        final String componentType, final String canonicalClassName, final VariableRegistry variableRegistry, final ComponentLog logger) {
+        super(reportingTask, id, controller, processScheduler, validationContextFactory, componentType, canonicalClassName,variableRegistry, logger);
         this.flowController = controller;
     }
 
     @Override
+    public Authorizable getParentAuthorizable() {
+        return flowController;
+    }
+
+    @Override
+    public Resource getResource() {
+        return ResourceFactory.getComponentResource(ResourceType.ReportingTask, getIdentifier(), getName());
+    }
+
+    @Override
+    public boolean isRestricted() {
+        return getReportingTask().getClass().isAnnotationPresent(Restricted.class);
+    }
+
+    @Override
     public ReportingContext getReportingContext() {
-        return new StandardReportingContext(flowController, flowController.getBulletinRepository(), getProperties(), flowController, getReportingTask(), variableRegistry);
+        return new StandardReportingContext(flowController, flowController.getBulletinRepository(), getProperties(), flowController, getReportingTask(), getVariableRegistry());
     }
 }

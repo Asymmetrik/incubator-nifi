@@ -17,16 +17,17 @@
 package org.apache.nifi.web.api.dto;
 
 import com.wordnik.swagger.annotations.ApiModelProperty;
+
+import javax.xml.bind.annotation.XmlType;
 import java.util.Collection;
 import java.util.List;
 import java.util.Map;
-import javax.xml.bind.annotation.XmlType;
 
 /**
  * Details for a processor within this NiFi.
  */
 @XmlType(name = "processor")
-public class ProcessorDTO extends NiFiComponentDTO {
+public class ProcessorDTO extends ComponentDTO {
 
     private String name;
     private String type;
@@ -38,6 +39,7 @@ public class ProcessorDTO extends NiFiComponentDTO {
     private Boolean supportsEventDriven;
     private Boolean supportsBatching;
     private Boolean persistsState;
+    private Boolean restricted;
     private String inputRequirement;
 
     private ProcessorConfigDTO config;
@@ -138,6 +140,20 @@ public class ProcessorDTO extends NiFiComponentDTO {
     }
 
     /**
+     * @return whether this processor requires elevated privileges
+     */
+    @ApiModelProperty(
+            value = "Whether the processor requires elevated privileges."
+    )
+    public Boolean getRestricted() {
+        return restricted;
+    }
+
+    public void setRestricted(Boolean restricted) {
+        this.restricted = restricted;
+    }
+
+    /**
      * @return the input requirement of this processor
      */
     @ApiModelProperty(
@@ -185,7 +201,8 @@ public class ProcessorDTO extends NiFiComponentDTO {
      * @return The available relationships
      */
     @ApiModelProperty(
-            value = "The available relationships that the processor currently supports."
+            value = "The available relationships that the processor currently supports.",
+            readOnly = true
     )
     public List<RelationshipDTO> getRelationships() {
         return relationships;
@@ -201,7 +218,7 @@ public class ProcessorDTO extends NiFiComponentDTO {
      * @return The processor configuration details
      */
     @ApiModelProperty(
-            value = "The configuration details for the processor. These details will be included in a resopnse if the verbose flag is included in a request."
+            value = "The configuration details for the processor. These details will be included in a response if the verbose flag is included in a request."
     )
     public ProcessorConfigDTO getConfig() {
         return config;

@@ -77,10 +77,10 @@ public class TestPutElasticsearch {
     @Test
     public void testHostnameExpressionLanguage() throws IOException {
         runner = TestRunners.newTestRunner(new PutElasticsearchTestProcessor(false)); // no failures
-        runner.setProperty(AbstractElasticsearchProcessor.CLUSTER_NAME, "elasticsearch");
-        runner.setProperty(AbstractElasticsearchProcessor.HOSTS, "${xxx}");
-        runner.setProperty(AbstractElasticsearchProcessor.PING_TIMEOUT, "5s");
-        runner.setProperty(AbstractElasticsearchProcessor.SAMPLER_INTERVAL, "5s");
+        runner.setProperty(AbstractElasticsearchTransportClientProcessor.CLUSTER_NAME, "elasticsearch");
+        runner.setProperty(AbstractElasticsearchTransportClientProcessor.HOSTS, "${xxx}");
+        runner.setProperty(AbstractElasticsearchTransportClientProcessor.PING_TIMEOUT, "5s");
+        runner.setProperty(AbstractElasticsearchTransportClientProcessor.SAMPLER_INTERVAL, "5s");
 
         runner.setProperty(PutElasticsearch.INDEX, "doc");
         runner.setProperty(PutElasticsearch.TYPE, "status");
@@ -93,10 +93,10 @@ public class TestPutElasticsearch {
     public void testPutElasticSearchOnTrigger() throws IOException {
         runner = TestRunners.newTestRunner(new PutElasticsearchTestProcessor(false)); // no failures
         runner.setValidateExpressionUsage(false);
-        runner.setProperty(AbstractElasticsearchProcessor.CLUSTER_NAME, "elasticsearch");
-        runner.setProperty(AbstractElasticsearchProcessor.HOSTS, "127.0.0.1:9300");
-        runner.setProperty(AbstractElasticsearchProcessor.PING_TIMEOUT, "5s");
-        runner.setProperty(AbstractElasticsearchProcessor.SAMPLER_INTERVAL, "5s");
+        runner.setProperty(AbstractElasticsearchTransportClientProcessor.CLUSTER_NAME, "elasticsearch");
+        runner.setProperty(AbstractElasticsearchTransportClientProcessor.HOSTS, "127.0.0.1:9300");
+        runner.setProperty(AbstractElasticsearchTransportClientProcessor.PING_TIMEOUT, "5s");
+        runner.setProperty(AbstractElasticsearchTransportClientProcessor.SAMPLER_INTERVAL, "5s");
 
         runner.setProperty(PutElasticsearch.INDEX, "doc");
         runner.assertNotValid();
@@ -121,21 +121,25 @@ public class TestPutElasticsearch {
     public void testPutElasticSearchOnTriggerWithFailures() throws IOException {
         runner = TestRunners.newTestRunner(new PutElasticsearchTestProcessor(true)); // simulate failures
         runner.setValidateExpressionUsage(false);
-        runner.setProperty(AbstractElasticsearchProcessor.CLUSTER_NAME, "elasticsearch");
-        runner.setProperty(AbstractElasticsearchProcessor.HOSTS, "127.0.0.1:9300");
-        runner.setProperty(AbstractElasticsearchProcessor.PING_TIMEOUT, "5s");
-        runner.setProperty(AbstractElasticsearchProcessor.SAMPLER_INTERVAL, "5s");
+        runner.setProperty(AbstractElasticsearchTransportClientProcessor.CLUSTER_NAME, "elasticsearch");
+        runner.setProperty(AbstractElasticsearchTransportClientProcessor.HOSTS, "127.0.0.1:9300");
+        runner.setProperty(AbstractElasticsearchTransportClientProcessor.PING_TIMEOUT, "5s");
+        runner.setProperty(AbstractElasticsearchTransportClientProcessor.SAMPLER_INTERVAL, "5s");
         runner.setProperty(PutElasticsearch.INDEX, "doc");
         runner.setProperty(PutElasticsearch.TYPE, "status");
-        runner.setProperty(PutElasticsearch.BATCH_SIZE, "1");
+        runner.setProperty(PutElasticsearch.BATCH_SIZE, "2");
         runner.setProperty(PutElasticsearch.ID_ATTRIBUTE, "doc_id");
 
         runner.enqueue(docExample, new HashMap<String, String>() {{
             put("doc_id", "28039652140");
         }});
+        runner.enqueue(docExample, new HashMap<String, String>() {{
+            put("doc_id", "28039652141");
+        }});
         runner.run(1, true, true);
 
-        runner.assertAllFlowFilesTransferred(PutElasticsearch.REL_FAILURE, 1);
+        runner.assertTransferCount(PutElasticsearch.REL_FAILURE, 1);
+        runner.assertTransferCount(PutElasticsearch.REL_SUCCESS, 1);
         final MockFlowFile out = runner.getFlowFilesForRelationship(PutElasticsearch.REL_FAILURE).get(0);
         assertNotNull(out);
         out.assertAttributeEquals("doc_id", "28039652140");
@@ -145,10 +149,10 @@ public class TestPutElasticsearch {
     public void testPutElasticsearchOnTriggerWithExceptions() throws IOException {
         PutElasticsearchTestProcessor processor = new PutElasticsearchTestProcessor(false);
         runner = TestRunners.newTestRunner(processor);
-        runner.setProperty(AbstractElasticsearchProcessor.CLUSTER_NAME, "elasticsearch");
-        runner.setProperty(AbstractElasticsearchProcessor.HOSTS, "127.0.0.1:9300");
-        runner.setProperty(AbstractElasticsearchProcessor.PING_TIMEOUT, "5s");
-        runner.setProperty(AbstractElasticsearchProcessor.SAMPLER_INTERVAL, "5s");
+        runner.setProperty(AbstractElasticsearchTransportClientProcessor.CLUSTER_NAME, "elasticsearch");
+        runner.setProperty(AbstractElasticsearchTransportClientProcessor.HOSTS, "127.0.0.1:9300");
+        runner.setProperty(AbstractElasticsearchTransportClientProcessor.PING_TIMEOUT, "5s");
+        runner.setProperty(AbstractElasticsearchTransportClientProcessor.SAMPLER_INTERVAL, "5s");
         runner.setProperty(PutElasticsearch.INDEX, "doc");
         runner.setProperty(PutElasticsearch.TYPE, "status");
         runner.setValidateExpressionUsage(false);
@@ -209,10 +213,10 @@ public class TestPutElasticsearch {
     public void testPutElasticsearchOnTriggerWithNoIdAttribute() throws IOException {
         runner = TestRunners.newTestRunner(new PutElasticsearchTestProcessor(true)); // simulate failures
         runner.setValidateExpressionUsage(false);
-        runner.setProperty(AbstractElasticsearchProcessor.CLUSTER_NAME, "elasticsearch");
-        runner.setProperty(AbstractElasticsearchProcessor.HOSTS, "127.0.0.1:9300");
-        runner.setProperty(AbstractElasticsearchProcessor.PING_TIMEOUT, "5s");
-        runner.setProperty(AbstractElasticsearchProcessor.SAMPLER_INTERVAL, "5s");
+        runner.setProperty(AbstractElasticsearchTransportClientProcessor.CLUSTER_NAME, "elasticsearch");
+        runner.setProperty(AbstractElasticsearchTransportClientProcessor.HOSTS, "127.0.0.1:9300");
+        runner.setProperty(AbstractElasticsearchTransportClientProcessor.PING_TIMEOUT, "5s");
+        runner.setProperty(AbstractElasticsearchTransportClientProcessor.SAMPLER_INTERVAL, "5s");
         runner.setProperty(PutElasticsearch.INDEX, "doc");
         runner.setProperty(PutElasticsearch.TYPE, "status");
         runner.setProperty(PutElasticsearch.BATCH_SIZE, "1");
@@ -230,10 +234,10 @@ public class TestPutElasticsearch {
     public void testPutElasticsearchOnTriggerWithIndexFromAttribute() throws IOException {
         runner = TestRunners.newTestRunner(new PutElasticsearchTestProcessor(false));
         runner.setValidateExpressionUsage(false);
-        runner.setProperty(AbstractElasticsearchProcessor.CLUSTER_NAME, "elasticsearch");
-        runner.setProperty(AbstractElasticsearchProcessor.HOSTS, "127.0.0.1:9300");
-        runner.setProperty(AbstractElasticsearchProcessor.PING_TIMEOUT, "5s");
-        runner.setProperty(AbstractElasticsearchProcessor.SAMPLER_INTERVAL, "5s");
+        runner.setProperty(AbstractElasticsearchTransportClientProcessor.CLUSTER_NAME, "elasticsearch");
+        runner.setProperty(AbstractElasticsearchTransportClientProcessor.HOSTS, "127.0.0.1:9300");
+        runner.setProperty(AbstractElasticsearchTransportClientProcessor.PING_TIMEOUT, "5s");
+        runner.setProperty(AbstractElasticsearchTransportClientProcessor.SAMPLER_INTERVAL, "5s");
         runner.setProperty(PutElasticsearch.INDEX, "${i}");
         runner.setProperty(PutElasticsearch.TYPE, "${type}");
         runner.setProperty(PutElasticsearch.BATCH_SIZE, "1");
@@ -267,10 +271,10 @@ public class TestPutElasticsearch {
     public void testPutElasticSearchOnTriggerWithInvalidIndexOp() throws IOException {
         runner = TestRunners.newTestRunner(new PutElasticsearchTestProcessor(false)); // no failures
         runner.setValidateExpressionUsage(false);
-        runner.setProperty(AbstractElasticsearchProcessor.CLUSTER_NAME, "elasticsearch");
-        runner.setProperty(AbstractElasticsearchProcessor.HOSTS, "127.0.0.1:9300");
-        runner.setProperty(AbstractElasticsearchProcessor.PING_TIMEOUT, "5s");
-        runner.setProperty(AbstractElasticsearchProcessor.SAMPLER_INTERVAL, "5s");
+        runner.setProperty(AbstractElasticsearchTransportClientProcessor.CLUSTER_NAME, "elasticsearch");
+        runner.setProperty(AbstractElasticsearchTransportClientProcessor.HOSTS, "127.0.0.1:9300");
+        runner.setProperty(AbstractElasticsearchTransportClientProcessor.PING_TIMEOUT, "5s");
+        runner.setProperty(AbstractElasticsearchTransportClientProcessor.SAMPLER_INTERVAL, "5s");
 
         runner.setProperty(PutElasticsearch.INDEX, "doc");
         runner.assertNotValid();
@@ -364,10 +368,16 @@ public class TestPutElasticsearch {
             public BulkResponse get() throws InterruptedException, ExecutionException {
                 BulkResponse response = mock(BulkResponse.class);
                 when(response.hasFailures()).thenReturn(responseHasFailures);
-                BulkItemResponse item = mock(BulkItemResponse.class);
-                when(item.getItemId()).thenReturn(1);
-                when(item.isFailed()).thenReturn(true);
-                when(response.getItems()).thenReturn(new BulkItemResponse[]{item});
+                BulkItemResponse item1 = mock(BulkItemResponse.class);
+                BulkItemResponse item2 = mock(BulkItemResponse.class);
+                when(item1.getItemId()).thenReturn(1);
+                when(item1.isFailed()).thenReturn(true);
+                BulkItemResponse.Failure failure = mock(BulkItemResponse.Failure.class);
+                when(failure.getMessage()).thenReturn("Bad message");
+                when(item1.getFailure()).thenReturn(failure);
+                when(item2.getItemId()).thenReturn(2);
+                when(item2.isFailed()).thenReturn(false);
+                when(response.getItems()).thenReturn(new BulkItemResponse[]{item1, item2});
                 return response;
             }
 
@@ -395,10 +405,10 @@ public class TestPutElasticsearch {
         runner.setValidateExpressionUsage(false);
 
         //Local Cluster - Mac pulled from brew
-        runner.setProperty(AbstractElasticsearchProcessor.CLUSTER_NAME, "elasticsearch_brew");
-        runner.setProperty(AbstractElasticsearchProcessor.HOSTS, "127.0.0.1:9300");
-        runner.setProperty(AbstractElasticsearchProcessor.PING_TIMEOUT, "5s");
-        runner.setProperty(AbstractElasticsearchProcessor.SAMPLER_INTERVAL, "5s");
+        runner.setProperty(AbstractElasticsearchTransportClientProcessor.CLUSTER_NAME, "elasticsearch_brew");
+        runner.setProperty(AbstractElasticsearchTransportClientProcessor.HOSTS, "127.0.0.1:9300");
+        runner.setProperty(AbstractElasticsearchTransportClientProcessor.PING_TIMEOUT, "5s");
+        runner.setProperty(AbstractElasticsearchTransportClientProcessor.SAMPLER_INTERVAL, "5s");
 
         runner.setProperty(PutElasticsearch.INDEX, "doc");
         runner.setProperty(PutElasticsearch.BATCH_SIZE, "1");
@@ -427,10 +437,10 @@ public class TestPutElasticsearch {
         runner.setValidateExpressionUsage(false);
 
         //Local Cluster - Mac pulled from brew
-        runner.setProperty(AbstractElasticsearchProcessor.CLUSTER_NAME, "elasticsearch_brew");
-        runner.setProperty(AbstractElasticsearchProcessor.HOSTS, "127.0.0.1:9300");
-        runner.setProperty(AbstractElasticsearchProcessor.PING_TIMEOUT, "5s");
-        runner.setProperty(AbstractElasticsearchProcessor.SAMPLER_INTERVAL, "5s");
+        runner.setProperty(AbstractElasticsearchTransportClientProcessor.CLUSTER_NAME, "elasticsearch_brew");
+        runner.setProperty(AbstractElasticsearchTransportClientProcessor.HOSTS, "127.0.0.1:9300");
+        runner.setProperty(AbstractElasticsearchTransportClientProcessor.PING_TIMEOUT, "5s");
+        runner.setProperty(AbstractElasticsearchTransportClientProcessor.SAMPLER_INTERVAL, "5s");
         runner.setProperty(PutElasticsearch.INDEX, "doc");
         runner.setProperty(PutElasticsearch.BATCH_SIZE, "100");
 

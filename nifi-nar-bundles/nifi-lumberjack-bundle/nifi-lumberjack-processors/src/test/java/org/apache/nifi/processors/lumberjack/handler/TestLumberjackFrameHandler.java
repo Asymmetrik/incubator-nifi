@@ -26,7 +26,7 @@ import java.util.List;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.LinkedBlockingQueue;
 
-import org.apache.nifi.logging.ProcessorLog;
+import org.apache.nifi.logging.ComponentLog;
 import org.apache.nifi.processor.util.listen.dispatcher.AsyncChannelDispatcher;
 import org.apache.nifi.processor.util.listen.event.EventFactory;
 import org.apache.nifi.processor.util.listen.response.ChannelResponder;
@@ -49,7 +49,7 @@ public class TestLumberjackFrameHandler {
     private AsyncChannelDispatcher dispatcher;
     private LumberjackEncoder encoder;
 
-    private ProcessorLog logger;
+    private ComponentLog logger;
 
     private LumberjackFrameHandler<LumberjackEvent> frameHandler;
 
@@ -60,7 +60,7 @@ public class TestLumberjackFrameHandler {
         this.events = new LinkedBlockingQueue<>();
         this.key = Mockito.mock(SelectionKey.class);
         this.dispatcher = Mockito.mock(AsyncChannelDispatcher.class);
-        this.logger = Mockito.mock(ProcessorLog.class);
+        this.logger = Mockito.mock(ComponentLog.class);
 
         this.frameHandler = new LumberjackFrameHandler<>(key, charset, eventFactory, events, dispatcher, logger);
     }
@@ -92,7 +92,7 @@ public class TestLumberjackFrameHandler {
             0x00, 0x00, 0x00, 0x02,  // Number of pairs
             0x00, 0x00, 0x00, 0x04,  // Length of first pair key ('line')
             0x6C, 0x69, 0x6E, 0x65, // 'line'
-            0x00, 0x00, 0x00, 0x0C, // Lenght of 'test-content'
+            0x00, 0x00, 0x00, 0x0C, // Length of 'test-content'
             0x74, 0x65, 0x73, 0x74, //
             0x2d, 0x63, 0x6f, 0x6e, // 'test-content'
             0x74, 0x65, 0x6e, 0x74, //

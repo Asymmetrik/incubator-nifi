@@ -36,7 +36,7 @@ import java.util.regex.Pattern;
 import org.apache.nifi.components.PropertyDescriptor;
 import org.apache.nifi.components.PropertyValue;
 import org.apache.nifi.flowfile.FlowFile;
-import org.apache.nifi.logging.ProcessorLog;
+import org.apache.nifi.logging.ComponentLog;
 import org.apache.nifi.processor.ProcessContext;
 import org.apache.nifi.processor.util.StandardValidators;
 import org.slf4j.LoggerFactory;
@@ -56,7 +56,7 @@ public class SFTPTransfer implements FileTransfer {
         .description("The fully qualified path to the Private Key file")
         .required(false)
         .addValidator(StandardValidators.FILE_EXISTS_VALIDATOR)
-		.expressionLanguageSupported(true)
+        .expressionLanguageSupported(true)
         .build();
     public static final PropertyDescriptor PRIVATE_KEY_PASSPHRASE = new PropertyDescriptor.Builder()
         .name("Private Key Passphrase")
@@ -84,7 +84,7 @@ public class SFTPTransfer implements FileTransfer {
         .addValidator(StandardValidators.PORT_VALIDATOR)
         .required(true)
         .defaultValue("22")
-		.expressionLanguageSupported(true)
+        .expressionLanguageSupported(true)
         .build();
     public static final PropertyDescriptor USE_KEEPALIVE_ON_TIMEOUT = new PropertyDescriptor.Builder()
         .name("Send Keep Alive On Timeout")
@@ -109,7 +109,7 @@ public class SFTPTransfer implements FileTransfer {
         .defaultValue("false")
         .build();
 
-    private final ProcessorLog logger;
+    private final ComponentLog logger;
 
     private final ProcessContext ctx;
     private Session session;
@@ -119,7 +119,7 @@ public class SFTPTransfer implements FileTransfer {
 
     private final boolean disableDirectoryListing;
 
-    public SFTPTransfer(final ProcessContext processContext, final ProcessorLog logger) {
+    public SFTPTransfer(final ProcessContext processContext, final ComponentLog logger) {
         this.ctx = processContext;
         this.logger = logger;
 

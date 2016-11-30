@@ -16,58 +16,40 @@
  */
 package org.apache.nifi.web.security;
 
-import org.apache.nifi.web.security.token.NewAccountAuthorizationRequestToken;
-import org.apache.nifi.web.security.token.NewAccountAuthorizationToken;
-import org.apache.nifi.web.security.token.NiFiAuthorizationRequestToken;
-import org.apache.nifi.web.security.token.NiFiAuthorizationToken;
+import org.apache.nifi.authorization.util.IdentityMapping;
+import org.apache.nifi.authorization.util.IdentityMappingUtil;
+import org.apache.nifi.util.NiFiProperties;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.security.authentication.AuthenticationProvider;
-import org.springframework.security.core.Authentication;
-import org.springframework.security.core.AuthenticationException;
-import org.springframework.security.core.userdetails.AuthenticationUserDetailsService;
-import org.springframework.security.core.userdetails.UserDetails;
-import org.springframework.security.core.userdetails.UsernameNotFoundException;
+
+import java.util.Collections;
+import java.util.List;
 
 /**
- *
+ * Base AuthenticationProvider that provides common functionality to mapping identities.
  */
-public class NiFiAuthenticationProvider implements AuthenticationProvider {
+public abstract class NiFiAuthenticationProvider implements AuthenticationProvider {
 
-    private final AuthenticationUserDetailsService<NiFiAuthorizationRequestToken> userDetailsService;
+    private static final Logger LOGGER = LoggerFactory.getLogger(NiFiAuthenticationProvider.class);
 
-    public NiFiAuthenticationProvider(final AuthenticationUserDetailsService<NiFiAuthorizationRequestToken> userDetailsService) {
-        this.userDetailsService = userDetailsService;
+    private NiFiProperties properties;
+    private List<IdentityMapping> mappings;
+
+    /**
+     * @param properties the NiFiProperties instance
+     */
+    public NiFiAuthenticationProvider(final NiFiProperties properties) {
+        this.properties = properties;
+        this.mappings = Collections.unmodifiableList(IdentityMappingUtil.getIdentityMappings(properties));
     }
 
-    @Override
-    public Authentication authenticate(Authentication authentication) throws AuthenticationException {
-        final NiFiAuthorizationRequestToken request = (NiFiAuthorizationRequestToken) authentication;
-
-        try {
-            // defer to the nifi user details service to authorize the user
-            final UserDetails userDetails = userDetailsService.loadUserDetails(request);
-
-            // build a token for accesing nifi
-            final NiFiAuthorizationToken result = new NiFiAuthorizationToken(userDetails);
-            result.setDetails(request.getDetails());
-            return result;
-        } catch (final UsernameNotFoundException unfe) {
-            // if the authorization request is for a new account and it could not be authorized because the user was not found,
-            // return the token so the new account could be created. this must go here to ensure that any proxies have been authorized
-            if (isNewAccountAuthenticationToken(request)) {
-                return new NewAccountAuthorizationToken(((NewAccountAuthorizationRequestToken) authentication).getNewAccountRequest());
-            } else {
-                throw unfe;
-            }
-        }
+    public List<IdentityMapping> getMappings() {
+        return mappings;
     }
 
-    private boolean isNewAccountAuthenticationToken(final Authentication authentication) {
-        return NewAccountAuthorizationRequestToken.class.isAssignableFrom(authentication.getClass());
-    }
-
-    @Override
-    public boolean supports(Class<?> authentication) {
-        return NiFiAuthorizationRequestToken.class.isAssignableFrom(authentication);
+    protected String mapIdentity(final String identity) {
+        return IdentityMappingUtil.mapIdentity(identity, mappings);
     }
 
 }

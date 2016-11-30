@@ -31,7 +31,7 @@ import javax.jms.Session;
 import javax.jms.TextMessage;
 import javax.jms.Topic;
 
-import org.apache.nifi.logging.ProcessorLog;
+import org.apache.nifi.logging.ComponentLog;
 import org.springframework.jms.core.JmsTemplate;
 import org.springframework.jms.core.SessionCallback;
 import org.springframework.jms.support.JmsHeaders;
@@ -48,9 +48,9 @@ final class JMSConsumer extends JMSWorker {
      * @param jmsTemplate
      *            instance of {@link JmsTemplate}
      * @param processLog
-     *            instance of {@link ProcessorLog}
+     *            instance of {@link ComponentLog}
      */
-    JMSConsumer(JmsTemplate jmsTemplate, ProcessorLog processLog) {
+    JMSConsumer(JmsTemplate jmsTemplate, ComponentLog processLog) {
         super(jmsTemplate, processLog);
         if (this.processLog.isInfoEnabled()) {
             this.processLog.info("Created Message Consumer for '" + jmsTemplate.toString() + "'.");

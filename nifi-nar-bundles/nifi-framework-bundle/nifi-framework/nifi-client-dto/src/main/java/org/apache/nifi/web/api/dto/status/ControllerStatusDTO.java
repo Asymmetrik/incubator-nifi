@@ -17,40 +17,33 @@
 package org.apache.nifi.web.api.dto.status;
 
 import com.wordnik.swagger.annotations.ApiModelProperty;
-import java.util.List;
+
 import javax.xml.bind.annotation.XmlType;
-import org.apache.nifi.web.api.dto.BulletinDTO;
 
 /**
  * The status of this NiFi controller.
  */
 @XmlType(name = "controllerStatus")
-public class ControllerStatusDTO {
+public class ControllerStatusDTO implements Cloneable {
 
-    private Integer activeThreadCount;
+    private Integer activeThreadCount = 0;
     private String queued;
-    private String connectedNodes;
-    private Boolean hasPendingAccounts;
+    private Integer flowFilesQueued = 0;
+    private Long bytesQueued = 0L;
 
-    private Integer runningCount;
-    private Integer stoppedCount;
-    private Integer invalidCount;
-    private Integer disabledCount;
-    private Integer activeRemotePortCount;
-    private Integer inactiveRemotePortCount;
-
-    private List<BulletinDTO> bulletins;
-    private List<BulletinDTO> controllerServiceBulletins;
-    private List<BulletinDTO> reportingTaskBulletins;
+    private Integer runningCount = 0;
+    private Integer stoppedCount = 0;
+    private Integer invalidCount = 0;
+    private Integer disabledCount = 0;
+    private Integer activeRemotePortCount = 0;
+    private Integer inactiveRemotePortCount = 0;
 
     /**
      * The active thread count.
      *
      * @return The active thread count
      */
-    @ApiModelProperty(
-            value = "The number of active threads in the NiFi."
-    )
+    @ApiModelProperty("The number of active threads in the NiFi.")
     public Integer getActiveThreadCount() {
         return activeThreadCount;
     }
@@ -62,9 +55,7 @@ public class ControllerStatusDTO {
     /**
      * @return queue for the controller
      */
-    @ApiModelProperty(
-            value = "The number of flowfilew queued in the NiFi."
-    )
+    @ApiModelProperty("The number of flowfiles queued in the NiFi.")
     public String getQueued() {
         return queued;
     }
@@ -74,82 +65,9 @@ public class ControllerStatusDTO {
     }
 
     /**
-     * @return Used in clustering, will report the number of nodes connected vs
-     * the number of nodes in the cluster
-     */
-    @ApiModelProperty(
-            value = "When clustered, reports the number of nodes connected vs the number of nodes in the cluster."
-    )
-    public String getConnectedNodes() {
-        return connectedNodes;
-    }
-
-    public void setConnectedNodes(String connectedNodes) {
-        this.connectedNodes = connectedNodes;
-    }
-
-    /**
-     * @return System bulletins to be reported to the user
-     */
-    @ApiModelProperty(
-            value = "System level bulletins to be reported to the user."
-    )
-    public List<BulletinDTO> getBulletins() {
-        return bulletins;
-    }
-
-    public void setBulletins(List<BulletinDTO> bulletins) {
-        this.bulletins = bulletins;
-    }
-
-    /**
-     * @return Controller service bulletins to be reported to the user
-     */
-    @ApiModelProperty(
-            value = "Controller service bulletins to be reported to the user."
-    )
-    public List<BulletinDTO> getControllerServiceBulletins() {
-        return controllerServiceBulletins;
-    }
-
-    public void setControllerServiceBulletins(List<BulletinDTO> controllerServiceBulletins) {
-        this.controllerServiceBulletins = controllerServiceBulletins;
-    }
-
-    /**
-     * @return Reporting task bulletins to be reported to the user
-     */
-    @ApiModelProperty(
-            value = "Reporting task bulletins to be reported to the user."
-    )
-    public List<BulletinDTO> getReportingTaskBulletins() {
-        return reportingTaskBulletins;
-    }
-
-    public void setReportingTaskBulletins(List<BulletinDTO> reportingTaskBulletins) {
-        this.reportingTaskBulletins = reportingTaskBulletins;
-    }
-
-    /**
-     * @return whether or not there are pending user requests
-     */
-    @ApiModelProperty(
-            value = "Whether there are any pending user account requests."
-    )
-    public Boolean getHasPendingAccounts() {
-        return hasPendingAccounts;
-    }
-
-    public void setHasPendingAccounts(Boolean hasPendingAccounts) {
-        this.hasPendingAccounts = hasPendingAccounts;
-    }
-
-    /**
      * @return number of running components in this controller
      */
-    @ApiModelProperty(
-            value = "The number of running components in the NiFi."
-    )
+    @ApiModelProperty("The number of running components in the NiFi.")
     public Integer getRunningCount() {
         return runningCount;
     }
@@ -161,9 +79,7 @@ public class ControllerStatusDTO {
     /**
      * @return number of stopped components in this controller
      */
-    @ApiModelProperty(
-            value = "The number of stopped components in the NiFi."
-    )
+    @ApiModelProperty("The number of stopped components in the NiFi.")
     public Integer getStoppedCount() {
         return stoppedCount;
     }
@@ -175,9 +91,7 @@ public class ControllerStatusDTO {
     /**
      * @return number of invalid components in this controller
      */
-    @ApiModelProperty(
-            value = "The number of invalid components in the NiFi."
-    )
+    @ApiModelProperty("The number of invalid components in the NiFi.")
     public Integer getInvalidCount() {
         return invalidCount;
     }
@@ -189,9 +103,7 @@ public class ControllerStatusDTO {
     /**
      * @return number of disabled components in this controller
      */
-    @ApiModelProperty(
-            value = "The number of disabled components in the NiFi."
-    )
+    @ApiModelProperty("The number of disabled components in the NiFi.")
     public Integer getDisabledCount() {
         return disabledCount;
     }
@@ -203,9 +115,7 @@ public class ControllerStatusDTO {
     /**
      * @return number of active remote ports in this controller
      */
-    @ApiModelProperty(
-            value = "The number of active remote ports in the NiFi."
-    )
+    @ApiModelProperty("The number of active remote ports in the NiFi.")
     public Integer getActiveRemotePortCount() {
         return activeRemotePortCount;
     }
@@ -217,9 +127,7 @@ public class ControllerStatusDTO {
     /**
      * @return number of inactive remote ports in this controller
      */
-    @ApiModelProperty(
-            value = "The number of inactive remote ports in the NiFi."
-    )
+    @ApiModelProperty("The number of inactive remote ports in the NiFi.")
     public Integer getInactiveRemotePortCount() {
         return inactiveRemotePortCount;
     }
@@ -228,4 +136,37 @@ public class ControllerStatusDTO {
         this.inactiveRemotePortCount = inactiveRemotePortCount;
     }
 
+    @ApiModelProperty("The number of FlowFiles queued across the entire flow")
+    public Integer getFlowFilesQueued() {
+        return flowFilesQueued;
+    }
+
+    public void setFlowFilesQueued(Integer flowFilesQueued) {
+        this.flowFilesQueued = flowFilesQueued;
+    }
+
+    @ApiModelProperty("The size of the FlowFiles queued across the entire flow")
+    public Long getBytesQueued() {
+        return bytesQueued;
+    }
+
+    public void setBytesQueued(Long bytesQueued) {
+        this.bytesQueued = bytesQueued;
+    }
+
+    @Override
+    public ControllerStatusDTO clone() {
+        final ControllerStatusDTO other = new ControllerStatusDTO();
+        other.setActiveThreadCount(getActiveThreadCount());
+        other.setQueued(getQueued());
+        other.setFlowFilesQueued(getFlowFilesQueued());
+        other.setBytesQueued(getBytesQueued());
+        other.setRunningCount(getRunningCount());
+        other.setStoppedCount(getStoppedCount());
+        other.setInvalidCount(getInvalidCount());
+        other.setDisabledCount(getDisabledCount());
+        other.setActiveRemotePortCount(getActiveRemotePortCount());
+        other.setInactiveRemotePortCount(getInactiveRemotePortCount());
+        return other;
+    }
 }

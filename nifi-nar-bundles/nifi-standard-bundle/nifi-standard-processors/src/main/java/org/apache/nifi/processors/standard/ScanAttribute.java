@@ -44,7 +44,6 @@ import org.apache.nifi.annotation.lifecycle.OnScheduled;
 import org.apache.nifi.components.PropertyDescriptor;
 import org.apache.nifi.flowfile.FlowFile;
 import org.apache.nifi.logging.ComponentLog;
-import org.apache.nifi.logging.ProcessorLog;
 import org.apache.nifi.processor.AbstractProcessor;
 import org.apache.nifi.processor.ProcessContext;
 import org.apache.nifi.processor.ProcessSession;
@@ -118,7 +117,6 @@ public class ScanAttribute extends AbstractProcessor {
     private List<PropertyDescriptor> properties;
     private Set<Relationship> relationships;
 
-    private volatile String dictionaryFile = null;
     private volatile Pattern dictionaryFilterPattern = null;
     private volatile Pattern attributePattern = null;
     private volatile Set<String> dictionaryTerms = null;
@@ -169,19 +167,17 @@ public class ScanAttribute extends AbstractProcessor {
         final String attributeRegex = context.getProperty(ATTRIBUTE_PATTERN).getValue();
         this.attributePattern = (attributeRegex.equals(".*")) ? null : Pattern.compile(attributeRegex);
 
-        this.dictionaryFile = context.getProperty(DICTIONARY_FILE).evaluateAttributeExpressions().getValue();
-        this.dictionaryTerms = createDictionary();
-
-        long fileWatcherMillis = context.getProperty(FILE_WATCH_INTERVAL).asTimePeriod(TimeUnit.MILLISECONDS);
-        this.fileWatcher = new SynchronousFileWatcher(Paths.get(dictionaryFile), new LastModifiedMonitor(), fileWatcherMillis);
+        this.dictionaryTerms = createDictionary(context);
+        this.fileWatcher = new SynchronousFileWatcher(Paths.get(context.getProperty(DICTIONARY_FILE).evaluateAttributeExpressions().getValue()),
+                new LastModifiedMonitor(), context.getProperty(FILE_WATCH_INTERVAL).asTimePeriod(TimeUnit.MILLISECONDS));
 
         this.batchSize = context.getProperty(BATCH_SIZE).asInteger();
     }
 
-    private Set<String> createDictionary() throws IOException {
+    private Set<String> createDictionary(final ProcessContext context) throws IOException {
         final Set<String> terms = new HashSet<>();
 
-        final File file = new File(this.dictionaryFile);
+        final File file = new File(context.getProperty(DICTIONARY_FILE).evaluateAttributeExpressions().getValue());
         try (final InputStream fis = new FileInputStream(file);
                 final BufferedReader reader = new BufferedReader(new InputStreamReader(fis))) {
 
@@ -224,7 +220,7 @@ public class ScanAttribute extends AbstractProcessor {
         final ComponentLog logger = getLogger();
         try {
             if (fileWatcher.checkAndReset()) {
-                this.dictionaryTerms = createDictionary();
+                this.dictionaryTerms = createDictionary(context);
             }
         } catch (final IOException e) {
             logger.error("Unable to reload dictionary due to {}", e);
