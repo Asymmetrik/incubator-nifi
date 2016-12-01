@@ -94,7 +94,7 @@ public class PutDynamoDBTest extends AbstractDynamoDBTest {
         putRunner.setProperty(AbstractDynamoDBProcessor.TABLE, stringHashStringRangeTableName);
         putRunner.setProperty(AbstractDynamoDBProcessor.HASH_KEY_NAME, "hashS");
         putRunner.setProperty(AbstractDynamoDBProcessor.HASH_KEY_VALUE, "h1");
-        putRunner.setProperty(AbstractDynamoDBProcessor.JSON_DOCUMENT, "document");
+        putRunner.setProperty(PutDynamoDB.OPTIONAL_JSON_DOCUMENT, "document");
         String document = "{\"hello\": 2}";
         putRunner.enqueue(document.getBytes());
 
@@ -121,7 +121,7 @@ public class PutDynamoDBTest extends AbstractDynamoDBTest {
         putRunner.setProperty(AbstractDynamoDBProcessor.RANGE_KEY_NAME, "rangeS");
         putRunner.setProperty(AbstractDynamoDBProcessor.HASH_KEY_NAME, "hashS");
         putRunner.setProperty(AbstractDynamoDBProcessor.RANGE_KEY_VALUE, "r1");
-        putRunner.setProperty(AbstractDynamoDBProcessor.JSON_DOCUMENT, "document");
+        putRunner.setProperty(PutDynamoDB.OPTIONAL_JSON_DOCUMENT, "document");
         String document = "{\"hello\": 2}";
         putRunner.enqueue(document.getBytes());
 
@@ -148,7 +148,7 @@ public class PutDynamoDBTest extends AbstractDynamoDBTest {
         putRunner.setProperty(AbstractDynamoDBProcessor.HASH_KEY_NAME, "hashS");
         putRunner.setProperty(AbstractDynamoDBProcessor.HASH_KEY_VALUE, "h1");
         putRunner.setProperty(AbstractDynamoDBProcessor.RANGE_KEY_VALUE, "r1");
-        putRunner.setProperty(AbstractDynamoDBProcessor.JSON_DOCUMENT, "document");
+        putRunner.setProperty(PutDynamoDB.OPTIONAL_JSON_DOCUMENT, "document");
         putRunner.enqueue(new byte[] {});
 
         putRunner.run(1);
@@ -174,7 +174,7 @@ public class PutDynamoDBTest extends AbstractDynamoDBTest {
         putRunner.setProperty(AbstractDynamoDBProcessor.HASH_KEY_NAME, "hashS");
         putRunner.setProperty(AbstractDynamoDBProcessor.RANGE_KEY_NAME, "rangeS");
         putRunner.setProperty(AbstractDynamoDBProcessor.HASH_KEY_VALUE, "h1");
-        putRunner.setProperty(AbstractDynamoDBProcessor.JSON_DOCUMENT, "j1");
+        putRunner.setProperty(PutDynamoDB.OPTIONAL_JSON_DOCUMENT, "j1");
         putRunner.enqueue(new byte[] {});
 
         putRunner.run(1);
@@ -200,7 +200,7 @@ public class PutDynamoDBTest extends AbstractDynamoDBTest {
         putRunner.setProperty(AbstractDynamoDBProcessor.HASH_KEY_VALUE, "h1");
         putRunner.setProperty(AbstractDynamoDBProcessor.RANGE_KEY_NAME, "rangeS");
         putRunner.setProperty(AbstractDynamoDBProcessor.RANGE_KEY_VALUE, "r1");
-        putRunner.setProperty(AbstractWriteDynamoDBProcessor.JSON_DOCUMENT, "document");
+        putRunner.setProperty(PutDynamoDB.OPTIONAL_JSON_DOCUMENT, "document");
         String document = "{\"name\":\"john\"}";
         putRunner.enqueue(document.getBytes());
 
@@ -229,7 +229,7 @@ public class PutDynamoDBTest extends AbstractDynamoDBTest {
         putRunner.setProperty(AbstractDynamoDBProcessor.HASH_KEY_VALUE, "h1");
         putRunner.setProperty(AbstractDynamoDBProcessor.RANGE_KEY_NAME, "rangeS");
         putRunner.setProperty(AbstractDynamoDBProcessor.RANGE_KEY_VALUE, "r1");
-        putRunner.setProperty(AbstractWriteDynamoDBProcessor.JSON_DOCUMENT, "document");
+        putRunner.setProperty(PutDynamoDB.OPTIONAL_JSON_DOCUMENT, "document");
         String document = "{\"name\":\"john\"}";
         putRunner.enqueue(document.getBytes());
 
@@ -269,7 +269,7 @@ public class PutDynamoDBTest extends AbstractDynamoDBTest {
         putRunner.setProperty(AbstractDynamoDBProcessor.HASH_KEY_VALUE, "h1");
         putRunner.setProperty(AbstractDynamoDBProcessor.RANGE_KEY_NAME, "rangeS");
         putRunner.setProperty(AbstractDynamoDBProcessor.RANGE_KEY_VALUE, "r1");
-        putRunner.setProperty(AbstractWriteDynamoDBProcessor.JSON_DOCUMENT, "document");
+        putRunner.setProperty(PutDynamoDB.OPTIONAL_JSON_DOCUMENT, "document");
         String document = "{\"name\":\"john\"}";
         putRunner.enqueue(document.getBytes());
 
@@ -309,7 +309,7 @@ public class PutDynamoDBTest extends AbstractDynamoDBTest {
         putRunner.setProperty(AbstractDynamoDBProcessor.HASH_KEY_VALUE, "h1");
         putRunner.setProperty(AbstractDynamoDBProcessor.RANGE_KEY_NAME, "rangeS");
         putRunner.setProperty(AbstractDynamoDBProcessor.RANGE_KEY_VALUE, "r1");
-        putRunner.setProperty(AbstractWriteDynamoDBProcessor.JSON_DOCUMENT, "document");
+        putRunner.setProperty(PutDynamoDB.OPTIONAL_JSON_DOCUMENT, "document");
         byte [] item = new byte[PutDynamoDB.DYNAMODB_MAX_ITEM_SIZE + 1];
         for (int i = 0; i < item.length; i++) {
             item[i] = 'a';
@@ -357,7 +357,7 @@ public class PutDynamoDBTest extends AbstractDynamoDBTest {
         putRunner.setProperty(AbstractDynamoDBProcessor.HASH_KEY_VALUE, "h1");
         putRunner.setProperty(AbstractDynamoDBProcessor.RANGE_KEY_NAME, "rangeS");
         putRunner.setProperty(AbstractDynamoDBProcessor.RANGE_KEY_VALUE, "r1");
-        putRunner.setProperty(AbstractWriteDynamoDBProcessor.JSON_DOCUMENT, "document");
+        putRunner.setProperty(PutDynamoDB.OPTIONAL_JSON_DOCUMENT, "document");
         String document = "{\"name\":\"john\"}";
         putRunner.enqueue(document.getBytes());
 
@@ -397,7 +397,7 @@ public class PutDynamoDBTest extends AbstractDynamoDBTest {
         putRunner.setProperty(AbstractDynamoDBProcessor.HASH_KEY_VALUE, "h1");
         putRunner.setProperty(AbstractDynamoDBProcessor.RANGE_KEY_NAME, "rangeS");
         putRunner.setProperty(AbstractDynamoDBProcessor.RANGE_KEY_VALUE, "r1");
-        putRunner.setProperty(AbstractWriteDynamoDBProcessor.JSON_DOCUMENT, "document");
+        putRunner.setProperty(PutDynamoDB.OPTIONAL_JSON_DOCUMENT, "document");
         String document = "{\"name\":\"john\"}";
         putRunner.enqueue(document.getBytes());
 
@@ -437,7 +437,7 @@ public class PutDynamoDBTest extends AbstractDynamoDBTest {
         putRunner.setProperty(AbstractDynamoDBProcessor.HASH_KEY_VALUE, "h1");
         putRunner.setProperty(AbstractDynamoDBProcessor.RANGE_KEY_NAME, "rangeS");
         putRunner.setProperty(AbstractDynamoDBProcessor.RANGE_KEY_VALUE, "r1");
-        putRunner.setProperty(AbstractWriteDynamoDBProcessor.JSON_DOCUMENT, "document");
+        putRunner.setProperty(PutDynamoDB.OPTIONAL_JSON_DOCUMENT, "document");
         String document = "{\"name\":\"john\"}";
         putRunner.enqueue(document.getBytes());
 
@@ -474,7 +474,7 @@ public class PutDynamoDBTest extends AbstractDynamoDBTest {
         putRunner.setProperty(AbstractDynamoDBProcessor.HASH_KEY_VALUE, "h1");
         putRunner.setProperty(AbstractDynamoDBProcessor.RANGE_KEY_NAME, "rangeS");
         putRunner.setProperty(AbstractDynamoDBProcessor.RANGE_KEY_VALUE, "r1");
-        putRunner.setProperty(AbstractDynamoDBProcessor.JSON_DOCUMENT, "j2");
+        putRunner.setProperty(PutDynamoDB.OPTIONAL_JSON_DOCUMENT, "j2");
         putRunner.enqueue("{\"hello\":\"world\"}".getBytes());
 
         putRunner.run(1);
