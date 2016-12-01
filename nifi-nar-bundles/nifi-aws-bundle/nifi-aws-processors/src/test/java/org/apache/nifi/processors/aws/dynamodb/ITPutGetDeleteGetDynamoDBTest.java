@@ -16,17 +16,16 @@
  */
 package org.apache.nifi.processors.aws.dynamodb;
 
-import static org.junit.Assert.assertEquals;
-
-import static org.junit.Assert.assertTrue;
-
-import java.util.List;
-
 import org.apache.nifi.util.MockFlowFile;
 import org.apache.nifi.util.TestRunner;
 import org.apache.nifi.util.TestRunners;
 import org.junit.Ignore;
 import org.junit.Test;
+
+import java.util.List;
+
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertTrue;
 
 @Ignore
 public class ITPutGetDeleteGetDynamoDBTest extends ITAbstractDynamoDBTest {
@@ -43,7 +42,7 @@ public class ITPutGetDeleteGetDynamoDBTest extends ITAbstractDynamoDBTest {
         putRunner.setProperty(AbstractWriteDynamoDBProcessor.RANGE_KEY_NAME, "rangeS");
         putRunner.setProperty(AbstractWriteDynamoDBProcessor.HASH_KEY_VALUE, "h1");
         putRunner.setProperty(AbstractWriteDynamoDBProcessor.RANGE_KEY_VALUE, "r1");
-        putRunner.setProperty(AbstractWriteDynamoDBProcessor.JSON_DOCUMENT, "document");
+        putRunner.setProperty(PutDynamoDB.OPTIONAL_JSON_DOCUMENT, "document");
         String document = "{\"name\":\"john\"}";
         putRunner.enqueue(document.getBytes());
 
@@ -135,7 +134,7 @@ public class ITPutGetDeleteGetDynamoDBTest extends ITAbstractDynamoDBTest {
         putRunner.setProperty(AbstractWriteDynamoDBProcessor.RANGE_KEY_NAME, "rangeS");
         putRunner.setProperty(AbstractWriteDynamoDBProcessor.HASH_KEY_VALUE, "h1");
         putRunner.setProperty(AbstractWriteDynamoDBProcessor.RANGE_KEY_VALUE, "r1");
-        putRunner.setProperty(AbstractWriteDynamoDBProcessor.JSON_DOCUMENT, "document");
+        putRunner.setProperty(PutDynamoDB.OPTIONAL_JSON_DOCUMENT, "document");
         String document = "{\"name\":\"john\"}";
         putRunner.enqueue(document.getBytes());
 
@@ -203,7 +202,7 @@ public class ITPutGetDeleteGetDynamoDBTest extends ITAbstractDynamoDBTest {
         putRunner.setProperty(AbstractWriteDynamoDBProcessor.RANGE_KEY_NAME, "rangeS");
         putRunner.setProperty(AbstractWriteDynamoDBProcessor.HASH_KEY_VALUE, "h1");
         putRunner.setProperty(AbstractWriteDynamoDBProcessor.RANGE_KEY_VALUE, "r1");
-        putRunner.setProperty(AbstractWriteDynamoDBProcessor.JSON_DOCUMENT, "document");
+        putRunner.setProperty(PutDynamoDB.OPTIONAL_JSON_DOCUMENT, "document");
         String document = "{\"name\":\"john\"}";
         putRunner.enqueue(document.getBytes());
 
@@ -250,7 +249,7 @@ public class ITPutGetDeleteGetDynamoDBTest extends ITAbstractDynamoDBTest {
         putRunner.setProperty(AbstractWriteDynamoDBProcessor.HASH_KEY_NAME, "hashN");
         putRunner.setProperty(AbstractWriteDynamoDBProcessor.HASH_KEY_VALUE, "40");
         putRunner.setProperty(AbstractWriteDynamoDBProcessor.HASH_KEY_VALUE_TYPE, AbstractWriteDynamoDBProcessor.ALLOWABLE_VALUE_NUMBER);
-        putRunner.setProperty(AbstractWriteDynamoDBProcessor.JSON_DOCUMENT, "document");
+        putRunner.setProperty(PutDynamoDB.OPTIONAL_JSON_DOCUMENT, "document");
         String document = "{\"age\":40}";
         putRunner.enqueue(document.getBytes());
 
@@ -341,7 +340,7 @@ public class ITPutGetDeleteGetDynamoDBTest extends ITAbstractDynamoDBTest {
         putRunner.setProperty(AbstractWriteDynamoDBProcessor.RANGE_KEY_VALUE_TYPE, AbstractWriteDynamoDBProcessor.ALLOWABLE_VALUE_NUMBER);
         putRunner.setProperty(AbstractWriteDynamoDBProcessor.HASH_KEY_VALUE, "40");
         putRunner.setProperty(AbstractWriteDynamoDBProcessor.RANGE_KEY_VALUE, "50");
-        putRunner.setProperty(AbstractWriteDynamoDBProcessor.JSON_DOCUMENT, "document");
+        putRunner.setProperty(PutDynamoDB.OPTIONAL_JSON_DOCUMENT, "document");
         String document = "{\"40\":\"50\"}";
         putRunner.enqueue(document.getBytes());
 

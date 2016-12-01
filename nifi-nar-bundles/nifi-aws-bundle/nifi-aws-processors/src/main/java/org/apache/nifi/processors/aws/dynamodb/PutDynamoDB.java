@@ -16,31 +16,6 @@
  */
 package org.apache.nifi.processors.aws.dynamodb;
 
-import java.io.ByteArrayOutputStream;
-import java.io.IOException;
-import java.util.Arrays;
-import java.util.Collections;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
-
-import org.apache.commons.io.IOUtils;
-import org.apache.commons.lang3.StringUtils;
-import org.apache.nifi.annotation.behavior.InputRequirement;
-import org.apache.nifi.annotation.behavior.ReadsAttribute;
-import org.apache.nifi.annotation.behavior.ReadsAttributes;
-import org.apache.nifi.annotation.behavior.InputRequirement.Requirement;
-import org.apache.nifi.annotation.behavior.SupportsBatching;
-import org.apache.nifi.annotation.behavior.WritesAttribute;
-import org.apache.nifi.annotation.behavior.WritesAttributes;
-import org.apache.nifi.annotation.documentation.CapabilityDescription;
-import org.apache.nifi.annotation.documentation.SeeAlso;
-import org.apache.nifi.annotation.documentation.Tags;
-import org.apache.nifi.components.PropertyDescriptor;
-import org.apache.nifi.flowfile.FlowFile;
-import org.apache.nifi.processor.ProcessContext;
-import org.apache.nifi.processor.ProcessSession;
-
 import com.amazonaws.AmazonClientException;
 import com.amazonaws.AmazonServiceException;
 import com.amazonaws.services.dynamodbv2.document.BatchWriteItemOutcome;
@@ -49,6 +24,22 @@ import com.amazonaws.services.dynamodbv2.document.Item;
 import com.amazonaws.services.dynamodbv2.document.TableWriteItems;
 import com.amazonaws.services.dynamodbv2.model.AttributeValue;
 import com.amazonaws.services.dynamodbv2.model.WriteRequest;
+import org.apache.commons.io.IOUtils;
+import org.apache.commons.lang3.StringUtils;
+import org.apache.nifi.annotation.behavior.*;
+import org.apache.nifi.annotation.behavior.InputRequirement.Requirement;
+import org.apache.nifi.annotation.documentation.CapabilityDescription;
+import org.apache.nifi.annotation.documentation.SeeAlso;
+import org.apache.nifi.annotation.documentation.Tags;
+import org.apache.nifi.components.PropertyDescriptor;
+import org.apache.nifi.flowfile.FlowFile;
+import org.apache.nifi.processor.ProcessContext;
+import org.apache.nifi.processor.ProcessSession;
+import org.apache.nifi.processor.util.StandardValidators;
+
+import java.io.ByteArrayOutputStream;
+import java.io.IOException;
+import java.util.*;
 
 @SupportsBatching
 @SeeAlso({DeleteDynamoDB.class, GetDynamoDB.class})
@@ -78,9 +69,16 @@ import com.amazonaws.services.dynamodbv2.model.WriteRequest;
 })
 public class PutDynamoDB extends AbstractWriteDynamoDBProcessor {
 
+    public static final PropertyDescriptor OPTIONAL_JSON_DOCUMENT = new PropertyDescriptor.Builder()
+        .name("Json Document attribute")
+        .required(false)
+        .addValidator(StandardValidators.NON_EMPTY_VALIDATOR)
+        .description("The Json document to be retrieved from the dynamodb item")
+        .build();
+
     public static final List<PropertyDescriptor> properties = Collections.unmodifiableList(
         Arrays.asList(TABLE, HASH_KEY_NAME, RANGE_KEY_NAME, HASH_KEY_VALUE, RANGE_KEY_VALUE,
-            HASH_KEY_VALUE_TYPE, RANGE_KEY_VALUE_TYPE, JSON_DOCUMENT, DOCUMENT_CHARSET, BATCH_SIZE,
+            HASH_KEY_VALUE_TYPE, RANGE_KEY_VALUE_TYPE, OPTIONAL_JSON_DOCUMENT, DOCUMENT_CHARSET, BATCH_SIZE,
             REGION, ACCESS_KEY, SECRET_KEY, CREDENTIALS_FILE, AWS_CREDENTIALS_PROVIDER_SERVICE, TIMEOUT, SSL_CONTEXT_SERVICE));
 
     /**
@@ -108,7 +106,7 @@ public class PutDynamoDB extends AbstractWriteDynamoDBProcessor {
         final String hashKeyValueType = context.getProperty(HASH_KEY_VALUE_TYPE).getValue();
         final String rangeKeyName = context.getProperty(RANGE_KEY_NAME).getValue();
         final String rangeKeyValueType = context.getProperty(RANGE_KEY_VALUE_TYPE).getValue();
-        final String jsonDocument = context.getProperty(JSON_DOCUMENT).getValue();
+        final String jsonDocument = context.getProperty(OPTIONAL_JSON_DOCUMENT).getValue();
         final String charset = context.getProperty(DOCUMENT_CHARSET).getValue();
 
         TableWriteItems tableWriteItems = new TableWriteItems(table);
@@ -135,14 +133,14 @@ public class PutDynamoDB extends AbstractWriteDynamoDBProcessor {
             session.exportTo(flowFile, baos);
 
             try {
-                if (rangeKeyValue == null || StringUtils.isBlank(rangeKeyValue.toString())) {
-                    tableWriteItems.addItemToPut(new Item().withKeyComponent(hashKeyName, hashKeyValue)
-                        .withJSON(jsonDocument, IOUtils.toString(baos.toByteArray(), charset)));
-                } else {
-                    tableWriteItems.addItemToPut(new Item().withKeyComponent(hashKeyName, hashKeyValue)
-                        .withKeyComponent(rangeKeyName, rangeKeyValue)
-                        .withJSON(jsonDocument, IOUtils.toString(baos.toByteArray(), charset)));
+                Item item = new Item().withKeyComponent(hashKeyName, hashKeyValue);
+                if (rangeKeyValue != null && !StringUtils.isBlank(rangeKeyValue.toString())) {
+                    item = item.withKeyComponent(rangeKeyName, rangeKeyValue);
                 }
+                if (!StringUtils.isBlank(jsonDocument)) {
+                    item = item.withJSON(jsonDocument, IOUtils.toString(baos.toByteArray(), charset));
+                }
+                tableWriteItems.addItemToPut(item);
             } catch (IOException ioe) {
                 getLogger().error("IOException while creating put item : " + ioe.getMessage());
                 flowFile = session.putAttribute(flowFile, DYNAMODB_ITEM_IO_ERROR, ioe.getMessage());
