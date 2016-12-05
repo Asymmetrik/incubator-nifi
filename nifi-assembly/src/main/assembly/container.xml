@@ -37,6 +37,7 @@
                 <include>log4j-over-slf4j</include>
                 <include>logback-classic</include>
                 <include>nifi-api</include>
+                <include>nifi-framework-api</include>
                 <include>nifi-framework-nar</include>
                 <include>nifi-jetty-bundle</include>
                 <include>nifi-provenance-repository-nar</include>
