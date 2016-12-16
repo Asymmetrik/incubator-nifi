@@ -85,10 +85,11 @@ import javax.ws.rs.Path;
 import javax.ws.rs.PathParam;
 import javax.ws.rs.Produces;
 import javax.ws.rs.QueryParam;
-import javax.ws.rs.WebApplicationException;
 import javax.ws.rs.core.Context;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
+import javax.ws.rs.core.UriBuilder;
+import javax.ws.rs.core.UriInfo;
 import javax.xml.bind.JAXBContext;
 import javax.xml.bind.JAXBElement;
 import javax.xml.bind.JAXBException;
@@ -1919,6 +1920,7 @@ public class ProcessGroupResource extends ApplicationResource {
     )
     public Response uploadTemplate(
             @Context final HttpServletRequest httpServletRequest,
+            @Context final UriInfo uriInfo,
             @ApiParam(
                     value = "The process group id.",
                     required = true
@@ -1953,15 +1955,13 @@ public class ProcessGroupResource extends ApplicationResource {
         entity.setTemplate(template);
 
         if (isReplicateRequest()) {
-            // convert request accordingly
-            URI importUri = null;
-            try {
-                importUri = new URI(generateResourceUri("process-groups", groupId, "templates", "import"));
-            } catch (final URISyntaxException e) {
-                throw new WebApplicationException(e);
-            }
 
-            // change content type to JSON for serializing entity
+            // convert request accordingly
+            final UriBuilder uriBuilder = uriInfo.getBaseUriBuilder();
+            uriBuilder.segment("process-groups", groupId, "templates", "import");
+            final URI importUri = uriBuilder.build();
+
+            // change content type to XML for serializing entity
             final Map<String, String> headersToOverride = new HashMap<>();
             headersToOverride.put("content-type", MediaType.APPLICATION_XML);
 
