@@ -16,17 +16,16 @@
  */
 package org.apache.nifi.processors.aws.dynamodb;
 
-import static org.junit.Assert.assertEquals;
-
-import static org.junit.Assert.assertTrue;
-
-import java.util.List;
-
 import org.apache.nifi.util.MockFlowFile;
 import org.apache.nifi.util.TestRunner;
 import org.apache.nifi.util.TestRunners;
 import org.junit.Ignore;
 import org.junit.Test;
+
+import java.util.List;
+
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertTrue;
 
 @Ignore
 public class ITPutGetDeleteGetDynamoDBTest extends ITAbstractDynamoDBTest {
