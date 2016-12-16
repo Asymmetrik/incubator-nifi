@@ -1954,7 +1954,6 @@ public class ProcessGroupResource extends ApplicationResource {
         entity.setTemplate(template);
 
         if (isReplicateRequest()) {
-
             // convert request accordingly
             final UriBuilder uriBuilder = uriInfo.getBaseUriBuilder();
             uriBuilder.segment("process-groups", groupId, "templates", "import");
