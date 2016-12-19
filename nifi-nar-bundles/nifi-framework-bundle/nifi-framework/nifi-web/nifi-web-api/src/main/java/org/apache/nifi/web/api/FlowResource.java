@@ -16,6 +16,11 @@
  */
 package org.apache.nifi.web.api;
 
+import com.google.common.base.Function;
+import com.google.common.base.Predicate;
+import com.google.common.collect.Collections2;
+import com.google.common.collect.Lists;
+
 import com.sun.jersey.api.core.ResourceContext;
 import com.wordnik.swagger.annotations.Api;
 import com.wordnik.swagger.annotations.ApiOperation;
@@ -113,7 +118,11 @@ import javax.ws.rs.WebApplicationException;
 import javax.ws.rs.core.Context;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
+
+import java.io.IOException;
+import java.nio.file.Files;
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.Date;
 import java.util.EnumSet;
 import java.util.HashMap;
@@ -1085,6 +1094,7 @@ public class FlowResource extends ApplicationResource {
         final AboutDTO aboutDTO = new AboutDTO();
         aboutDTO.setTitle("NiFi");
         aboutDTO.setVersion(getProperties().getUiTitle());
+        aboutDTO.setNarVersions(buildNarVersions());
         aboutDTO.setUri(generateResourceUri());
         aboutDTO.setTimezone(new Date());
 
@@ -1104,6 +1114,26 @@ public class FlowResource extends ApplicationResource {
 
         // generate the response
         return clusterContext(generateOkResponse(entity)).build();
+    }
+
+    private Collection<String> buildNarVersions() {
+        List<java.nio.file.Path> narLibDirs = properties.getNarLibraryDirectories();
+
+        List<String> narPathStrings = Lists.transform(narLibDirs, new Function<java.nio.file.Path, String>() {
+            @Override
+            public String apply(java.nio.file.Path p) {
+                if (Files.isSymbolicLink(p)) {
+                    try {
+                        p = Files.readSymbolicLink(p);
+                    } catch (IOException e) {
+                        e.printStackTrace();
+                    }
+                }
+                return p.getFileName().toString();
+            }
+        });
+
+        return Collections2.filter(narPathStrings, path -> StringUtils.isNotBlank(path) && !path.startsWith("lib"));
     }
 
     // --------------

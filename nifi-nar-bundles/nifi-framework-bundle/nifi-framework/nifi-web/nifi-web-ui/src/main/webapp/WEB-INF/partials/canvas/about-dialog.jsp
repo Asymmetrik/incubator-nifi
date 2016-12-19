@@ -32,13 +32,18 @@
                 <p id="nf-version-detail-commit">
                     From <span id="nf-about-build-revision"></span> on branch <span id="nf-about-build-branch"></span>
                 </p>
+                <p id="nf-version-detail-nars">
+                    External nars: <span id="nf-about-nar-versions"></span>
+                </p>
             </div>
+            <!--
             <p>
                 Apache NiFi is a framework to support highly scalable and flexible dataflows.
                 It can be run on on laptops up through clusters of enterprise class servers.
                 Instead of dictating a particular dataflow or behavior it empowers you to design your own
                 optimal dataflow tailored to your specific environment.
             </p>
+            -->
         </div>
     </div>
 </div>

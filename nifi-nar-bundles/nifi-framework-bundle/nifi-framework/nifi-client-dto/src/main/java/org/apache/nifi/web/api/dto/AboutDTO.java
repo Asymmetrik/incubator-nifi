@@ -22,6 +22,8 @@ import org.apache.nifi.web.api.dto.util.TimezoneAdapter;
 
 import javax.xml.bind.annotation.XmlType;
 import javax.xml.bind.annotation.adapters.XmlJavaTypeAdapter;
+
+import java.util.Collection;
 import java.util.Date;
 
 /**
@@ -32,6 +34,7 @@ public class AboutDTO {
 
     private String title;
     private String version;
+    private Collection<String> narVersions;
 
     private String uri;
     private String contentViewerUrl;
@@ -73,6 +76,22 @@ public class AboutDTO {
 
     public void setVersion(String version) {
         this.version = version;
+    }
+
+    /**
+     * The collection of nar versions.
+     *
+     * @return The version.
+     */
+    @ApiModelProperty(
+            value = "The nar versions."
+    )
+    public Collection<String> getNarVersions() {
+        return narVersions;
+    }
+
+    public void setNarVersions(Collection<String> narVersions) {
+        this.narVersions = narVersions;
     }
 
     /**
