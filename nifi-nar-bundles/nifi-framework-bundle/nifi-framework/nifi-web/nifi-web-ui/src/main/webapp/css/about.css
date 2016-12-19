@@ -39,6 +39,12 @@
     cursor: pointer;
 }
 
+#nf-nar-versions {
+    //font-weight:900;
+    //font-size: 8pt;
+    //padding-top: 9px;
+}
+
 #nf-about-content p {
     padding-top: 9px;
     padding-bottom: 9px;
@@ -62,6 +68,10 @@
 }
 
 #nf-version-detail-commit {
+    display: none;
+}
+
+#nf-version-detail-nars {
     display: none;
 }
 

@@ -278,6 +278,7 @@ nf.ng.Canvas.GlobalMenuCtrl = function (serviceProvider) {
                     // set the document title and the about title
                     document.title = aboutDetails.title;
                     $('#nf-version').text(aboutDetails.version);
+                    $('#nf-about-nar-versions').text(aboutDetails.narVersions);
                     var showVersionDetail = false;
                     if (aboutDetails.buildTag && aboutDetails.buildTag !== 'HEAD') {
                         $('#nf-about-build-tag').text(aboutDetails.buildTag);
@@ -293,6 +294,11 @@ nf.ng.Canvas.GlobalMenuCtrl = function (serviceProvider) {
                     if (aboutDetails.buildTimestamp) {
                         $('#nf-about-build-timestamp').text(aboutDetails.buildTimestamp);
                         $('#nf-version-detail-timestamp').show();
+                        showVersionDetail = true;
+                    }
+                    if (aboutDetails.narVersions.length > 0) {
+                        $('#nf-about-nar-versions').text(aboutDetails.narVersions);
+                        $('#nf-version-detail-nars').show();
                         showVersionDetail = true;
                     }
                     if (showVersionDetail) {
