@@ -17,52 +17,32 @@
 package org.apache.nifi.authorization;
 
 import org.apache.nifi.authorization.resource.Authorizable;
-import org.apache.nifi.connectable.Connectable;
-import org.apache.nifi.groups.ProcessGroup;
+
+import java.util.Set;
 
 /**
- * Authorizable for a Connection and its Group, Source, and Destination.
+ * Authorizable for a Template.
  */
-public interface ConnectionAuthorizable {
+public interface TemplateAuthorizable {
     /**
-     * Returns the authorizable for this connection. Non null
+     * Returns the authorizable for this template. Non null
      *
      * @return authorizable
      */
     Authorizable getAuthorizable();
 
     /**
-     * Returns the source.
+     * Returns temporary instances of all encapsulated processors. Non null
      *
-     * @return source
+     * @return temporary instances of all encapsulated processors
      */
-    Connectable getSource();
+    Set<ConfigurableComponentAuthorizable> getEncapsulatedProcessors();
 
     /**
-     * Returns the data authorizable for the source of the connection.
+     * Returns temporary instances of all encapsulated controller services. Non null
      *
-     * @return source data authorizable
+     * @return temporary instances of all encapsulated controller services
      */
-    Authorizable getSourceData();
+    Set<ConfigurableComponentAuthorizable> getEncapsulatedControllerServices();
 
-    /**
-     * Returns the destination.
-     *
-     * @return destination
-     */
-    Connectable getDestination();
-
-    /**
-     * Returns the data authorizable for the destination of the connection.
-     *
-     * @return destination data authorizable
-     */
-    Authorizable getDestinationData();
-
-    /**
-     * Returns the parent process group.
-     *
-     * @return parent
-     */
-    ProcessGroup getParentGroup();
 }

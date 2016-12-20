@@ -31,10 +31,12 @@ import org.apache.nifi.authorization.Authorizer;
 import org.apache.nifi.authorization.ConfigurableComponentAuthorizable;
 import org.apache.nifi.authorization.ProcessGroupAuthorizable;
 import org.apache.nifi.authorization.RequestAction;
+import org.apache.nifi.authorization.SnippetAuthorizable;
+import org.apache.nifi.authorization.TemplateAuthorizable;
 import org.apache.nifi.authorization.resource.Authorizable;
 import org.apache.nifi.authorization.user.NiFiUser;
 import org.apache.nifi.authorization.user.NiFiUserUtils;
-import org.apache.nifi.controller.Snippet;
+import org.apache.nifi.connectable.ConnectableType;
 import org.apache.nifi.web.NiFiServiceFacade;
 import org.apache.nifi.web.ResourceNotFoundException;
 import org.apache.nifi.web.Revision;
@@ -100,6 +102,8 @@ import java.net.URI;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.function.Consumer;
 
 /**
  * RESTful endpoint for managing a Group.
@@ -373,14 +377,9 @@ public class ProcessGroupResource extends ApplicationResource {
                     final NiFiUser user = NiFiUserUtils.getNiFiUser();
                     final ProcessGroupAuthorizable processGroupAuthorizable = lookup.getProcessGroup(id);
 
-                    // ensure write to the process group
-                    final Authorizable processGroup = processGroupAuthorizable.getAuthorizable();
-                    processGroup.authorize(authorizer, RequestAction.WRITE, user);
-
-                    // ensure write to all encapsulated components
-                    processGroupAuthorizable.getEncapsulatedAuthorizables().forEach(encaupsulatedAuthorizable -> {
-                        encaupsulatedAuthorizable.authorize(authorizer, RequestAction.WRITE, user);
-                    });
+                    // ensure write to this process group and all encapsulated components including templates and controller services. additionally, ensure
+                    // read to any referenced services by encapsulated components
+                    authorizeProcessGroup(processGroupAuthorizable, authorizer, lookup, RequestAction.WRITE, true, true, true, false);
                 },
                 () -> serviceFacade.verifyDeleteProcessGroup(id),
                 (revision, processGroupEntity) -> {
@@ -560,7 +559,8 @@ public class ProcessGroupResource extends ApplicationResource {
             response = ProcessorEntity.class,
             authorizations = {
                     @Authorization(value = "Write - /process-groups/{uuid}", type = ""),
-                    @Authorization(value = "Read - any referenced Controller Services - /controller-services/{uuid}", type = "")
+                    @Authorization(value = "Read - any referenced Controller Services - /controller-services/{uuid}", type = ""),
+                    @Authorization(value = "Write - if the Processor is restricted - /restricted-components", type = "")
             }
     )
     @ApiResponses(
@@ -1524,8 +1524,32 @@ public class ProcessGroupResource extends ApplicationResource {
             throw new IllegalArgumentException("The source of the connection must be specified.");
         }
 
+        if (requestConnection.getSource().getType() == null) {
+            throw new IllegalArgumentException("The type of the source of the connection must be specified.");
+        }
+
+        final ConnectableType sourceConnectableType;
+        try {
+            sourceConnectableType = ConnectableType.valueOf(requestConnection.getSource().getType());
+        } catch (final IllegalArgumentException e) {
+            throw new IllegalArgumentException(String.format("Unrecognized source type %s. Expected values are [%s]",
+                    requestConnection.getSource().getType(), StringUtils.join(ConnectableType.values(), ", ")));
+        }
+
         if (requestConnection.getDestination() == null || requestConnection.getDestination().getId() == null) {
             throw new IllegalArgumentException("The destination of the connection must be specified.");
+        }
+
+        if (requestConnection.getDestination().getType() == null) {
+            throw new IllegalArgumentException("The type of the destination of the connection must be specified.");
+        }
+
+        final ConnectableType destinationConnectableType;
+        try {
+            destinationConnectableType = ConnectableType.valueOf(requestConnection.getDestination().getType());
+        } catch (final IllegalArgumentException e) {
+            throw new IllegalArgumentException(String.format("Unrecognized destination type %s. Expected values are [%s]",
+                    requestConnection.getDestination().getType(), StringUtils.join(ConnectableType.values(), ", ")));
         }
 
         if (isReplicateRequest()) {
@@ -1540,15 +1564,29 @@ public class ProcessGroupResource extends ApplicationResource {
                     final Authorizable processGroup = lookup.getProcessGroup(groupId).getAuthorizable();
                     processGroup.authorize(authorizer, RequestAction.WRITE, NiFiUserUtils.getNiFiUser());
 
+                    // explicitly handle RPGs differently as the connectable id can be ambiguous if self referencing
+                    final Authorizable source;
+                    if (ConnectableType.REMOTE_OUTPUT_PORT.equals(sourceConnectableType)) {
+                        source = lookup.getRemoteProcessGroup(requestConnection.getSource().getGroupId());
+                    } else {
+                        source = lookup.getLocalConnectable(requestConnection.getSource().getId());
+                    }
+
                     // ensure write access to the source
-                    final Authorizable source = lookup.getConnectable(requestConnection.getSource().getId());
                     if (source == null) {
                         throw new ResourceNotFoundException("Cannot find source component with ID [" + requestConnection.getSource().getId() + "]");
                     }
                     source.authorize(authorizer, RequestAction.WRITE, NiFiUserUtils.getNiFiUser());
 
+                    // explicitly handle RPGs differently as the connectable id can be ambiguous if self referencing
+                    final Authorizable destination;
+                    if (ConnectableType.REMOTE_INPUT_PORT.equals(destinationConnectableType)) {
+                        destination = lookup.getRemoteProcessGroup(requestConnection.getDestination().getGroupId());
+                    } else {
+                        destination = lookup.getLocalConnectable(requestConnection.getDestination().getId());
+                    }
+
                     // ensure write access to the destination
-                    final Authorizable destination = lookup.getConnectable(requestConnection.getDestination().getId());
                     if (destination == null) {
                         throw new ResourceNotFoundException("Cannot find destination component with ID [" + requestConnection.getDestination().getId() + "]");
                     }
@@ -1647,11 +1685,12 @@ public class ProcessGroupResource extends ApplicationResource {
     @Produces(MediaType.APPLICATION_JSON)
     @Path("{id}/snippet-instance")
     @ApiOperation(
-            value = "Copies a snippet",
+            value = "Copies a snippet and discards it.",
             response = FlowSnippetEntity.class,
             authorizations = {
                     @Authorization(value = "Write - /process-groups/{uuid}", type = ""),
-                    @Authorization(value = "Read - /{component-type}/{uuid} - For each component in the snippet and their descendant components", type = "")
+                    @Authorization(value = "Read - /{component-type}/{uuid} - For each component in the snippet and their descendant components", type = ""),
+                    @Authorization(value = "Write - if the snippet contains any restricted Processors - /restricted-components", type = "")
             }
     )
     @ApiResponses(
@@ -1692,7 +1731,24 @@ public class ProcessGroupResource extends ApplicationResource {
                 serviceFacade,
                 requestCopySnippetEntity,
                 lookup -> {
-                    authorizeSnippetUsage(lookup, groupId, requestCopySnippetEntity.getSnippetId());
+                    final NiFiUser user = NiFiUserUtils.getNiFiUser();
+                    final SnippetAuthorizable snippet = authorizeSnippetUsage(lookup, groupId, requestCopySnippetEntity.getSnippetId(), false);
+
+                    // flag to only perform the restricted check once, atomic reference so we can mark final and use in lambda
+                    final AtomicBoolean restrictedCheckPerformed = new AtomicBoolean(false);
+                    final Consumer<ConfigurableComponentAuthorizable> authorizeRestricted = authorizable -> {
+                        if (authorizable.isRestricted() && restrictedCheckPerformed.compareAndSet(false, true)) {
+                            lookup.getRestrictedComponents().authorize(authorizer, RequestAction.WRITE, user);
+                        }
+                    };
+
+                    // consider each processor. note - this request will not create new controller services so we do not need to check
+                    // for if there are not restricted controller services. it will however, need to authorize the user has access
+                    // to any referenced services and this is done within authorizeSnippetUsage above.
+                    snippet.getSelectedProcessors().stream().forEach(authorizeRestricted);
+                    snippet.getSelectedProcessGroups().stream().forEach(processGroup -> {
+                        processGroup.getEncapsulatedProcessors().forEach(authorizeRestricted);
+                    });
                 },
                 null,
                 copySnippetRequestEntity -> {
@@ -1741,7 +1797,8 @@ public class ProcessGroupResource extends ApplicationResource {
             response = FlowEntity.class,
             authorizations = {
                     @Authorization(value = "Write - /process-groups/{uuid}", type = ""),
-                    @Authorization(value = "Read - /templates/{uuid}", type = "")
+                    @Authorization(value = "Read - /templates/{uuid}", type = ""),
+                    @Authorization(value = "Write - if the template contains any restricted components - /restricted-components", type = "")
             }
     )
     @ApiResponses(
@@ -1778,11 +1835,27 @@ public class ProcessGroupResource extends ApplicationResource {
                 serviceFacade,
                 requestInstantiateTemplateRequestEntity,
                 lookup -> {
-                    final Authorizable processGroup = lookup.getProcessGroup(groupId).getAuthorizable();
-                    processGroup.authorize(authorizer, RequestAction.WRITE, NiFiUserUtils.getNiFiUser());
+                    final NiFiUser user = NiFiUserUtils.getNiFiUser();
 
-                    final Authorizable template = lookup.getTemplate(requestInstantiateTemplateRequestEntity.getTemplateId());
-                    template.authorize(authorizer, RequestAction.READ, NiFiUserUtils.getNiFiUser());
+                    // ensure write on the group
+                    final Authorizable processGroup = lookup.getProcessGroup(groupId).getAuthorizable();
+                    processGroup.authorize(authorizer, RequestAction.WRITE, user);
+
+                    // ensure read on the template
+                    final TemplateAuthorizable template = lookup.getTemplate(requestInstantiateTemplateRequestEntity.getTemplateId());
+                    template.getAuthorizable().authorize(authorizer, RequestAction.READ, user);
+
+                    // flag to only perform the restricted check once, atomic reference so we can mark final and use in lambda
+                    final AtomicBoolean restrictedCheckPerformed = new AtomicBoolean(false);
+                    final Consumer<ConfigurableComponentAuthorizable> authorizeRestricted = authorizable -> {
+                        if (authorizable.isRestricted() && restrictedCheckPerformed.compareAndSet(false, true)) {
+                            lookup.getRestrictedComponents().authorize(authorizer, RequestAction.WRITE, user);
+                        }
+                    };
+
+                    // ensure restricted access if necessary
+                    template.getEncapsulatedProcessors().forEach(authorizeRestricted);
+                    template.getEncapsulatedControllerServices().forEach(authorizeRestricted);
                 },
                 null,
                 instantiateTemplateRequestEntity -> {
@@ -1810,13 +1883,16 @@ public class ProcessGroupResource extends ApplicationResource {
     // templates
     // ---------
 
-    private void authorizeSnippetUsage(final AuthorizableLookup lookup, final String groupId, final String snippetId) {
-        // ensure write access to the target process group
-        lookup.getProcessGroup(groupId).getAuthorizable().authorize(authorizer, RequestAction.WRITE, NiFiUserUtils.getNiFiUser());
+    private SnippetAuthorizable authorizeSnippetUsage(final AuthorizableLookup lookup, final String groupId, final String snippetId, final boolean authorizeTransitiveServices) {
+        final NiFiUser user = NiFiUserUtils.getNiFiUser();
 
-        // ensure read permission to every component in the snippet
-        final Snippet snippet = lookup.getSnippet(snippetId);
-        authorizeSnippet(snippet, authorizer, lookup, RequestAction.READ);
+        // ensure write access to the target process group
+        lookup.getProcessGroup(groupId).getAuthorizable().authorize(authorizer, RequestAction.WRITE, user);
+
+        // ensure read permission to every component in the snippet including referenced services
+        final SnippetAuthorizable snippet = lookup.getSnippet(snippetId);
+        authorizeSnippet(snippet, authorizer, lookup, RequestAction.READ, true, authorizeTransitiveServices);
+        return snippet;
     }
 
     /**
@@ -1831,7 +1907,7 @@ public class ProcessGroupResource extends ApplicationResource {
     @Produces(MediaType.APPLICATION_JSON)
     @Path("{id}/templates")
     @ApiOperation(
-            value = "Creates a template",
+            value = "Creates a template and discards the specified snippet.",
             response = TemplateEntity.class,
             authorizations = {
                     @Authorization(value = "Write - /process-groups/{uuid}", type = ""),
@@ -1871,7 +1947,7 @@ public class ProcessGroupResource extends ApplicationResource {
                 serviceFacade,
                 requestCreateTemplateRequestEntity,
                 lookup -> {
-                    authorizeSnippetUsage(lookup, groupId, requestCreateTemplateRequestEntity.getSnippetId());
+                    authorizeSnippetUsage(lookup, groupId, requestCreateTemplateRequestEntity.getSnippetId(), true);
                 },
                 () -> serviceFacade.verifyCanAddTemplate(groupId, requestCreateTemplateRequestEntity.getName()),
                 createTemplateRequestEntity -> {
@@ -2078,7 +2154,8 @@ public class ProcessGroupResource extends ApplicationResource {
             response = ControllerServiceEntity.class,
             authorizations = {
                     @Authorization(value = "Write - /process-groups/{uuid}", type = ""),
-                    @Authorization(value = "Read - any referenced Controller Services - /controller-services/{uuid}", type = "")
+                    @Authorization(value = "Read - any referenced Controller Services - /controller-services/{uuid}", type = ""),
+                    @Authorization(value = "Write - if the Controller Service is restricted - /restricted-components", type = "")
             }
     )
     @ApiResponses(
@@ -2138,7 +2215,7 @@ public class ProcessGroupResource extends ApplicationResource {
                     final Authorizable processGroup = lookup.getProcessGroup(groupId).getAuthorizable();
                     processGroup.authorize(authorizer, RequestAction.WRITE, user);
 
-                    final ConfigurableComponentAuthorizable authorizable = lookup.getProcessorByType(requestControllerService.getType());
+                    final ConfigurableComponentAuthorizable authorizable = lookup.getControllerServiceByType(requestControllerService.getType());
                     if (authorizable.isRestricted()) {
                         lookup.getRestrictedComponents().authorize(authorizer, RequestAction.WRITE, user);
                     }
