@@ -63,22 +63,26 @@ public abstract class AbstractCassandraProcessor extends AbstractProcessor {
     private static final Validator HOSTNAME_PORT_VALIDATOR = new Validator() {
         @Override
         public ValidationResult validate(final String subject, final String input, final ValidationContext context) {
-            final List<String> esList = Arrays.asList(input.split(","));
-            for (String hostnamePort : esList) {
-                String[] addresses = hostnamePort.split(":");
-                // Protect against invalid input like http://127.0.0.1:9042 (URL scheme should not be there)
-                if (addresses.length != 2) {
-                    return new ValidationResult.Builder().subject(subject).input(input).explanation(
-                            "Each entry must be in hostname:port form (no scheme such as http://, and port must be specified)")
-                            .valid(false).build();
-                }
-                // Validate the port
-                String port = addresses[1].trim();
-                ValidationResult portValidatorResult = StandardValidators.PORT_VALIDATOR.validate(subject, port, context);
-                if (!portValidatorResult.isValid()) {
-                    return portValidatorResult;
-                }
+            if (context.isExpressionLanguageSupported(subject) && context.isExpressionLanguagePresent(input)) {
+                return new ValidationResult.Builder().valid(true).explanation("Contains Expression Language").build();
+            } else {
+                final List<String> esList = Arrays.asList(input.split(","));
+                for (String hostnamePort : esList) {
+                    String[] addresses = hostnamePort.split(":");
+                    // Protect against invalid input like http://127.0.0.1:9042 (URL scheme should not be there)
+                    if (addresses.length != 2) {
+                        return new ValidationResult.Builder().subject(subject).input(input).explanation(
+                                "Each entry must be in hostname:port form (no scheme such as http://, and port must be specified)")
+                                .valid(false).build();
+                    }
+                    // Validate the port
+                    String port = addresses[1].trim();
+                    ValidationResult portValidatorResult = StandardValidators.PORT_VALIDATOR.validate(subject, port, context);
+                    if (!portValidatorResult.isValid()) {
+                        return portValidatorResult;
+                    }
 
+                }
             }
             return new ValidationResult.Builder().subject(subject).input(input).explanation(
                     "Valid cluster definition").valid(true).build();
@@ -92,7 +96,7 @@ public abstract class AbstractCassandraProcessor extends AbstractProcessor {
                     + "comma-separated and in hostname:port format. Example node1:port,node2:port,...."
                     + " The default client port for Cassandra is 9042, but the port(s) must be explicitly specified.")
             .required(true)
-            .expressionLanguageSupported(false)
+            .expressionLanguageSupported(true)
             .addValidator(HOSTNAME_PORT_VALIDATOR)
             .build();
 
@@ -101,6 +105,7 @@ public abstract class AbstractCassandraProcessor extends AbstractProcessor {
             .description("The Cassandra Keyspace to connect to. If no keyspace is specified, the query will need to "
                     + "include the keyspace name before any table reference.")
             .required(false)
+            .expressionLanguageSupported(true)
             .addValidator(StandardValidators.NON_EMPTY_VALIDATOR)
             .build();
 
@@ -188,7 +193,7 @@ public abstract class AbstractCassandraProcessor extends AbstractProcessor {
     protected void connectToCassandra(ProcessContext context) {
         if (cluster.get() == null) {
             ComponentLog log = getLogger();
-            final String contactPointList = context.getProperty(CONTACT_POINTS).getValue();
+            final String contactPointList = context.getProperty(CONTACT_POINTS).evaluateAttributeExpressions().getValue();
             final String consistencyLevel = context.getProperty(CONSISTENCY_LEVEL).getValue();
             List<InetSocketAddress> contactPoints = getContactPoints(contactPointList);
 
@@ -232,7 +237,7 @@ public abstract class AbstractCassandraProcessor extends AbstractProcessor {
             PropertyValue keyspaceProperty = context.getProperty(KEYSPACE);
             final Session newSession;
             if (keyspaceProperty != null) {
-                newSession = newCluster.connect(keyspaceProperty.getValue());
+                newSession = newCluster.connect(keyspaceProperty.evaluateAttributeExpressions().getValue());
             } else {
                 newSession = newCluster.connect();
             }
