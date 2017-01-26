@@ -44,7 +44,6 @@
                 <include>nifi-language-translation-nar</include>
                 <include>nifi-enrich-nar</include>
                 <include>nifi-ambari-nar</include>
-                <include>nifi-avro-nar</include>
                 <include>nifi-media-nar</include>
                 <include>nifi-couchbase-nar</include>
                 <include>nifi-hbase-nar</include>

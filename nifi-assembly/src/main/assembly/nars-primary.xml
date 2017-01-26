@@ -41,12 +41,13 @@
                 <include>nifi-html-nar</include>
                 <include>nifi-scripting-nar</include>
                 <!-- extras -->
-                <include>nifi-mongodb-nar</include>
+                <include>nifi-avro-nar</include>
                 <include>nifi-aws-nar</include>
                 <include>nifi-elasticsearch-nar</include>
                 <include>nifi-kafka-0-8-nar</include>
                 <include>nifi-kafka-0-9-nar</include>
                 <include>nifi-kafka-0-10-nar</include>
+                <include>nifi-mongodb-nar</include>
                 <include>nifi-slack-nar</include>
             </includes>
         </dependencySet>
