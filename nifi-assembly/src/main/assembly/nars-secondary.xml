@@ -33,7 +33,6 @@
             <includes>
                 <include>nifi-hadoop-libraries-nar</include>
                 <include>nifi-hadoop-nar</include>
-                <include>nifi-kite-nar</include>
                 <include>nifi-flume-nar</include>
                 <include>nifi-ldap-iaa-providers-nar</include>
                 <include>nifi-kerberos-iaa-providers-nar</include>

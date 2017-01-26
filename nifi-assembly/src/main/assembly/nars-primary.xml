@@ -47,7 +47,8 @@
                 <include>nifi-kafka-0-8-nar</include>
                 <include>nifi-kafka-0-9-nar</include>
                 <include>nifi-kafka-0-10-nar</include>
-                <include>nifi-mongodb-nar</include>
+                <include>nifi-kite-nar</include>                
+		<include>nifi-mongodb-nar</include>
                 <include>nifi-slack-nar</include>
             </includes>
         </dependencySet>
