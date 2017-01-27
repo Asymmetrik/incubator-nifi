@@ -31,7 +31,6 @@
             <useTransitiveFiltering>true</useTransitiveFiltering>
             <useStrictFiltering>true</useStrictFiltering>
             <includes>
-                <include>nifi-hadoop-libraries-nar</include>
                 <include>nifi-hadoop-nar</include>
                 <include>nifi-flume-nar</include>
                 <include>nifi-ldap-iaa-providers-nar</include>
