@@ -35,6 +35,15 @@
                 <include>nifi-standard-services-api-nar</include>
                 <include>nifi-ssl-context-service-nar</include>
                 <include>nifi-distributed-cache-services-nar</include>
+                <include>nifi-dbcp-service-nar</include>
+                <include>nifi-solr-nar</include>
+                <include>nifi-enrich-nar</include>
+                <include>nifi-media-nar</include>
+                <include>nifi-riemann-nar</include>
+                <include>nifi-lumberjack-nar</include>
+                <include>nifi-datadog-nar</include>
+                <include>nifi-email-nar</include>
+                <include>nifi-site-to-site-reporting-nar</include>
                 <include>nifi-standard-nar</include>
                 <include>nifi-update-attribute-nar</include>
                 <include>nifi-http-context-map-nar</include>
@@ -48,8 +57,8 @@
                 <include>nifi-kafka-0-8-nar</include>
                 <include>nifi-kafka-0-9-nar</include>
                 <include>nifi-kafka-0-10-nar</include>
-                <include>nifi-kite-nar</include>                
-		<include>nifi-mongodb-nar</include>
+                <include>nifi-kite-nar</include>
+                <include>nifi-mongodb-nar</include>
                 <include>nifi-slack-nar</include>
             </includes>
         </dependencySet>
