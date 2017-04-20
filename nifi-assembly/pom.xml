@@ -521,9 +521,11 @@ language governing permissions and limitations under the License. -->
                             <url>http://nifi.apache.org</url>
                             <group>Utilities</group>
                             <prefix>/opt/nifi</prefix>
+                            <!--
                             <defineStatements>
                                 <defineStatement>_use_internal_dependency_generator 0</defineStatement>
                             </defineStatements>
+                            -->
                             <defaultDirmode>750</defaultDirmode>
                             <defaultFilemode>640</defaultFilemode>
                             <defaultUsername>nifi</defaultUsername>
