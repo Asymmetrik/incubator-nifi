@@ -2010,7 +2010,7 @@ language governing permissions and limitations under the License. -->
                             <tagNameFormat>asymmetrik/@{project.artifactId}-@{project.version}</tagNameFormat>
                             <!-- skip maven-gpg-plugin -->
                             <arguments>-Dgpg.skip=true -Dmaven.test.skip=true</arguments>
-                            <releaseProfiles />
+                            <releaseProfiles>rpm</releaseProfiles>
                             <pushChanges>true</pushChanges>
                             <localCheckout>false</localCheckout>
                         </configuration>
