@@ -46,54 +46,6 @@ language governing permissions and limitations under the License. -->
                             </descriptors>
                         </configuration>
                     </execution>
-                    <execution>
-                        <id>make bare container assembly</id>
-                        <goals>
-                            <goal>single</goal>
-                        </goals>
-                        <phase>package</phase>
-                        <configuration>
-                            <descriptors>
-                                <descriptor>src/main/assembly/container.xml</descriptor>
-                            </descriptors>
-                        </configuration>
-                    </execution>
-                    <execution>
-                        <id>make primary nars assembly</id>
-                        <goals>
-                            <goal>single</goal>
-                        </goals>
-                        <phase>package</phase>
-                        <configuration>
-                            <descriptors>
-                                <descriptor>src/main/assembly/nars-primary.xml</descriptor>
-                            </descriptors>
-                        </configuration>
-                    </execution>
-                    <execution>
-                        <id>make secondary nars assembly</id>
-                        <goals>
-                            <goal>single</goal>
-                        </goals>
-                        <phase>package</phase>
-                        <configuration>
-                            <descriptors>
-                                <descriptor>src/main/assembly/nars-secondary.xml</descriptor>
-                            </descriptors>
-                        </configuration>
-                    </execution>
-                    <execution>
-                        <id>make all nars assembly</id>
-                        <goals>
-                            <goal>single</goal>
-                        </goals>
-                        <phase>package</phase>
-                        <configuration>
-                            <descriptors>
-                                <descriptor>src/main/assembly/nars-all.xml</descriptor>
-                            </descriptors>
-                        </configuration>
-                    </execution>
                 </executions>
             </plugin>
             <plugin>
@@ -475,6 +427,9 @@ language governing permissions and limitations under the License. -->
             </activation>
             <properties>
                 <nifi.run.as>nifi</nifi.run.as>
+                <nifi.install.dir>/var/lib/nifi</nifi.install.dir>
+                <nifi.log.dir>/var/log/nifi</nifi.log.dir>
+                <nifi.pid.dir>/var/run/nifi</nifi.pid.dir>
             </properties>
             <build>
                 <plugins>
@@ -520,19 +475,19 @@ language governing permissions and limitations under the License. -->
                             <license>Apache License, Version 2.0 and others (see included LICENSE file)</license>
                             <url>http://nifi.apache.org</url>
                             <group>Utilities</group>
-                            <prefix>/opt/nifi</prefix>
+                            <prefix>${nifi.install.dir}</prefix>
                             <!--
                             <defineStatements>
                                 <defineStatement>_use_internal_dependency_generator 0</defineStatement>
                             </defineStatements>
                             -->
-                            <defaultDirmode>750</defaultDirmode>
-                            <defaultFilemode>640</defaultFilemode>
+                            <defaultDirmode>755</defaultDirmode>
+                            <defaultFilemode>644</defaultFilemode>
                             <defaultUsername>nifi</defaultUsername>
                             <defaultGroupname>nifi</defaultGroupname>
                             <preinstallScriptlet>
                                 <script>
-                                    /usr/bin/getent group nifi &gt;/dev/null || /usr/sbin/groupadd -r nifi; /usr/bin/getent passwd nifi &gt;/dev/null || /usr/sbin/useradd -r -g nifi -d /opt/nifi -s /sbin/nologin -c "NiFi System User" nifi
+                                    /usr/bin/getent group nifi &gt;/dev/null || /usr/sbin/groupadd -r nifi; /usr/bin/getent passwd nifi &gt;/dev/null || /usr/sbin/useradd -r -g nifi -d ${nifi.install.dir} -s /sbin/nologin -c "NiFi System User" nifi
                                 </script>
                             </preinstallScriptlet>
                             <targetOS>linux</targetOS>
@@ -550,10 +505,10 @@ language governing permissions and limitations under the License. -->
                                     </provides>
                                     <mappings>
                                         <mapping>
-                                            <directory>/opt/nifi/nifi-${project.version}</directory>
+                                            <directory>${nifi.install.dir}/nifi-${project.version}</directory>
                                         </mapping>
                                         <mapping>
-                                            <directory>/opt/nifi/nifi-${project.version}</directory>
+                                            <directory>${nifi.install.dir}/nifi-${project.version}</directory>
                                             <sources>
                                                 <source>
                                                     <location>./LICENSE</location>
@@ -568,11 +523,14 @@ language governing permissions and limitations under the License. -->
                                             </sources>
                                         </mapping>
                                         <mapping>
-                                            <directory>/opt/nifi</directory>
+                                            <directory>${nifi.log.dir}</directory>
                                         </mapping>
                                         <mapping>
-                                            <directory>/opt/nifi/nifi-${project.version}/bin</directory>
-                                            <filemode>750</filemode>
+                                            <directory>${nifi.pid.dir}</directory>
+                                        </mapping>
+                                        <mapping>
+                                            <directory>${nifi.install.dir}/nifi-${project.version}/bin</directory>
+                                            <filemode>755</filemode>
                                             <sources>
                                                 <source>
                                                     <location>${project.build.directory}/generated-resources/bin/nifi.sh</location>
@@ -587,7 +545,7 @@ language governing permissions and limitations under the License. -->
                                             </sources>
                                         </mapping>
                                         <mapping>
-                                            <directory>/opt/nifi/nifi-${project.version}/conf</directory>
+                                            <directory>${nifi.install.dir}/nifi-${project.version}/conf</directory>
                                             <configuration>true</configuration>
                                             <sources>
                                                 <source>
@@ -597,14 +555,14 @@ language governing permissions and limitations under the License. -->
                                             </sources>
                                         </mapping>
                                         <mapping>
-                                            <directory>/opt/nifi/nifi-${project.version}/lib</directory>
+                                            <directory>${nifi.install.dir}/nifi-${project.version}/lib</directory>
                                         </mapping>
                                         <!-- The lib excludes and lib/bootstrap includes are computed by looking at the desired contents of
                                         lib vs the desired contents of bootstrap directories.  The bootstrap directory should be comprised of explicitly
                                         included items as found from the lib/bootstrap of a non rpm build and the lib folder should be specific excludes
                                         being those which we want in bootstrap and NOT in lib. -->
                                         <mapping>
-                                            <directory>/opt/nifi/nifi-${project.version}/lib</directory>
+                                            <directory>${nifi.install.dir}/nifi-${project.version}/lib</directory>
                                             <dependency>
                                                 <excludes>
                                                     <exclude>org.bouncycastle:bcprov-jdk15on</exclude>
@@ -640,7 +598,7 @@ language governing permissions and limitations under the License. -->
                                             </dependency>
                                         </mapping>
                                         <mapping>
-                                            <directory>/opt/nifi/nifi-${project.version}/lib/bootstrap</directory>
+                                            <directory>${nifi.install.dir}/nifi-${project.version}/lib/bootstrap</directory>
                                             <dependency>
                                                 <includes>
                                                     <include>org.bouncycastle:bcprov-jdk15on</include>
@@ -673,7 +631,7 @@ language governing permissions and limitations under the License. -->
                                             </dependency>
                                         </mapping>
                                         <mapping>
-                                            <directory>/opt/nifi/nifi-${project.version}/docs</directory>
+                                            <directory>${nifi.install.dir}/nifi-${project.version}/docs</directory>
                                             <sources>
                                                 <source>
                                                     <location>${project.build.directory}/generated-docs</location>
