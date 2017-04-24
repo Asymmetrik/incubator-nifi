@@ -16,13 +16,26 @@
 #    limitations under the License.
 #
 
+# Ensure LANG is configured
+if [ -f /etc/rc.d/init.d/functions ]; then
+    . /etc/rc.d/init.d/functions
+fi
+
 # The java implementation to use.
 #export JAVA_HOME=/usr/java/jdk1.8.0/
 
 export NIFI_HOME=$(cd "${SCRIPT_DIR}" && cd .. && pwd)
 
 #The directory for the NiFi pid file
-export NIFI_PID_DIR="${NIFI_HOME}/run"
+if [ -d /var/run/nifi ]; then
+    export NIFI_PID_DIR=/var/run/nifi
+else
+    export NIFI_PID_DIR="${NIFI_HOME}/run"
+fi
 
 #The directory for NiFi log files
-export NIFI_LOG_DIR="${NIFI_HOME}/logs"
+if [ -d /var/log/nifi ]; then
+    export NIFI_LOG_DIR=/var/log/nifi
+else
+    export NIFI_LOG_DIR="${NIFI_HOME}/logs"
+fi
