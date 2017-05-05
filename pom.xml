@@ -2179,5 +2179,37 @@
                     should be overridden on the command-line <hadoop.version>2.6.0-cdh5.8.1</hadoop.version> -->
             </properties>
         </profile>
+       <profile>
+            <id>asymmetrik</id>
+            <distributionManagement>
+                <repository>
+                    <id>asymmetrik-releases</id>
+                    <url>https://nexus.asymmetrik.com/content/repositories/releases</url>
+                </repository>
+                <snapshotRepository>
+                    <id>asymmetrik-snapshots</id>
+                    <url>https://nexus.asymmetrik.com/content/repositories/snapshots</url>
+                </snapshotRepository>
+            </distributionManagement>
+            <build>
+                <plugins>
+                    <plugin>
+                        <groupId>org.apache.maven.plugins</groupId>
+                        <artifactId>maven-release-plugin</artifactId>
+                        <configuration>
+                            <useReleaseProfile>false</useReleaseProfile>
+                            <autoVersionSubmodules>true</autoVersionSubmodules>
+                            <goals>deploy</goals>
+                            <tagNameFormat>asymmetrik/@{project.artifactId}-@{project.version}</tagNameFormat>
+                            <!-- skip maven-gpg-plugin -->
+                            <arguments>-Dgpg.skip=true -Dmaven.test.skip=true</arguments>
+                            <releaseProfiles>rpm</releaseProfiles>
+                            <pushChanges>true</pushChanges>
+                            <localCheckout>false</localCheckout>
+                        </configuration>
+                    </plugin>
+                </plugins>
+            </build>
+        </profile>
     </profiles>
 </project>
