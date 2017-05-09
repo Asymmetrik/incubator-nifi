@@ -25,25 +25,25 @@
                 <artifactId>maven-assembly-plugin</artifactId>
                 <configuration>
                     <finalName>nifi-${project.version}</finalName>
-                    <attach>true</attach>
-                    <tarLongFileMode>posix</tarLongFileMode>
-                    <archiverConfig>
-                        <defaultDirectoryMode>0775</defaultDirectoryMode>
-                        <directoryMode>0775</directoryMode>
-                        <fileMode>0664</fileMode>
-                    </archiverConfig>
+                    <attach>false</attach>
                 </configuration>
                 <executions>
                     <execution>
-                        <id>make complete assembly</id>
+                        <id>make shared resource</id>
                         <goals>
                             <goal>single</goal>
                         </goals>
                         <phase>package</phase>
                         <configuration>
+                            <archiverConfig>
+                                <defaultDirectoryMode>0775</defaultDirectoryMode>
+                                <directoryMode>0775</directoryMode>
+                                <fileMode>0664</fileMode>
+                            </archiverConfig>
                             <descriptors>
                                 <descriptor>src/main/assembly/dependencies.xml</descriptor>
                             </descriptors>
+                            <tarLongFileMode>posix</tarLongFileMode>
                         </configuration>
                     </execution>
                 </executions>
@@ -776,7 +776,7 @@
                         <artifactId>maven-assembly-plugin</artifactId>
                         <configuration>
                             <finalName>nifi-${project.version}</finalName>
-                            <attach>false</attach>
+                            <attach>true</attach>
                         </configuration>
                         <executions>
                             <execution>
