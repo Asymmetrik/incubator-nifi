@@ -75,6 +75,7 @@ public interface FileTransfer extends Closeable {
         .addValidator(Validator.VALID)
         .required(false)
         .sensitive(true)
+        .expressionLanguageSupported(true)
         .build();
     public static final PropertyDescriptor DATA_TIMEOUT = new PropertyDescriptor.Builder()
         .name("Data Timeout")

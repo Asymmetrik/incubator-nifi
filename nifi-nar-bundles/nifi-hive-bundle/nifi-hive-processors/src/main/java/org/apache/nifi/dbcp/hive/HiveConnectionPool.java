@@ -22,6 +22,7 @@ import org.apache.commons.dbcp.BasicDataSource;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hive.jdbc.HiveDriver;
+import org.apache.nifi.annotation.behavior.RequiresInstanceClassLoading;
 import org.apache.nifi.annotation.documentation.CapabilityDescription;
 import org.apache.nifi.annotation.documentation.Tags;
 import org.apache.nifi.annotation.lifecycle.OnDisabled;
@@ -43,6 +44,7 @@ import org.apache.nifi.util.hive.HiveUtils;
 import org.apache.nifi.util.hive.ValidationResources;
 
 import java.io.IOException;
+import java.lang.reflect.UndeclaredThrowableException;
 import java.security.PrivilegedExceptionAction;
 import java.sql.Connection;
 import java.sql.SQLException;
@@ -59,6 +61,7 @@ import org.apache.nifi.controller.ControllerServiceInitializationContext;
  * Implementation for Database Connection Pooling Service used for Apache Hive
  * connections. Apache DBCP is used for connection pooling functionality.
  */
+@RequiresInstanceClassLoading
 @Tags({"hive", "dbcp", "jdbc", "database", "connection", "pooling", "store"})
 @CapabilityDescription("Provides Database Connection Pooling Service for Apache Hive. Connections can be asked from pool and returned after usage.")
 public class HiveConnectionPool extends AbstractControllerService implements HiveDBCPService {
@@ -276,13 +279,16 @@ public class HiveConnectionPool extends AbstractControllerService implements Hiv
     public Connection getConnection() throws ProcessException {
         try {
             if (ugi != null) {
-                return ugi.doAs(new PrivilegedExceptionAction<Connection>() {
-                    @Override
-                    public Connection run() throws Exception {
-                        return dataSource.getConnection();
+                try {
+                    return ugi.doAs((PrivilegedExceptionAction<Connection>) () -> dataSource.getConnection());
+                } catch (UndeclaredThrowableException e) {
+                    Throwable cause = e.getCause();
+                    if (cause instanceof SQLException) {
+                        throw (SQLException) cause;
+                    } else {
+                        throw e;
                     }
-                });
-
+                }
             } else {
                 getLogger().info("Simple Authentication");
                 return dataSource.getConnection();

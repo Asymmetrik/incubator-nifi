@@ -57,6 +57,7 @@ public abstract class AbstractElasticsearchHttpProcessor extends AbstractElastic
             .required(true)
             .expressionLanguageSupported(true)
             .addValidator(StandardValidators.URL_VALIDATOR)
+            .expressionLanguageSupported(true)
             .build();
 
     public static final PropertyDescriptor PROXY_HOST = new PropertyDescriptor.Builder()
@@ -82,6 +83,7 @@ public abstract class AbstractElasticsearchHttpProcessor extends AbstractElastic
             .required(true)
             .defaultValue("5 secs")
             .addValidator(StandardValidators.TIME_PERIOD_VALIDATOR)
+            .expressionLanguageSupported(true)
             .build();
 
     public static final PropertyDescriptor RESPONSE_TIMEOUT = new PropertyDescriptor.Builder()
@@ -91,6 +93,7 @@ public abstract class AbstractElasticsearchHttpProcessor extends AbstractElastic
             .required(true)
             .defaultValue("15 secs")
             .addValidator(StandardValidators.TIME_PERIOD_VALIDATOR)
+            .expressionLanguageSupported(true)
             .build();
 
     private final AtomicReference<OkHttpClient> okHttpClientAtomicReference = new AtomicReference<>();
@@ -110,8 +113,8 @@ public abstract class AbstractElasticsearchHttpProcessor extends AbstractElastic
         }
 
         // Set timeouts
-        okHttpClient.connectTimeout((context.getProperty(CONNECT_TIMEOUT).asTimePeriod(TimeUnit.MILLISECONDS).intValue()), TimeUnit.MILLISECONDS);
-        okHttpClient.readTimeout(context.getProperty(RESPONSE_TIMEOUT).asTimePeriod(TimeUnit.MILLISECONDS).intValue(), TimeUnit.MILLISECONDS);
+        okHttpClient.connectTimeout((context.getProperty(CONNECT_TIMEOUT).evaluateAttributeExpressions().asTimePeriod(TimeUnit.MILLISECONDS).intValue()), TimeUnit.MILLISECONDS);
+        okHttpClient.readTimeout(context.getProperty(RESPONSE_TIMEOUT).evaluateAttributeExpressions().asTimePeriod(TimeUnit.MILLISECONDS).intValue(), TimeUnit.MILLISECONDS);
 
         final SSLContextService sslService = context.getProperty(PROP_SSL_CONTEXT_SERVICE).asControllerService(SSLContextService.class);
         final SSLContext sslContext = sslService == null ? null : sslService.createSSLContext(SSLContextService.ClientAuth.NONE);

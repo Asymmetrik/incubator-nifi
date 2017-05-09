@@ -25,4 +25,7 @@ public interface PreparedQuery {
 
     String evaluateExpressions(Map<String, String> valueLookup, AttributeValueDecorator decorator) throws ProcessException;
 
+    String evaluateExpressions(final Map<String, String> valueLookup, final AttributeValueDecorator decorator, final Map<String, String> stateVariables) throws ProcessException;
+
+    boolean isExpressionLanguagePresent();
 }

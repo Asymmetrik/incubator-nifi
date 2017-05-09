@@ -619,6 +619,10 @@ public final class StandardProcessGroup implements ProcessGroup {
             group.removeLabel(label);
         }
 
+        for (final ControllerServiceNode cs : group.getControllerServices(false)) {
+            group.removeControllerService(cs);
+        }
+
         for (final ProcessGroup childGroup : new ArrayList<>(group.getProcessGroups())) {
             group.removeProcessGroup(childGroup);
         }
@@ -763,7 +767,7 @@ public final class StandardProcessGroup implements ProcessGroup {
         } finally {
             if (removed) {
                 try {
-                    ExtensionManager.removeInstanceClassLoaderIfExists(id);
+                    ExtensionManager.removeInstanceClassLoader(id);
                 } catch (Throwable t) {
                 }
             }
@@ -1910,7 +1914,7 @@ public final class StandardProcessGroup implements ProcessGroup {
         } finally {
             if (removed) {
                 try {
-                    ExtensionManager.removeInstanceClassLoaderIfExists(service.getIdentifier());
+                    ExtensionManager.removeInstanceClassLoader(service.getIdentifier());
                 } catch (Throwable t) {
                 }
             }
@@ -2103,6 +2107,7 @@ public final class StandardProcessGroup implements ProcessGroup {
         writeLock.lock();
         try {
             verifyContents(snippet);
+            verifyDestinationNotInSnippet(snippet, destination);
 
             if (!isDisconnected(snippet)) {
                 throw new IllegalStateException("One or more components within the snippet is connected to a component outside of the snippet. Only a disconnected snippet may be moved.");
@@ -2257,6 +2262,23 @@ public final class StandardProcessGroup implements ProcessGroup {
     }
 
     /**
+     * Verifies that a move request cannot attempt to move a process group into itself.
+     *
+     * @param snippet the snippet
+     * @param destination the destination
+     * @throws IllegalStateException if the snippet contains an ID that is equal to the identifier of the destination
+     */
+    private void verifyDestinationNotInSnippet(final Snippet snippet, final ProcessGroup destination) throws IllegalStateException {
+        if (snippet.getProcessGroups() != null && destination != null) {
+            snippet.getProcessGroups().forEach((processGroupId, revision) -> {
+                if (processGroupId.equals(destination.getIdentifier())) {
+                    throw new IllegalStateException("Unable to move Process Group into itself.");
+                }
+            });
+        }
+    }
+
+    /**
      * <p>
      * Verifies that all ID's specified by the given set exist as keys in the
      * given Map. If any of the ID's does not exist as a key in the map, will
@@ -2322,6 +2344,10 @@ public final class StandardProcessGroup implements ProcessGroup {
 
             for (final Connection connection : connections.values()) {
                 connection.verifyCanDelete();
+            }
+
+            for(final ControllerServiceNode cs : controllerServices.values()) {
+                cs.verifyCanDelete();
             }
 
             for (final ProcessGroup childGroup : processGroups.values()) {
@@ -2489,6 +2515,7 @@ public final class StandardProcessGroup implements ProcessGroup {
             }
 
             verifyContents(snippet);
+            verifyDestinationNotInSnippet(snippet, newProcessGroup);
 
             if (!isDisconnected(snippet)) {
                 throw new IllegalStateException("One or more components within the snippet is connected to a component outside of the snippet. Only a disconnected snippet may be moved.");

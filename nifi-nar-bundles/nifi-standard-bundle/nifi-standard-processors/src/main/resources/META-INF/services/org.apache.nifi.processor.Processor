@@ -18,11 +18,13 @@ org.apache.nifi.processors.standard.CompressContent
 org.apache.nifi.processors.standard.ControlRate
 org.apache.nifi.processors.standard.ConvertCharacterSet
 org.apache.nifi.processors.standard.ConvertJSONToSQL
+org.apache.nifi.processors.standard.ConvertRecord
 org.apache.nifi.processors.standard.DebugFlow
 org.apache.nifi.processors.standard.DetectDuplicate
 org.apache.nifi.processors.standard.DistributeLoad
 org.apache.nifi.processors.standard.DuplicateFlowFile
 org.apache.nifi.processors.standard.EncryptContent
+org.apache.nifi.processors.standard.EnforceOrder
 org.apache.nifi.processors.standard.EvaluateJsonPath
 org.apache.nifi.processors.standard.EvaluateXPath
 org.apache.nifi.processors.standard.EvaluateXQuery
@@ -46,6 +48,7 @@ org.apache.nifi.processors.standard.JoltTransformJSON
 org.apache.nifi.processors.standard.GenerateTableFetch
 org.apache.nifi.processors.standard.GetJMSQueue
 org.apache.nifi.processors.standard.GetJMSTopic
+org.apache.nifi.processors.standard.ExtractGrok
 org.apache.nifi.processors.standard.ListDatabaseTables
 org.apache.nifi.processors.standard.ListFile
 org.apache.nifi.processors.standard.ListenHTTP
@@ -58,11 +61,13 @@ org.apache.nifi.processors.standard.LogAttribute
 org.apache.nifi.processors.standard.MergeContent
 org.apache.nifi.processors.standard.ModifyBytes
 org.apache.nifi.processors.standard.MonitorActivity
+org.apache.nifi.processors.standard.Notify
 org.apache.nifi.processors.standard.ParseCEF
 org.apache.nifi.processors.standard.ParseSyslog
 org.apache.nifi.processors.standard.PostHTTP
-org.apache.nifi.processors.standard.PutEmail
+org.apache.nifi.processors.standard.PutDatabaseRecord
 org.apache.nifi.processors.standard.PutDistributedMapCache
+org.apache.nifi.processors.standard.PutEmail
 org.apache.nifi.processors.standard.PutFile
 org.apache.nifi.processors.standard.PutFTP
 org.apache.nifi.processors.standard.PutJMS
@@ -72,6 +77,7 @@ org.apache.nifi.processors.standard.PutSyslog
 org.apache.nifi.processors.standard.PutTCP
 org.apache.nifi.processors.standard.PutUDP
 org.apache.nifi.processors.standard.QueryDatabaseTable
+org.apache.nifi.processors.standard.QueryRecord
 org.apache.nifi.processors.standard.ReplaceText
 org.apache.nifi.processors.standard.RouteText
 org.apache.nifi.processors.standard.ReplaceTextWithMapping
@@ -82,6 +88,7 @@ org.apache.nifi.processors.standard.ScanContent
 org.apache.nifi.processors.standard.SegmentContent
 org.apache.nifi.processors.standard.SplitContent
 org.apache.nifi.processors.standard.SplitJson
+org.apache.nifi.processors.standard.SplitRecord
 org.apache.nifi.processors.standard.SplitText
 org.apache.nifi.processors.standard.SplitXml
 org.apache.nifi.processors.standard.TailFile
@@ -89,7 +96,9 @@ org.apache.nifi.processors.standard.TransformXml
 org.apache.nifi.processors.standard.UnpackContent
 org.apache.nifi.processors.standard.ValidateXml
 org.apache.nifi.processors.standard.ValidateCsv
+org.apache.nifi.processors.standard.Wait
 org.apache.nifi.processors.standard.ExecuteSQL
 org.apache.nifi.processors.standard.FetchDistributedMapCache
 org.apache.nifi.processors.standard.ListFTP
 org.apache.nifi.processors.standard.FetchFTP
+org.apache.nifi.processors.standard.UpdateCounter

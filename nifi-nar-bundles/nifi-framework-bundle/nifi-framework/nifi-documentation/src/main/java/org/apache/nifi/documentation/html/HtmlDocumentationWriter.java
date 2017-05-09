@@ -23,12 +23,16 @@ import org.apache.nifi.annotation.behavior.Stateful;
 import org.apache.nifi.annotation.documentation.CapabilityDescription;
 import org.apache.nifi.annotation.documentation.SeeAlso;
 import org.apache.nifi.annotation.documentation.Tags;
+import org.apache.nifi.bundle.Bundle;
+import org.apache.nifi.bundle.BundleCoordinate;
 import org.apache.nifi.components.AllowableValue;
 import org.apache.nifi.components.ConfigurableComponent;
 import org.apache.nifi.components.PropertyDescriptor;
 import org.apache.nifi.controller.ControllerService;
 import org.apache.nifi.documentation.DocumentationWriter;
 import org.apache.nifi.nar.ExtensionManager;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import javax.xml.stream.FactoryConfigurationError;
 import javax.xml.stream.XMLOutputFactory;
@@ -48,6 +52,8 @@ import java.util.Set;
  *
  */
 public class HtmlDocumentationWriter implements DocumentationWriter {
+
+    public static final Logger LOGGER = LoggerFactory.getLogger(HtmlDocumentationWriter.class);
 
     /**
      * The filename where additional user specified information may be stored.
@@ -91,11 +97,17 @@ public class HtmlDocumentationWriter implements DocumentationWriter {
 
         xmlStreamWriter.writeStartElement("link");
         xmlStreamWriter.writeAttribute("rel", "stylesheet");
-        xmlStreamWriter.writeAttribute("href", "../../css/component-usage.css");
+        xmlStreamWriter.writeAttribute("href", "/nifi-docs/css/component-usage.css");
         xmlStreamWriter.writeAttribute("type", "text/css");
         xmlStreamWriter.writeEndElement();
-
         xmlStreamWriter.writeEndElement();
+
+        xmlStreamWriter.writeStartElement("script");
+        xmlStreamWriter.writeAttribute("type", "text/javascript");
+        xmlStreamWriter.writeCharacters("window.onload = function(){if(self==top) { " +
+                "document.getElementById('nameHeader').style.display = \"inherit\"; } }" );
+        xmlStreamWriter.writeEndElement();
+
     }
 
     /**
@@ -123,6 +135,7 @@ public class HtmlDocumentationWriter implements DocumentationWriter {
             final XMLStreamWriter xmlStreamWriter, final boolean hasAdditionalDetails)
             throws XMLStreamException {
         xmlStreamWriter.writeStartElement("body");
+        writeHeader(configurableComponent, xmlStreamWriter);
         writeDescription(configurableComponent, xmlStreamWriter, hasAdditionalDetails);
         writeTags(configurableComponent, xmlStreamWriter);
         writeProperties(configurableComponent, xmlStreamWriter);
@@ -131,6 +144,23 @@ public class HtmlDocumentationWriter implements DocumentationWriter {
         writeStatefulInfo(configurableComponent, xmlStreamWriter);
         writeRestrictedInfo(configurableComponent, xmlStreamWriter);
         writeSeeAlso(configurableComponent, xmlStreamWriter);
+        xmlStreamWriter.writeEndElement();
+    }
+
+    /**
+     * Write the header to be displayed when loaded outside an iframe.
+     *
+     * @param configurableComponent the component to describe
+     * @param xmlStreamWriter the stream writer to use
+     * @throws XMLStreamException thrown if there was a problem writing the XML
+     */
+    private void writeHeader(ConfigurableComponent configurableComponent, XMLStreamWriter xmlStreamWriter)
+            throws XMLStreamException {
+        xmlStreamWriter.writeStartElement("h1");
+        xmlStreamWriter.writeAttribute("id", "nameHeader");
+        // Style will be overwritten on load if needed
+        xmlStreamWriter.writeAttribute("style", "display: none;");
+        xmlStreamWriter.writeCharacters(getTitle(configurableComponent));
         xmlStreamWriter.writeEndElement();
     }
 
@@ -162,7 +192,7 @@ public class HtmlDocumentationWriter implements DocumentationWriter {
 
             xmlStreamWriter.writeEndElement();
         } else {
-            xmlStreamWriter.writeCharacters("This processor has no state management.");
+            xmlStreamWriter.writeCharacters("This component does not store state.");
         }
     }
 
@@ -180,7 +210,9 @@ public class HtmlDocumentationWriter implements DocumentationWriter {
         writeSimpleElement(xmlStreamWriter, "h3", "Restricted: ");
 
         if(restricted != null) {
-            writeSimpleElement(xmlStreamWriter, "td", restricted.value());
+            xmlStreamWriter.writeCharacters(restricted.value());
+        } else {
+            xmlStreamWriter.writeCharacters("This component is not restricted.");
         }
     }
 
@@ -213,13 +245,26 @@ public class HtmlDocumentationWriter implements DocumentationWriter {
                     xmlStreamWriter.writeCharacters(", ");
                 }
 
-                final String link = "../" + linkedComponent + "/index.html";
+                final List<Bundle> linkedComponentBundles = ExtensionManager.getBundles(linkedComponent);
 
-                final int indexOfLastPeriod = linkedComponent.lastIndexOf(".") + 1;
+                if (linkedComponentBundles != null && linkedComponentBundles.size() > 0) {
+                    final Bundle firstBundle = linkedComponentBundles.get(0);
+                    final BundleCoordinate firstCoordinate = firstBundle.getBundleDetails().getCoordinate();
 
-                writeLink(xmlStreamWriter, linkedComponent.substring(indexOfLastPeriod), link);
+                    final String group = firstCoordinate.getGroup();
+                    final String id = firstCoordinate.getId();
+                    final String version = firstCoordinate.getVersion();
 
-                ++index;
+                    final String link = "/nifi-docs/components/" + group + "/" + id + "/" + version + "/" + linkedComponent + "/index.html";
+
+                    final int indexOfLastPeriod = linkedComponent.lastIndexOf(".") + 1;
+
+                    writeLink(xmlStreamWriter, linkedComponent.substring(indexOfLastPeriod), link);
+
+                    ++index;
+                } else {
+                    LOGGER.warn("Could not link to {} because no bundles were found", new Object[] {linkedComponent});
+                }
             }
             xmlStreamWriter.writeEndElement();
         }
@@ -340,7 +385,7 @@ public class HtmlDocumentationWriter implements DocumentationWriter {
                     xmlStreamWriter.writeCharacters(", ");
                 }
                 xmlStreamWriter.writeCharacters("whether a property supports the ");
-                writeLink(xmlStreamWriter, "NiFi Expression Language", "../../html/expression-language-guide.html");
+                writeLink(xmlStreamWriter, "NiFi Expression Language", "/nifi-docs/html/expression-language-guide.html");
             }
             if (containsSensitiveProperties) {
                 xmlStreamWriter.writeCharacters(", and whether a property is considered " + "\"sensitive\", meaning that its value will be encrypted. Before entering a "
@@ -498,7 +543,7 @@ public class HtmlDocumentationWriter implements DocumentationWriter {
             throws XMLStreamException {
         xmlStreamWriter.writeCharacters(" ");
         xmlStreamWriter.writeStartElement("img");
-        xmlStreamWriter.writeAttribute("src", "../../html/images/iconInfo.png");
+        xmlStreamWriter.writeAttribute("src", "/nifi-docs/html/images/iconInfo.png");
         xmlStreamWriter.writeAttribute("alt", description);
         xmlStreamWriter.writeAttribute("title", description);
         xmlStreamWriter.writeEndElement();
@@ -635,8 +680,23 @@ public class HtmlDocumentationWriter implements DocumentationWriter {
      * @param clazz the configurable component to link to
      * @throws XMLStreamException thrown if there is a problem writing the XML
      */
-    protected void writeLinkForComponent(final XMLStreamWriter xmlStreamWriter, final Class<?> clazz) throws XMLStreamException {
-        writeLink(xmlStreamWriter, clazz.getSimpleName(), "../" + clazz.getCanonicalName() + "/index.html");
+    protected void writeLinkForComponent(final XMLStreamWriter xmlStreamWriter, final Class<?> clazz)
+            throws XMLStreamException {
+        final String linkedComponentName = clazz.getName();
+        final List<Bundle> linkedComponentBundles = ExtensionManager.getBundles(linkedComponentName);
+
+        if (linkedComponentBundles != null && linkedComponentBundles.size() > 0) {
+            final Bundle firstLinkedComponentBundle = linkedComponentBundles.get(0);
+            final BundleCoordinate coordinate = firstLinkedComponentBundle.getBundleDetails().getCoordinate();
+
+            final String group = coordinate.getGroup();
+            final String id = coordinate.getId();
+            final String version = coordinate.getVersion();
+
+            writeLink(xmlStreamWriter, clazz.getSimpleName(), "/nifi-docs/components/" + group + "/" + id + "/" + version + "/" + clazz.getCanonicalName() + "/index.html");
+        } else {
+            LOGGER.warn("Could not link to {} because no bundles were found", new Object[] {linkedComponentName});
+        }
     }
 
     /**

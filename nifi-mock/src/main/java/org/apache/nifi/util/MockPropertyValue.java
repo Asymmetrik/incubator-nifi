@@ -16,10 +16,13 @@
  */
 package org.apache.nifi.util;
 
+import java.util.List;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
 
+import org.apache.nifi.attribute.expression.language.Query;
 import org.apache.nifi.attribute.expression.language.StandardPropertyValue;
+import org.apache.nifi.attribute.expression.language.Query.Range;
 import org.apache.nifi.components.PropertyDescriptor;
 import org.apache.nifi.components.PropertyValue;
 import org.apache.nifi.controller.ControllerService;
@@ -171,12 +174,18 @@ public class MockPropertyValue implements PropertyValue {
 
     @Override
     public PropertyValue evaluateAttributeExpressions(final FlowFile flowFile, final Map<String, String> additionalAttributes, final AttributeValueDecorator decorator) throws ProcessException {
+        return evaluateAttributeExpressions(flowFile, additionalAttributes, decorator, null);
+    }
+
+    @Override
+    public PropertyValue evaluateAttributeExpressions(FlowFile flowFile, Map<String, String> additionalAttributes, AttributeValueDecorator decorator, Map<String, String> stateValues)
+            throws ProcessException {
         markEvaluated();
         if (rawValue == null) {
             return this;
         }
 
-        final PropertyValue newValue = stdPropValue.evaluateAttributeExpressions(flowFile, additionalAttributes, decorator);
+        final PropertyValue newValue = stdPropValue.evaluateAttributeExpressions(flowFile, additionalAttributes, decorator, stateValues);
         return new MockPropertyValue(newValue.getValue(), serviceLookup, propertyDescriptor, true, variableRegistry);
     }
 
@@ -212,5 +221,15 @@ public class MockPropertyValue implements PropertyValue {
     @Override
     public String toString() {
         return getValue();
+    }
+
+    @Override
+    public boolean isExpressionLanguagePresent() {
+        if (!expectExpressions) {
+            return false;
+        }
+
+        final List<Range> elRanges = Query.extractExpressionRanges(rawValue);
+        return (elRanges != null && !elRanges.isEmpty());
     }
 }

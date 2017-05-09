@@ -15,9 +15,34 @@
  * limitations under the License.
  */
 
-/* global nf, Slick */
+/* global define, module, require, exports */
 
-nf.ClusterTable = (function () {
+(function (root, factory) {
+    if (typeof define === 'function' && define.amd) {
+        define(['jquery',
+                'Slick',
+                'nf.Common',
+                'nf.Dialog',
+                'nf.ErrorHandler'],
+            function ($, Slick, nfCommon, nfDialog, nfErrorHandler) {
+                return (nf.ClusterTable = factory($, Slick, nfCommon, nfDialog, nfErrorHandler));
+            });
+    } else if (typeof exports === 'object' && typeof module === 'object') {
+        module.exports = (nf.ClusterTable =
+            factory(require('jquery'),
+                require('Slick'),
+                require('nf.Common'),
+                require('nf.Dialog'),
+                require('nf.ErrorHandler')));
+    } else {
+        nf.ClusterTable = factory(root.$,
+            root.Slick,
+            root.nf.Common,
+            root.nf.Dialog,
+            root.nf.ErrorHandler);
+    }
+}(this, function ($, Slick, nfCommon, nfDialog, nfErrorHandler) {
+    'use strict';
 
     /**
      * Configuration object used to hold a number of configuration items.
@@ -31,14 +56,14 @@ nf.ClusterTable = (function () {
             systemDiagnostics: '../nifi-api/system-diagnostics'
         },
         data: [{
-                name: 'cluster',
-                update: refreshClusterData,
-                isAuthorized: nf.Common.canAccessController
-            },{
-                name: 'systemDiagnostics',
-                update: refreshSystemDiagnosticsData,
-                isAuthorized: nf.Common.canAccessSystem
-            }
+            name: 'cluster',
+            update: refreshClusterData,
+            isAuthorized: nfCommon.canAccessController
+        }, {
+            name: 'systemDiagnostics',
+            update: refreshSystemDiagnosticsData,
+            isAuthorized: nfCommon.canAccessSystem
+        }
         ]
     };
 
@@ -51,7 +76,7 @@ nf.ClusterTable = (function () {
         rowHeight: 24
     };
 
-    var nodesTab =  {
+    var nodesTab = {
         name: 'Nodes',
         data: {
             dataSet: 'cluster',
@@ -63,6 +88,8 @@ nf.ClusterTable = (function () {
         tableIdColumn: 'nodeId',
         tableOptions: commonTableOptions,
         tableOnClick: nodesTableOnClick,
+        createTableOnEnter: null,
+        cleanUpTable: null,
         init: commonTableInit,
         onSort: sort,
         onTabSelected: onSelectTab,
@@ -83,20 +110,12 @@ nf.ClusterTable = (function () {
         },
         tabContentId: 'cluster-jvm-tab-content',
         tableId: 'cluster-jvm-table',
-        tableColumnModel: [
-            {id: 'node', field: 'node', name: 'Node Address', sortable: true, resizable: true},
-            {id: 'heapMax', field: 'maxHeap', name: 'Heap Max', sortable: true, resizable: true, cssClass: 'cell-right', headerCssClass: 'header-right'},
-            {id: 'heapTotal', field: 'totalHeap', name: 'Heap Total', sortable: true, resizable: true, cssClass: 'cell-right', headerCssClass: 'header-right'},
-            {id: 'heapUsed', field: 'usedHeap', name: 'Heap Used', sortable: true, resizable: true, cssClass: 'cell-right', headerCssClass: 'header-right'},
-            {id: 'heapUtilPct', field: 'heapUtilization', name: 'Heap Utilization', sortable: true, resizable: true, cssClass: 'cell-right', headerCssClass: 'header-right'},
-            {id: 'nonHeapTotal', field: 'totalNonHeap', name: 'Non-Heap Total', sortable: true, resizable: true, cssClass: 'cell-right', headerCssClass: 'header-right'},
-            {id: 'nonHeapUsed', field: 'usedNonHeap', name: 'Non-Heap Used', sortable: true, resizable: true, cssClass: 'cell-right', headerCssClass: 'header-right'},
-            {id: 'gcOldGen', field: 'gcOldGen', name: 'G1 Old Generation', sortable: true, resizable: true, cssClass: 'cell-right', headerCssClass: 'header-right'},
-            {id: 'gcNewGen', field: 'gcNewGen', name: 'G1 Young Generation', sortable: true, resizable: true, cssClass: 'cell-right', headerCssClass: 'header-right'}
-        ],
+        tableColumnModel: createJvmTableColumnModel,
         tableIdColumn: 'id',
         tableOptions: commonTableOptions,
         tableOnClick: null,
+        createTableOnEnter: createJvmTableOnEnterHandler,
+        cleanUpTable: cleanUpJvmTable,
         init: commonTableInit,
         onSort: sort,
         onTabSelected: onSelectTab,
@@ -116,14 +135,48 @@ nf.ClusterTable = (function () {
         tableId: 'cluster-system-table',
         tableColumnModel: [
             {id: 'node', field: 'node', name: 'Node Address', sortable: true, resizable: true},
-            {id: 'processors', field: 'processors', name: 'Processors', sortable: true, resizable: true, cssClass: 'cell-right', headerCssClass: 'header-right'},
-            {id: 'processorLoadAverage', field: 'processorLoadAverage', name: 'Processor Load Average', sortable: true, resizable: true, cssClass: 'cell-right', headerCssClass: 'header-right'},
-            {id: 'totalThreads', field: 'totalThreads', name: 'Total Threads', sortable: true, resizable: true, cssClass: 'cell-right', headerCssClass: 'header-right'},
-            {id: 'daemonThreads', field: 'daemonThreads', name: 'Daemon Threads', sortable: true, resizable: true, cssClass: 'cell-right', headerCssClass: 'header-right'}
+            {
+                id: 'processors',
+                field: 'processors',
+                name: 'Processors',
+                sortable: true,
+                resizable: true,
+                cssClass: 'cell-right',
+                headerCssClass: 'header-right'
+            },
+            {
+                id: 'processorLoadAverage',
+                field: 'processorLoadAverage',
+                name: 'Processor Load Average',
+                sortable: true,
+                resizable: true,
+                cssClass: 'cell-right',
+                headerCssClass: 'header-right'
+            },
+            {
+                id: 'totalThreads',
+                field: 'totalThreads',
+                name: 'Total Threads',
+                sortable: true,
+                resizable: true,
+                cssClass: 'cell-right',
+                headerCssClass: 'header-right'
+            },
+            {
+                id: 'daemonThreads',
+                field: 'daemonThreads',
+                name: 'Daemon Threads',
+                sortable: true,
+                resizable: true,
+                cssClass: 'cell-right',
+                headerCssClass: 'header-right'
+            }
         ],
         tableIdColumn: 'id',
         tableOptions: commonTableOptions,
         tableOnClick: null,
+        createTableOnEnter: null,
+        cleanUpTable: null,
         init: commonTableInit,
         onSort: sort,
         onTabSelected: onSelectTab,
@@ -143,14 +196,48 @@ nf.ClusterTable = (function () {
         tableId: 'cluster-flowfile-table',
         tableColumnModel: [
             {id: 'node', field: 'node', name: 'Node Address', sortable: true, resizable: true},
-            {id: 'ffRepoTotal', field: 'ffRepoTotal', name: 'Total Space', sortable: true, resizable: true, cssClass: 'cell-right', headerCssClass: 'header-right'},
-            {id: 'ffRepoUsed', field: 'ffRepoUsed', name: 'Used Space', sortable: true, resizable: true, cssClass: 'cell-right', headerCssClass: 'header-right'},
-            {id: 'ffRepoFree', field: 'ffRepoFree', name: 'Free Space', sortable: true, resizable: true, cssClass: 'cell-right', headerCssClass: 'header-right'},
-            {id: 'ffStoreUtil', field: 'ffRepoUtil', name: 'Utilization', sortable: true, resizable: true, cssClass: 'cell-right', headerCssClass: 'header-right'}
+            {
+                id: 'ffRepoTotal',
+                field: 'ffRepoTotal',
+                name: 'Total Space',
+                sortable: true,
+                resizable: true,
+                cssClass: 'cell-right',
+                headerCssClass: 'header-right'
+            },
+            {
+                id: 'ffRepoUsed',
+                field: 'ffRepoUsed',
+                name: 'Used Space',
+                sortable: true,
+                resizable: true,
+                cssClass: 'cell-right',
+                headerCssClass: 'header-right'
+            },
+            {
+                id: 'ffRepoFree',
+                field: 'ffRepoFree',
+                name: 'Free Space',
+                sortable: true,
+                resizable: true,
+                cssClass: 'cell-right',
+                headerCssClass: 'header-right'
+            },
+            {
+                id: 'ffStoreUtil',
+                field: 'ffRepoUtil',
+                name: 'Utilization',
+                sortable: true,
+                resizable: true,
+                cssClass: 'cell-right',
+                headerCssClass: 'header-right'
+            }
         ],
         tableIdColumn: 'id',
         tableOptions: commonTableOptions,
         tableOnClick: null,
+        createTableOnEnter: null,
+        cleanUpTable: null,
         init: commonTableInit,
         onSort: sort,
         onTabSelected: onSelectTab,
@@ -171,14 +258,48 @@ nf.ClusterTable = (function () {
         tableColumnModel: [
             {id: 'node', field: 'node', name: 'Node Address', sortable: true, resizable: true},
             {id: 'contentRepoId', field: 'contentRepoId', name: 'Content Repository', sortable: true, resizable: true},
-            {id: 'contentRepoTotal', field: 'contentRepoTotal', name: 'Total Space', sortable: true, resizable: true, cssClass: 'cell-right', headerCssClass: 'header-right'},
-            {id: 'contentRepoUsed', field: 'contentRepoUsed', name: 'Used Space', sortable: true, resizable: true, cssClass: 'cell-right', headerCssClass: 'header-right'},
-            {id: 'contentRepoFree', field: 'contentRepoFree', name: 'Free Space', sortable: true, resizable: true, cssClass: 'cell-right', headerCssClass: 'header-right'},
-            {id: 'contentRepoUtil', field: 'contentRepoUtil', name: 'Utilization', sortable: true, resizable: true, cssClass: 'cell-right', headerCssClass: 'header-right'}
+            {
+                id: 'contentRepoTotal',
+                field: 'contentRepoTotal',
+                name: 'Total Space',
+                sortable: true,
+                resizable: true,
+                cssClass: 'cell-right',
+                headerCssClass: 'header-right'
+            },
+            {
+                id: 'contentRepoUsed',
+                field: 'contentRepoUsed',
+                name: 'Used Space',
+                sortable: true,
+                resizable: true,
+                cssClass: 'cell-right',
+                headerCssClass: 'header-right'
+            },
+            {
+                id: 'contentRepoFree',
+                field: 'contentRepoFree',
+                name: 'Free Space',
+                sortable: true,
+                resizable: true,
+                cssClass: 'cell-right',
+                headerCssClass: 'header-right'
+            },
+            {
+                id: 'contentRepoUtil',
+                field: 'contentRepoUtil',
+                name: 'Utilization',
+                sortable: true,
+                resizable: true,
+                cssClass: 'cell-right',
+                headerCssClass: 'header-right'
+            }
         ],
         tableIdColumn: 'id',
         tableOptions: commonTableOptions,
         tableOnClick: null,
+        createTableOnEnter: null,
+        cleanUpTable: null,
         init: commonTableInit,
         onSort: sort,
         onTabSelected: onSelectTab,
@@ -186,9 +307,9 @@ nf.ClusterTable = (function () {
             text: 'by address',
             value: 'node'
         }, {
-           text: 'by repository',
-           value: 'contentRepoId'
-       }]
+            text: 'by repository',
+            value: 'contentRepoId'
+        }]
     };
 
     var versionTab = {
@@ -211,6 +332,8 @@ nf.ClusterTable = (function () {
         tableIdColumn: 'id',
         tableOptions: commonTableOptions,
         tableOnClick: null,
+        createTableOnEnter: null,
+        cleanUpTable: null,
         init: commonTableInit,
         onSort: sort,
         onTabSelected: onSelectTab,
@@ -227,7 +350,7 @@ nf.ClusterTable = (function () {
     /**
      * Click handler for the Nodes table options.
      */
-    function nodesTableOnClick (e, args, target, item) {
+    function nodesTableOnClick(e, args, target, item) {
         if (nodesTab.grid.getColumns()[args.cell].id === 'actions') {
             if (target.hasClass('prompt-for-connect')) {
                 promptForConnect(item);
@@ -246,7 +369,7 @@ nf.ClusterTable = (function () {
     /**
      * Creates the Slick Grid column model for the Nodes table.
      */
-    function createNodeTableColumnModel () {
+    function createNodeTableColumnModel() {
         var moreDetailsFormatter = function (row, cell, value, columnDef, dataContext) {
             return '<div title="View Details" class="pointer show-node-details fa fa-info-circle" style="margin-top: 2px;"></div>';
         };
@@ -258,7 +381,7 @@ nf.ClusterTable = (function () {
 
         // function for formatting the last accessed time
         var valueFormatter = function (row, cell, value, columnDef, dataContext) {
-            return nf.Common.formatValue(value);
+            return nfCommon.formatValue(value);
         };
 
         // define a custom formatter for the status column
@@ -267,23 +390,72 @@ nf.ClusterTable = (function () {
         };
 
         var columnModel = [
-            {id: 'moreDetails', name: '&nbsp;', sortable: false, resizable: false, formatter: moreDetailsFormatter, width: 50, maxWidth: 50},
-            {id: 'formattedNodeAddress', field: 'formattedNodeAddress', name: 'Node Address', formatter: nodeFormatter, resizable: true, sortable: true},
-            {id: 'activeThreadCount', field: 'activeThreadCount', name: 'Active Thread Count', resizable: true, sortable: true, defaultSortAsc: false},
-            {id: 'queued', field: 'queued', name: '<span class="queued-title">Queue</span>&nbsp;/&nbsp;<span class="queued-size-title">Size</span>', resizable: true, sortable: true, defaultSortAsc: false},
-            {id: 'status', field: 'status', name: 'Status', formatter: statusFormatter, resizable: true, sortable: true},
-            {id: 'uptime', field: 'nodeStartTime', name: 'Uptime', formatter: valueFormatter, resizable: true, sortable: true, defaultSortAsc: false},
-            {id: 'heartbeat', field: 'heartbeat', name: 'Last Heartbeat', formatter: valueFormatter, resizable: true, sortable: true, defaultSortAsc: false}
+            {
+                id: 'moreDetails',
+                name: '&nbsp;',
+                sortable: false,
+                resizable: false,
+                formatter: moreDetailsFormatter,
+                width: 50,
+                maxWidth: 50
+            },
+            {
+                id: 'formattedNodeAddress',
+                field: 'formattedNodeAddress',
+                name: 'Node Address',
+                formatter: nodeFormatter,
+                resizable: true,
+                sortable: true
+            },
+            {
+                id: 'activeThreadCount',
+                field: 'activeThreadCount',
+                name: 'Active Thread Count',
+                resizable: true,
+                sortable: true,
+                defaultSortAsc: false
+            },
+            {
+                id: 'queued',
+                field: 'queued',
+                name: '<span class="queued-title">Queue</span>&nbsp;/&nbsp;<span class="queued-size-title">Size</span>',
+                resizable: true,
+                sortable: true,
+                defaultSortAsc: false
+            },
+            {
+                id: 'status',
+                field: 'status',
+                name: 'Status',
+                formatter: statusFormatter,
+                resizable: true,
+                sortable: true
+            },
+            {
+                id: 'uptime',
+                field: 'nodeStartTime',
+                name: 'Started At',
+                formatter: valueFormatter,
+                resizable: true,
+                sortable: true,
+                defaultSortAsc: false
+            },
+            {
+                id: 'heartbeat',
+                field: 'heartbeat',
+                name: 'Last Heartbeat',
+                formatter: valueFormatter,
+                resizable: true,
+                sortable: true,
+                defaultSortAsc: false
+            }
         ];
 
         // only allow the admin to modify the cluster
-        if (nf.Common.canModifyController()) {
+        if (nfCommon.canModifyController()) {
             var actionFormatter = function (row, cell, value, columnDef, dataContext) {
                 var canDisconnect = false;
                 var canConnect = false;
-
-                // determine if this node is already the primary
-                var isPrimary = dataContext.primary;
 
                 // determine the current status
                 if (dataContext.status === 'CONNECTED' || dataContext.status === 'CONNECTING') {
@@ -294,7 +466,7 @@ nf.ClusterTable = (function () {
 
                 // return the appropriate markup
                 if (canConnect) {
-                    return '<div title="Connect" class="pointer prompt-for-connect fa fa-plug" style="margin-top: 2px;"></div>&nbsp;<div title="Delete" class="pointer prompt-for-removal fa fa-trash" style="margin-top: 2px;"></div>';
+                    return '<div title="Connect" class="pointer prompt-for-connect fa fa-plug" style="margin-top: 2px;"></div><div title="Delete" class="pointer prompt-for-removal fa fa-trash" style="margin-top: 2px;"></div>';
                 } else if (canDisconnect) {
                     return '<div title="Disconnect" class="pointer prompt-for-disconnect fa fa-power-off" style="margin-top: 2px;"></div>';
                 } else {
@@ -302,10 +474,147 @@ nf.ClusterTable = (function () {
                 }
             };
 
-            columnModel.push({id: 'actions', label: '&nbsp;', formatter: actionFormatter, resizable: false, sortable: false, width: 80, maxWidth: 80});
+            columnModel.push({
+                id: 'actions',
+                label: '&nbsp;',
+                formatter: actionFormatter,
+                resizable: false,
+                sortable: false,
+                width: 80,
+                maxWidth: 80
+            });
         }
 
         return columnModel;
+    }
+
+    /**
+     * Click handler for the Nodes table options.
+     */
+    function createJvmTableOnEnterHandler(grid) {
+        var data = grid.getData();
+
+        return function (e) {
+            var jvmGc = $(this).find('div.show-jvm-gc');
+            if (jvmGc.length && !jvmGc.data('qtip')) {
+                var rowId = $(this).find('span.row-id').text();
+
+                // get the status item
+                var item = data.getItemById(rowId);
+
+                // generate the markup
+                var garbageCollections = nfCommon.getFormattedGarbageCollections(item.garbageCollection);
+                var tooltip = nfCommon.formatUnorderedList(garbageCollections);
+
+                // show the tooltip
+                if (nfCommon.isDefinedAndNotNull(tooltip)) {
+                    jvmGc.qtip($.extend({}, nfCommon.config.tooltipConfig, {
+                        content: tooltip,
+                        position: {
+                            container: $('#cluster'),
+                            at: 'bottom left',
+                            my: 'top right',
+                            adjust: {
+                                x: 4,
+                                y: 4
+                            }
+                        }
+                    }));
+                }
+            }
+        };
+    }
+
+    function cleanUpJvmTable(table) {
+        nfCommon.cleanUpTooltips(table, 'div.show-jvm-gc');
+    }
+
+    function createJvmTableColumnModel() {
+        var gcFormatter = function (row, cell, value, columnDef, dataContext) {
+            return '<div class="pointer show-jvm-gc fa fa-question-circle" style="margin-top: 2px;"></div><span class="hidden row-id">' + nfCommon.escapeHtml(dataContext.id) + '</span>';
+        };
+
+        return [
+            {
+                id: 'node',
+                field: 'node',
+                name: 'Node Address',
+                sortable: true,
+                resizable: true
+            },
+            {
+                id: 'heapMax',
+                field: 'maxHeap',
+                name: 'Heap Max',
+                sortable: true,
+                resizable: true,
+                cssClass: 'cell-right',
+                headerCssClass: 'header-right'
+            },
+            {
+                id: 'heapTotal',
+                field: 'totalHeap',
+                name: 'Heap Total',
+                sortable: true,
+                resizable: true,
+                cssClass: 'cell-right',
+                headerCssClass: 'header-right'
+            },
+            {
+                id: 'heapUsed',
+                field: 'usedHeap',
+                name: 'Heap Used',
+                sortable: true,
+                resizable: true,
+                cssClass: 'cell-right',
+                headerCssClass: 'header-right'
+            },
+            {
+                id: 'heapUtilPct',
+                field: 'heapUtilization',
+                name: 'Heap Utilization',
+                sortable: true,
+                resizable: true,
+                cssClass: 'cell-right',
+                headerCssClass: 'header-right'
+            },
+            {
+                id: 'nonHeapTotal',
+                field: 'totalNonHeap',
+                name: 'Non-Heap Total',
+                sortable: true,
+                resizable: true,
+                cssClass: 'cell-right',
+                headerCssClass: 'header-right'
+            },
+            {
+                id: 'nonHeapUsed',
+                field: 'usedNonHeap',
+                name: 'Non-Heap Used',
+                sortable: true,
+                resizable: true,
+                cssClass: 'cell-right',
+                headerCssClass: 'header-right'
+            },
+            {
+                id: 'gc',
+                name: 'GC',
+                sortable: false,
+                resizable: true,
+                formatter: gcFormatter,
+                width: 50,
+                maxWidth: 50
+            },
+            {
+                id: 'uptime',
+                field: 'uptime',
+                name: 'Uptime',
+                sortable: true,
+                resizable: true,
+                cssClass: 'cell-right',
+                headerCssClass: 'header-right'
+            }
+        ];
     }
 
     var prevColumn, count;
@@ -316,12 +625,12 @@ nf.ClusterTable = (function () {
      * @param {object} sortDetails
      * @param {object} data
      */
-    function sort (sortDetails, dataView, tab) {
+    function sort(sortDetails, dataView, tab) {
         // defines a function for sorting
         var comparer = function (a, b) {
             if (sortDetails.columnId === 'heartbeat' || sortDetails.columnId === 'uptime') {
-                var aDate = nf.Common.parseDateTime(a[sortDetails.columnId]);
-                var bDate = nf.Common.parseDateTime(b[sortDetails.columnId]);
+                var aDate = nfCommon.parseDateTime(a[sortDetails.columnId]);
+                var bDate = nfCommon.parseDateTime(b[sortDetails.columnId]);
                 return aDate.getTime() - bDate.getTime();
             } else if (sortDetails.columnId === 'queued') {
                 var aSplit = a[sortDetails.columnId].split(/ \/ /);
@@ -329,33 +638,27 @@ nf.ClusterTable = (function () {
                 var mod = count % 4;
                 if (mod < 2) {
                     $('#cluster-nodes-table span.queued-title').addClass('sorted');
-                    var aCount = nf.Common.parseCount(aSplit[0]);
-                    var bCount = nf.Common.parseCount(bSplit[0]);
+                    var aCount = nfCommon.parseCount(aSplit[0]);
+                    var bCount = nfCommon.parseCount(bSplit[0]);
                     return aCount - bCount;
                 } else {
                     $('#cluster-nodes-table span.queued-size-title').addClass('sorted');
-                    var aSize = nf.Common.parseSize(aSplit[1]);
-                    var bSize = nf.Common.parseSize(bSplit[1]);
+                    var aSize = nfCommon.parseSize(aSplit[1]);
+                    var bSize = nfCommon.parseSize(bSplit[1]);
                     return aSize - bSize;
                 }
             } else if (sortDetails.columnId === 'maxHeap' || sortDetails.columnId === 'totalHeap' || sortDetails.columnId === 'usedHeap'
-                    || sortDetails.columnId === 'totalNonHeap' || sortDetails.columnId === 'usedNonHeap'
-                    || sortDetails.columnId === 'ffRepoTotal' || sortDetails.columnId === 'ffRepoUsed'
-                    || sortDetails.columnId === 'ffRepoFree' || sortDetails.columnId === 'contentRepoTotal'
-                    || sortDetails.columnId === 'contentRepoUsed' || sortDetails.columnId === 'contentRepoFree') {
-                var aSize = nf.Common.parseSize(a[sortDetails.columnId]);
-                var bSize = nf.Common.parseSize(b[sortDetails.columnId]);
+                || sortDetails.columnId === 'totalNonHeap' || sortDetails.columnId === 'usedNonHeap'
+                || sortDetails.columnId === 'ffRepoTotal' || sortDetails.columnId === 'ffRepoUsed'
+                || sortDetails.columnId === 'ffRepoFree' || sortDetails.columnId === 'contentRepoTotal'
+                || sortDetails.columnId === 'contentRepoUsed' || sortDetails.columnId === 'contentRepoFree') {
+                var aSize = nfCommon.parseSize(a[sortDetails.columnId]);
+                var bSize = nfCommon.parseSize(b[sortDetails.columnId]);
                 return aSize - bSize;
             } else if (sortDetails.columnId === 'totalThreads' || sortDetails.columnId === 'daemonThreads'
-                    || sortDetails.columnId === 'processors') {
-                var aCount = nf.Common.parseCount(a[sortDetails.columnId]);
-                var bCount = nf.Common.parseCount(b[sortDetails.columnId]);
-                return aCount - bCount;
-            } else if (sortDetails.columnId === 'gcOldGen' || sortDetails.columnId === 'gcNewGen') {
-                var aSplit = a[sortDetails.columnId].split(/ /);
-                var bSplit = b[sortDetails.columnId].split(/ /);
-                var aCount = nf.Common.parseCount(aSplit[0]);
-                var bCount = nf.Common.parseCount(bSplit[0]);
+                || sortDetails.columnId === 'processors') {
+                var aCount = nfCommon.parseCount(a[sortDetails.columnId]);
+                var bCount = nfCommon.parseCount(b[sortDetails.columnId]);
                 return aCount - bCount;
             } else if (sortDetails.columnId === 'status') {
                 var aStatus = formatNodeStatus(a);
@@ -366,8 +669,8 @@ nf.ClusterTable = (function () {
                 var bNode = formatNodeAddress(b);
                 return aNode === bNode ? 0 : aNode > bNode ? 1 : -1;
             } else {
-                var aString = nf.Common.isDefinedAndNotNull(a[sortDetails.columnId]) ? a[sortDetails.columnId] : '';
-                var bString = nf.Common.isDefinedAndNotNull(b[sortDetails.columnId]) ? b[sortDetails.columnId] : '';
+                var aString = nfCommon.isDefinedAndNotNull(a[sortDetails.columnId]) ? a[sortDetails.columnId] : '';
+                var bString = nfCommon.isDefinedAndNotNull(b[sortDetails.columnId]) ? b[sortDetails.columnId] : '';
                 return aString === bString ? 0 : aString > bString ? 1 : -1;
             }
         };
@@ -397,7 +700,7 @@ nf.ClusterTable = (function () {
      * @returns {string}
      */
     var formatNodeAddress = function (node) {
-        return nf.Common.escapeHtml(node.address) + ':' + nf.Common.escapeHtml(node.apiPort);
+        return nfCommon.escapeHtml(node.address) + ':' + nfCommon.escapeHtml(node.apiPort);
     };
 
     /**
@@ -424,7 +727,7 @@ nf.ClusterTable = (function () {
      */
     var promptForConnect = function (node) {
         // prompt to connect
-        nf.Dialog.showYesNoDialog({
+        nfDialog.showYesNoDialog({
             headerText: 'Connect Node',
             dialogContent: 'Connect \'' + formatNodeAddress(node) + '\' to this cluster?',
             yesHandler: function () {
@@ -458,7 +761,7 @@ nf.ClusterTable = (function () {
             var clusterGrid = $('#cluster-nodes-table').data('gridInstance');
             var clusterData = clusterGrid.getData();
             clusterData.updateItem(node.nodeId, node);
-        }).fail(nf.Common.handleAjaxError);
+        }).fail(nfErrorHandler.handleAjaxError);
     };
 
     /**
@@ -468,7 +771,7 @@ nf.ClusterTable = (function () {
      */
     var promptForDisconnect = function (node) {
         // prompt for disconnect
-        nf.Dialog.showYesNoDialog({
+        nfDialog.showYesNoDialog({
             headerText: 'Disconnect Node',
             dialogContent: 'Disconnect \'' + formatNodeAddress(node) + '\' from the cluster?',
             yesHandler: function () {
@@ -503,7 +806,7 @@ nf.ClusterTable = (function () {
             var clusterGrid = $('#cluster-nodes-table').data('gridInstance');
             var clusterData = clusterGrid.getData();
             clusterData.updateItem(node.nodeId, node);
-        }).fail(nf.Common.handleAjaxError);
+        }).fail(nfErrorHandler.handleAjaxError);
     };
 
     /**
@@ -513,7 +816,7 @@ nf.ClusterTable = (function () {
      */
     var promptForRemoval = function (node) {
         // prompt for disconnect
-        nf.Dialog.showYesNoDialog({
+        nfDialog.showYesNoDialog({
             headerText: 'Remove Node',
             dialogContent: 'Remove \'' + formatNodeAddress(node) + '\' from the cluster?',
             yesHandler: function () {
@@ -537,7 +840,7 @@ nf.ClusterTable = (function () {
             var clusterGrid = $('#cluster-nodes-table').data('gridInstance');
             var clusterData = clusterGrid.getData();
             clusterData.deleteItem(nodeId);
-        }).fail(nf.Common.handleAjaxError);
+        }).fail(nfErrorHandler.handleAjaxError);
     };
 
     /**
@@ -561,7 +864,7 @@ nf.ClusterTable = (function () {
         var grid = visibleTab.grid;
 
         // ensure the grid has been initialized
-        if (nf.Common.isDefinedAndNotNull(grid)) {
+        if (nfCommon.isDefinedAndNotNull(grid)) {
             var gridData = grid.getData();
 
             // update the search criteria
@@ -617,7 +920,7 @@ nf.ClusterTable = (function () {
     /**
      * Updates count of displayed and total rows.
      */
-    function updateFilterStats (selectedTab) {
+    function updateFilterStats(selectedTab) {
         if (!selectedTab) {
             selectedTab = getSelectedTab();
         }
@@ -661,26 +964,28 @@ nf.ClusterTable = (function () {
                 $.each(node.events, function (i, event) {
                     eventMessages.push(event.timestamp + ": " + event.message);
                 });
-                $('<div></div>').append(nf.Common.formatUnorderedList(eventMessages)).appendTo(events);
+                $('<div></div>').append(nfCommon.formatUnorderedList(eventMessages)).appendTo(events);
             } else {
                 events.append('<div><span class="unset">None</span></div>');
             }
 
             // show the dialog
             $('#node-details-dialog').modal('show');
-        }).fail(nf.Common.handleAjaxError);
+        }).fail(nfErrorHandler.handleAjaxError);
     };
 
     /**
      * Applies system diagnostics data to the JVM tab.
      */
-    function updateJvmTableData (systemDiagnosticsResponse) {
-        if (nf.Common.isDefinedAndNotNull(systemDiagnosticsResponse.systemDiagnostics)
-            && nf.Common.isDefinedAndNotNull(systemDiagnosticsResponse.systemDiagnostics.nodeSnapshots)) {
+    function updateJvmTableData(systemDiagnosticsResponse) {
+        if (nfCommon.isDefinedAndNotNull(systemDiagnosticsResponse.systemDiagnostics)
+            && nfCommon.isDefinedAndNotNull(systemDiagnosticsResponse.systemDiagnostics.nodeSnapshots)) {
 
             var jvmTableRows = [];
             systemDiagnosticsResponse.systemDiagnostics.nodeSnapshots.forEach(function (nodeSnapshot) {
                 var snapshot = nodeSnapshot.snapshot;
+
+                // add the node jvm details
                 jvmTableRows.push({
                     id: nodeSnapshot.nodeId,
                     node: nodeSnapshot.address + ':' + nodeSnapshot.apiPort,
@@ -692,10 +997,8 @@ nf.ClusterTable = (function () {
                     maxNonHeap: snapshot.maxNonHeap,
                     totalNonHeap: snapshot.totalNonHeap,
                     usedNonHeap: snapshot.usedNonHeap,
-                    gcOldGen: snapshot.garbageCollection[0].collectionCount + ' times (' +
-                        snapshot.garbageCollection[0].collectionTime + ')',
-                    gcNewGen: snapshot.garbageCollection[1].collectionCount + ' times (' +
-                        snapshot.garbageCollection[1].collectionTime + ')'
+                    garbageCollection: snapshot.garbageCollection,
+                    uptime: snapshot.uptime
                 });
             });
             jvmTab.rowCount = jvmTableRows.length;
@@ -710,9 +1013,9 @@ nf.ClusterTable = (function () {
     /**
      * Applies system diagnostics data to the System tab.
      */
-    function updateSystemTableData (systemDiagnosticsResponse) {
-        if (nf.Common.isDefinedAndNotNull(systemDiagnosticsResponse.systemDiagnostics)
-            && nf.Common.isDefinedAndNotNull(systemDiagnosticsResponse.systemDiagnostics.nodeSnapshots)) {
+    function updateSystemTableData(systemDiagnosticsResponse) {
+        if (nfCommon.isDefinedAndNotNull(systemDiagnosticsResponse.systemDiagnostics)
+            && nfCommon.isDefinedAndNotNull(systemDiagnosticsResponse.systemDiagnostics.nodeSnapshots)) {
 
             var systemTableRows = [];
             systemDiagnosticsResponse.systemDiagnostics.nodeSnapshots.forEach(function (nodeSnapshot) {
@@ -739,9 +1042,9 @@ nf.ClusterTable = (function () {
     /**
      * Applies system diagnostics data to the FlowFile Storage tab.
      */
-    function updateFlowFileTableData (systemDiagnosticsResponse) {
-        if (nf.Common.isDefinedAndNotNull(systemDiagnosticsResponse.systemDiagnostics)
-            && nf.Common.isDefinedAndNotNull(systemDiagnosticsResponse.systemDiagnostics.nodeSnapshots)) {
+    function updateFlowFileTableData(systemDiagnosticsResponse) {
+        if (nfCommon.isDefinedAndNotNull(systemDiagnosticsResponse.systemDiagnostics)
+            && nfCommon.isDefinedAndNotNull(systemDiagnosticsResponse.systemDiagnostics.nodeSnapshots)) {
 
             var flowFileTableRows = [];
             systemDiagnosticsResponse.systemDiagnostics.nodeSnapshots.forEach(function (nodeSnapshot) {
@@ -768,9 +1071,9 @@ nf.ClusterTable = (function () {
     /**
      * Applies system diagnostics data to the Content Storage tab.
      */
-    function updateContentTableData (systemDiagnosticsResponse) {
-        if (nf.Common.isDefinedAndNotNull(systemDiagnosticsResponse.systemDiagnostics)
-            && nf.Common.isDefinedAndNotNull(systemDiagnosticsResponse.systemDiagnostics.nodeSnapshots)) {
+    function updateContentTableData(systemDiagnosticsResponse) {
+        if (nfCommon.isDefinedAndNotNull(systemDiagnosticsResponse.systemDiagnostics)
+            && nfCommon.isDefinedAndNotNull(systemDiagnosticsResponse.systemDiagnostics.nodeSnapshots)) {
 
             var contentStorageTableRows = [];
             systemDiagnosticsResponse.systemDiagnostics.nodeSnapshots.forEach(function (nodeSnapshot) {
@@ -801,9 +1104,9 @@ nf.ClusterTable = (function () {
     /**
      * Applies system diagnostics data to the Versions tab.
      */
-    function updateVersionTableData (systemDiagnosticsResponse) {
-        if (nf.Common.isDefinedAndNotNull(systemDiagnosticsResponse.systemDiagnostics)
-            && nf.Common.isDefinedAndNotNull(systemDiagnosticsResponse.systemDiagnostics.nodeSnapshots)) {
+    function updateVersionTableData(systemDiagnosticsResponse) {
+        if (nfCommon.isDefinedAndNotNull(systemDiagnosticsResponse.systemDiagnostics)
+            && nfCommon.isDefinedAndNotNull(systemDiagnosticsResponse.systemDiagnostics.nodeSnapshots)) {
 
             var versionTableRows = [];
             systemDiagnosticsResponse.systemDiagnostics.nodeSnapshots.forEach(function (nodeSnapshot) {
@@ -830,7 +1133,7 @@ nf.ClusterTable = (function () {
     /**
      * Loads system diagnostics data for the cluster.
      */
-    function refreshSystemDiagnosticsData () {
+    function refreshSystemDiagnosticsData() {
         var systemDiagnosticsUri = config.urls.systemDiagnostics
         var loadPromise = $.ajax({
             type: 'GET',
@@ -844,14 +1147,14 @@ nf.ClusterTable = (function () {
             handlers.forEach(function (handler) {
                 handler(systemDiagnosticsResponse);
             });
-        }).fail(nf.Common.handleAjaxError);
+        }).fail(nfErrorHandler.handleAjaxError);
         return loadPromise;
     };
 
     /**
      * Generic initialization for Slick Grid tables
      */
-    function commonTableInit (tab) {
+    function commonTableInit(tab) {
         var dataView = new Slick.Data.DataView({
             inlineFilters: false
         });
@@ -905,7 +1208,20 @@ nf.ClusterTable = (function () {
         }
 
         // hold onto an instance of the grid
-        $('#' + tab.tableId).data('gridInstance', grid);
+        var table = $('#' + tab.tableId).data('gridInstance', grid);
+
+        // enter events
+        if (typeof tab.createTableOnEnter === 'function') {
+            table.on('mouseenter', 'div.slick-cell', tab.createTableOnEnter(grid));
+        }
+
+        // clean up
+        if (typeof tab.cleanUpTable === 'function') {
+            grid.onViewportChanged.subscribe(function (e, args) {
+                tab.cleanUpTable(table);
+            });
+        }
+
         tab.dataView = dataView;
         tab.grid = grid;
     };
@@ -913,11 +1229,11 @@ nf.ClusterTable = (function () {
     /**
      * Apply the cluster nodes data set to the table.
      */
-    function updateNodesTableData (clusterResponse) {
+    function updateNodesTableData(clusterResponse) {
         var cluster = clusterResponse.cluster;
 
         // ensure there are groups specified
-        if (nf.Common.isDefinedAndNotNull(cluster.nodes)) {
+        if (nfCommon.isDefinedAndNotNull(cluster.nodes)) {
             var clusterGrid = nodesTab.grid;
             var clusterData = clusterGrid.getData();
 
@@ -937,7 +1253,7 @@ nf.ClusterTable = (function () {
     /**
      * Refreshes cluster data sets from the server.
      */
-    function refreshClusterData () {
+    function refreshClusterData() {
         var clusterNodesDataPromise = $.ajax({
             type: 'GET',
             url: config.urls.cluster,
@@ -947,17 +1263,17 @@ nf.ClusterTable = (function () {
             handlers.forEach(function (handler) {
                 handler(response);
             });
-        }).fail(nf.Common.handleAjaxError);
+        }).fail(nfErrorHandler.handleAjaxError);
         return clusterNodesDataPromise;
     }
 
     /**
      * Event handler triggered when the user switches tabs.
      */
-    function onSelectTab (tab) {
+    function onSelectTab(tab) {
         // Resize table
         var tabGrid = tab.grid;
-        if (nf.Common.isDefinedAndNotNull(tabGrid)) {
+        if (nfCommon.isDefinedAndNotNull(tabGrid)) {
             tabGrid.resizeCanvas();
         }
 
@@ -975,7 +1291,7 @@ nf.ClusterTable = (function () {
         updateFilterStats(tab);
     }
 
-    return {
+    var nfClusterTable = {
         /**
          * Initializes the cluster list.
          */
@@ -1062,7 +1378,7 @@ nf.ClusterTable = (function () {
 
             // listen for browser resize events to update the page size
             $(window).resize(function () {
-                nf.ClusterTable.resetTableSize();
+                nfClusterTable.resetTableSize();
             });
 
             // initialize tabs
@@ -1102,4 +1418,5 @@ nf.ClusterTable = (function () {
         }
     };
 
-}());
+    return nfClusterTable;
+}));

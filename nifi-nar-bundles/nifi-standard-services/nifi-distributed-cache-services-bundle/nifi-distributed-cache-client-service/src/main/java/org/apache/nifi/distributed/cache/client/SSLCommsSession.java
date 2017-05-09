@@ -42,8 +42,10 @@ public class SSLCommsSession implements CommsSession {
     private final SSLSocketChannelOutputStream out;
     private final BufferedOutputStream bufferedOut;
 
+    private int protocolVersion;
+
     public SSLCommsSession(final SSLContext sslContext, final String hostname, final int port) throws IOException {
-        sslSocketChannel = new SSLSocketChannel(sslContext, hostname, port, true);
+        sslSocketChannel = new SSLSocketChannel(sslContext, hostname, port, null, true);
 
         in = new SSLSocketChannelInputStream(sslSocketChannel);
         bufferedIn = new BufferedInputStream(in);
@@ -106,4 +108,13 @@ public class SSLCommsSession implements CommsSession {
         return timeUnit.convert(sslSocketChannel.getTimeout(), TimeUnit.MILLISECONDS);
     }
 
+    @Override
+    public int getProtocolVersion() {
+        return protocolVersion;
+    }
+
+    @Override
+    public void setProtocolVersion(final int protocolVersion) {
+        this.protocolVersion = protocolVersion;
+    }
 }

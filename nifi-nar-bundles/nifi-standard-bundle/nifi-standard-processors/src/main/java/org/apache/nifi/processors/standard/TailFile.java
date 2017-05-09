@@ -44,11 +44,11 @@ import org.apache.nifi.processor.Relationship;
 import org.apache.nifi.processor.exception.ProcessException;
 import org.apache.nifi.processor.io.OutputStreamCallback;
 import org.apache.nifi.processor.util.StandardValidators;
-import org.apache.nifi.stream.io.ByteArrayOutputStream;
 import org.apache.nifi.stream.io.NullOutputStream;
 import org.apache.nifi.stream.io.StreamUtils;
 
 import java.io.BufferedOutputStream;
+import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.IOException;
@@ -108,8 +108,7 @@ public class TailFile extends AbstractProcessor {
             + " In this mode, the file may not exist when starting the processor.");
     static final AllowableValue MODE_MULTIFILE = new AllowableValue("Multiple files", "Multiple files",
             "In this mode, the 'Files to tail' property accepts a regular expression and the processor will look"
-            + " for files in 'Base directory' to list the files to tail by the processor. In this mode, only the files existing"
-            + " when starting the processor will be used.");
+            + " for files in 'Base directory' to list the files to tail by the processor.");
 
     static final AllowableValue FIXED_NAME = new AllowableValue("Fixed name", "Fixed name", "With this rolling strategy, the files "
             + "where the log messages are appended have always the same name.");
@@ -311,8 +310,7 @@ public class TailFile extends AbstractProcessor {
     @OnScheduled
     public void recoverState(final ProcessContext context) throws IOException {
         // set isMultiChanging
-        isMultiChanging.set(context.getProperty(MODE).getValue().equals(MODE_MULTIFILE.getValue())
-                && context.getProperty(ROLLING_STRATEGY).getValue().equals(CHANGING_NAME.getValue()));
+        isMultiChanging.set(context.getProperty(MODE).getValue().equals(MODE_MULTIFILE.getValue()));
 
         // set last lookup to now
         lastLookup.set(new Date().getTime());
@@ -344,6 +342,25 @@ public class TailFile extends AbstractProcessor {
         }
 
         Map<String, String> statesMap = stateMap.toMap();
+
+        if (statesMap.containsKey(TailFileState.StateKeys.FILENAME)
+                && !statesMap.keySet().stream().anyMatch(key -> key.startsWith(MAP_PREFIX))) {
+            // If statesMap contains "filename" key without "file.0." prefix,
+            // and there's no key with "file." prefix, then
+            // it indicates that the statesMap is created with earlier version of NiFi.
+            // In this case, we need to migrate the state by adding prefix indexed with 0.
+            final Map<String, String> migratedStatesMap = new HashMap<>(statesMap.size());
+            for (String key : statesMap.keySet()) {
+                migratedStatesMap.put(MAP_PREFIX + "0." + key, statesMap.get(key));
+            }
+
+            // LENGTH is added from NiFi 1.1.0. Set the value with using the last position so that we can use existing state
+            // to avoid sending duplicated log data after updating NiFi.
+            migratedStatesMap.put(MAP_PREFIX + "0." + TailFileState.StateKeys.LENGTH, statesMap.get(TailFileState.StateKeys.POSITION));
+            statesMap = Collections.unmodifiableMap(migratedStatesMap);
+
+            getLogger().info("statesMap has been migrated. {}", new Object[]{migratedStatesMap});
+        }
 
         initStates(filesToTail, statesMap, false);
         recoverState(context, filesToTail, statesMap);
@@ -936,6 +953,15 @@ public class TailFile extends AbstractProcessor {
             Map<String, String> updatedState = new HashMap<String, String>();
 
             for(String key : oldState.toMap().keySet()) {
+                // These states are stored by older version of NiFi, and won't be used anymore.
+                // New states have 'file.<index>.' prefix.
+                if (TailFileState.StateKeys.CHECKSUM.equals(key)
+                        || TailFileState.StateKeys.FILENAME.equals(key)
+                        || TailFileState.StateKeys.POSITION.equals(key)
+                        || TailFileState.StateKeys.TIMESTAMP.equals(key)) {
+                    getLogger().info("Removed state {}={} stored by older version of NiFi.", new Object[]{key, oldState.get(key)});
+                    continue;
+                }
                 updatedState.put(key, oldState.get(key));
             }
 
