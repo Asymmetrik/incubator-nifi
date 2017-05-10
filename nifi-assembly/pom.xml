@@ -539,10 +539,14 @@
                             given the uid is created by the preinstallScriptlet below. Meanwhile, normal zip and tar.gz
                             ship without this particular property set -->
                             <installScriptlet>
-                                <!-- It is important to note because of the way the plugin calls the command, the sed backup
+                                <!--
+                                It is important to note because of the way the plugin calls the command, the sed backup
                                 parameter -i and the sed command do not beed to be wrapped by single or double quotes.
-                                Also note maven properties are processed before RPM variables and before sed commands -->
-                                <script>sed -i s/^run\.as=$/run\.as=${nifi.run.as}/ $RPM_BUILD_ROOT/opt/nifi/nifi-${project.version}/conf/bootstrap.conf</script>
+                                Also note maven properties are processed before RPM variables and before sed commands.
+                                The '-i.bak' and subsequent 'rm ...' ensure compatibility between OS X (BSD) and Linux
+                                (http://stackoverflow.com/questions/5694228/sed-in-place-flag-that-works-both-on-mac-bsd-and-linux)
+                                -->
+                                <script>sed -i.bak s/^run\.as=$/run\.as=${nifi.run.as}/ $RPM_BUILD_ROOT/opt/nifi/nifi-${project.version}/conf/bootstrap.conf; rm -f $RPM_BUILD_ROOT/opt/nifi/nifi-${project.version}/conf/bootstrap.conf.bak</script>
                             </installScriptlet>
                             <preinstallScriptlet>
                                 <script>/usr/bin/getent group nifi &gt;/dev/null || /usr/sbin/groupadd -r nifi; /usr/bin/getent passwd nifi &gt;/dev/null || /usr/sbin/useradd -r -g nifi -d /opt/nifi -s /sbin/nologin -c "NiFi System User" nifi</script>
