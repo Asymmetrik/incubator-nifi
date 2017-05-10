@@ -480,9 +480,6 @@
             </activation>
             <properties>
                 <nifi.run.as>nifi</nifi.run.as>
-                <nifi.install.dir>/var/lib/nifi</nifi.install.dir>
-                <nifi.log.dir>/var/log/nifi</nifi.log.dir>
-                <nifi.pid.dir>/var/run/nifi</nifi.pid.dir>
             </properties>
             <build>
                 <plugins>
@@ -528,7 +525,7 @@
                             <license>Apache License, Version 2.0 and others (see included LICENSE file)</license>
                             <url>http://nifi.apache.org</url>
                             <group>Utilities</group>
-                            <prefix>${nifi.install.dir}</prefix>
+                            <prefix>/opt/nifi</prefix>
                             <!--
                             <defineStatements>
                                 <defineStatement>_use_internal_dependency_generator 0</defineStatement>
@@ -548,7 +545,7 @@
                                 <script>sed -i s/^run\.as=$/run\.as=${nifi.run.as}/ $RPM_BUILD_ROOT/opt/nifi/nifi-${project.version}/conf/bootstrap.conf</script>
                             </installScriptlet>
                             <preinstallScriptlet>
-                                <script>/usr/bin/getent group nifi &gt;/dev/null || /usr/sbin/groupadd -r nifi; /usr/bin/getent passwd nifi &gt;/dev/null || /usr/sbin/useradd -r -g nifi -d ${nifi.install.dir} -s /sbin/nologin -c "NiFi System User" nifi</script>
+                                <script>/usr/bin/getent group nifi &gt;/dev/null || /usr/sbin/groupadd -r nifi; /usr/bin/getent passwd nifi &gt;/dev/null || /usr/sbin/useradd -r -g nifi -d /opt/nifi -s /sbin/nologin -c "NiFi System User" nifi</script>
                             </preinstallScriptlet>
                             <targetOS>linux</targetOS>
                         </configuration>
@@ -565,10 +562,10 @@
                                     </provides>
                                     <mappings>
                                         <mapping>
-                                            <directory>${nifi.install.dir}/nifi-${project.version}</directory>
+                                            <directory>/opt/nifi/nifi-${project.version}</directory>
                                         </mapping>
                                         <mapping>
-                                            <directory>${nifi.install.dir}/nifi-${project.version}</directory>
+                                            <directory>/opt/nifi/nifi-${project.version}</directory>
                                             <sources>
                                                 <source>
                                                     <location>./LICENSE</location>
@@ -583,13 +580,10 @@
                                             </sources>
                                         </mapping>
                                         <mapping>
-                                            <directory>${nifi.log.dir}</directory>
+                                            <directory>/opt/nifi</directory>
                                         </mapping>
                                         <mapping>
-                                            <directory>${nifi.pid.dir}</directory>
-                                        </mapping>
-                                        <mapping>
-                                            <directory>${nifi.install.dir}/nifi-${project.version}/bin</directory>
+                                            <directory>/opt/nifi/nifi-${project.version}/bin</directory>
                                             <filemode>755</filemode>
                                             <sources>
                                                 <source>
@@ -605,7 +599,7 @@
                                             </sources>
                                         </mapping>
                                         <mapping>
-                                            <directory>${nifi.install.dir}/nifi-${project.version}/conf</directory>
+                                            <directory>/opt/nifi/nifi-${project.version}/conf</directory>
                                             <configuration>true</configuration>
                                             <sources>
                                                 <source>
@@ -615,7 +609,7 @@
                                             </sources>
                                         </mapping>
                                         <mapping>
-                                            <directory>${nifi.install.dir}/nifi-${project.version}/lib</directory>
+                                            <directory>/opt/nifi/nifi-${project.version}/lib</directory>
                                         </mapping>
                                         <!-- The lib excludes and lib/bootstrap 
                                             includes are computed by looking at the desired contents of lib vs the desired 
@@ -624,7 +618,7 @@
                                             build and the lib folder should be specific excludes being those which we 
                                             want in bootstrap and NOT in lib. -->
                                         <mapping>
-                                            <directory>${nifi.install.dir}/nifi-${project.version}/lib</directory>
+                                            <directory>/opt/nifi/nifi-${project.version}/lib</directory>
                                             <dependency>
                                                 <excludes>
                                                     <exclude>org.bouncycastle:bcprov-jdk15on</exclude>
@@ -663,7 +657,7 @@
                                             </dependency>
                                         </mapping>
                                         <mapping>
-                                            <directory>${nifi.install.dir}/nifi-${project.version}/lib/bootstrap</directory>
+                                            <directory>/opt/nifi/nifi-${project.version}/lib/bootstrap</directory>
                                             <dependency>
                                                 <includes>
                                                     <include>org.bouncycastle:bcprov-jdk15on</include>
@@ -698,7 +692,7 @@
                                             </dependency>
                                         </mapping>
                                         <mapping>
-                                            <directory>${nifi.install.dir}/nifi-${project.version}/docs</directory>
+                                            <directory>/opt/nifi/nifi-${project.version}/docs</directory>
                                             <sources>
                                                 <source>
                                                     <location>${project.build.directory}/generated-docs</location>
