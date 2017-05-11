@@ -92,7 +92,6 @@ public class DeleteDynamoDBTest extends AbstractDynamoDBTest{
 
         final TestRunner deleteRunner = TestRunners.newTestRunner(deleteDynamoDB);
 
-        deleteRunner.setValidateExpressionUsage(false);
         deleteRunner.setProperty(AbstractDynamoDBProcessor.ACCESS_KEY, "abcd");
         deleteRunner.setProperty(AbstractDynamoDBProcessor.SECRET_KEY, "cdef");
         deleteRunner.setProperty(AbstractDynamoDBProcessor.REGION, REGION);
@@ -116,7 +115,6 @@ public class DeleteDynamoDBTest extends AbstractDynamoDBTest{
     public void testStringHashStringRangeDeleteSuccessfulWithMock() {
         final TestRunner deleteRunner = TestRunners.newTestRunner(deleteDynamoDB);
 
-        deleteRunner.setValidateExpressionUsage(false);
         deleteRunner.setProperty(AbstractDynamoDBProcessor.ACCESS_KEY,"abcd");
         deleteRunner.setProperty(AbstractDynamoDBProcessor.SECRET_KEY, "cdef");
         deleteRunner.setProperty(AbstractDynamoDBProcessor.REGION, REGION);
@@ -147,7 +145,6 @@ public class DeleteDynamoDBTest extends AbstractDynamoDBTest{
         result.setUnprocessedItems(unprocessed);
         final TestRunner deleteRunner = TestRunners.newTestRunner(deleteDynamoDB);
 
-        deleteRunner.setValidateExpressionUsage(false);
         deleteRunner.setProperty(AbstractDynamoDBProcessor.ACCESS_KEY,"abcd");
         deleteRunner.setProperty(AbstractDynamoDBProcessor.SECRET_KEY, "cdef");
         deleteRunner.setProperty(AbstractDynamoDBProcessor.REGION, REGION);
@@ -168,7 +165,6 @@ public class DeleteDynamoDBTest extends AbstractDynamoDBTest{
     public void testStringHashStringRangeDeleteNoHashValueFailure() {
         final TestRunner deleteRunner = TestRunners.newTestRunner(DeleteDynamoDB.class);
 
-        deleteRunner.setValidateExpressionUsage(false);
         deleteRunner.setProperty(AbstractDynamoDBProcessor.ACCESS_KEY,"abcd");
         deleteRunner.setProperty(AbstractDynamoDBProcessor.SECRET_KEY, "cdef");
         deleteRunner.setProperty(AbstractDynamoDBProcessor.REGION, REGION);
@@ -193,7 +189,6 @@ public class DeleteDynamoDBTest extends AbstractDynamoDBTest{
     public void testStringHashStringRangeDeleteOnlyHashWithRangeValueNoRangeNameFailure() {
         final TestRunner deleteRunner = TestRunners.newTestRunner(DeleteDynamoDB.class);
 
-        deleteRunner.setValidateExpressionUsage(false);
         deleteRunner.setProperty(AbstractDynamoDBProcessor.ACCESS_KEY,"abcd");
         deleteRunner.setProperty(AbstractDynamoDBProcessor.SECRET_KEY, "cdef");
         deleteRunner.setProperty(AbstractDynamoDBProcessor.REGION, REGION);
@@ -218,7 +213,6 @@ public class DeleteDynamoDBTest extends AbstractDynamoDBTest{
     public void testStringHashStringRangeDeleteOnlyHashWithRangeNameNoRangeValueFailure() {
         final TestRunner deleteRunner = TestRunners.newTestRunner(DeleteDynamoDB.class);
 
-        deleteRunner.setValidateExpressionUsage(false);
         deleteRunner.setProperty(AbstractDynamoDBProcessor.ACCESS_KEY,"abcd");
         deleteRunner.setProperty(AbstractDynamoDBProcessor.SECRET_KEY, "cdef");
         deleteRunner.setProperty(AbstractDynamoDBProcessor.REGION, REGION);
@@ -242,7 +236,6 @@ public class DeleteDynamoDBTest extends AbstractDynamoDBTest{
     public void testStringHashStringRangeDeleteNonExistentHashSuccess() {
         final TestRunner deleteRunner = TestRunners.newTestRunner(deleteDynamoDB);
 
-        deleteRunner.setValidateExpressionUsage(false);
         deleteRunner.setProperty(AbstractDynamoDBProcessor.ACCESS_KEY,"abcd");
         deleteRunner.setProperty(AbstractDynamoDBProcessor.SECRET_KEY, "cdef");
         deleteRunner.setProperty(AbstractDynamoDBProcessor.REGION, REGION);
@@ -263,7 +256,6 @@ public class DeleteDynamoDBTest extends AbstractDynamoDBTest{
     public void testStringHashStringRangeDeleteNonExistentRangeSuccess() {
         final TestRunner deleteRunner = TestRunners.newTestRunner(deleteDynamoDB);
 
-        deleteRunner.setValidateExpressionUsage(false);
         deleteRunner.setProperty(AbstractDynamoDBProcessor.ACCESS_KEY,"abcd");
         deleteRunner.setProperty(AbstractDynamoDBProcessor.SECRET_KEY, "cdef");
         deleteRunner.setProperty(AbstractDynamoDBProcessor.REGION, REGION);
@@ -297,7 +289,6 @@ public class DeleteDynamoDBTest extends AbstractDynamoDBTest{
         };
         final TestRunner deleteRunner = TestRunners.newTestRunner(deleteDynamoDB);
 
-        deleteRunner.setValidateExpressionUsage(false);
         deleteRunner.setProperty(AbstractDynamoDBProcessor.ACCESS_KEY,"abcd");
         deleteRunner.setProperty(AbstractDynamoDBProcessor.SECRET_KEY, "cdef");
         deleteRunner.setProperty(AbstractDynamoDBProcessor.REGION, REGION);
@@ -336,7 +327,6 @@ public class DeleteDynamoDBTest extends AbstractDynamoDBTest{
         };
         final TestRunner deleteRunner = TestRunners.newTestRunner(deleteDynamoDB);
 
-        deleteRunner.setValidateExpressionUsage(false);
         deleteRunner.setProperty(AbstractDynamoDBProcessor.ACCESS_KEY,"abcd");
         deleteRunner.setProperty(AbstractDynamoDBProcessor.SECRET_KEY, "cdef");
         deleteRunner.setProperty(AbstractDynamoDBProcessor.REGION, REGION);
@@ -375,7 +365,6 @@ public class DeleteDynamoDBTest extends AbstractDynamoDBTest{
         };
         final TestRunner deleteRunner = TestRunners.newTestRunner(deleteDynamoDB);
 
-        deleteRunner.setValidateExpressionUsage(false);
         deleteRunner.setProperty(AbstractDynamoDBProcessor.ACCESS_KEY,"abcd");
         deleteRunner.setProperty(AbstractDynamoDBProcessor.SECRET_KEY, "cdef");
         deleteRunner.setProperty(AbstractDynamoDBProcessor.REGION, REGION);

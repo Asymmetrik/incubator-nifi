@@ -87,7 +87,6 @@ public class PutDynamoDBTest extends AbstractDynamoDBTest {
 
         final TestRunner putRunner = TestRunners.newTestRunner(putDynamoDB);
 
-        putRunner.setValidateExpressionUsage(false);
         putRunner.setProperty(AbstractDynamoDBProcessor.ACCESS_KEY,"abcd");
         putRunner.setProperty(AbstractDynamoDBProcessor.SECRET_KEY, "cdef");
         putRunner.setProperty(AbstractDynamoDBProcessor.REGION, REGION);
@@ -113,7 +112,6 @@ public class PutDynamoDBTest extends AbstractDynamoDBTest {
     public void testStringHashStringRangePutNoHashValueFailure() {
         final TestRunner putRunner = TestRunners.newTestRunner(PutDynamoDB.class);
 
-        putRunner.setValidateExpressionUsage(false);
         putRunner.setProperty(AbstractDynamoDBProcessor.ACCESS_KEY,"abcd");
         putRunner.setProperty(AbstractDynamoDBProcessor.SECRET_KEY, "cdef");
         putRunner.setProperty(AbstractDynamoDBProcessor.REGION, REGION);
@@ -140,7 +138,6 @@ public class PutDynamoDBTest extends AbstractDynamoDBTest {
     public void testStringHashStringRangePutOnlyHashWithRangeValueNoRangeNameFailure() {
         final TestRunner putRunner = TestRunners.newTestRunner(PutDynamoDB.class);
 
-        putRunner.setValidateExpressionUsage(false);
         putRunner.setProperty(AbstractDynamoDBProcessor.ACCESS_KEY,"abcd");
         putRunner.setProperty(AbstractDynamoDBProcessor.SECRET_KEY, "cdef");
         putRunner.setProperty(AbstractDynamoDBProcessor.REGION, REGION);
@@ -166,7 +163,6 @@ public class PutDynamoDBTest extends AbstractDynamoDBTest {
     public void testStringHashStringRangePutOnlyHashWithRangeNameNoRangeValueFailure() {
         final TestRunner putRunner = TestRunners.newTestRunner(PutDynamoDB.class);
 
-        putRunner.setValidateExpressionUsage(false);
         putRunner.setProperty(AbstractDynamoDBProcessor.ACCESS_KEY,"abcd");
         putRunner.setProperty(AbstractDynamoDBProcessor.SECRET_KEY, "cdef");
         putRunner.setProperty(AbstractDynamoDBProcessor.REGION, REGION);
@@ -191,7 +187,6 @@ public class PutDynamoDBTest extends AbstractDynamoDBTest {
     public void testStringHashStringRangePutSuccessfulWithMock() {
         final TestRunner putRunner = TestRunners.newTestRunner(putDynamoDB);
 
-        putRunner.setValidateExpressionUsage(false);
         putRunner.setProperty(AbstractDynamoDBProcessor.ACCESS_KEY,"abcd");
         putRunner.setProperty(AbstractDynamoDBProcessor.SECRET_KEY, "cdef");
         putRunner.setProperty(AbstractDynamoDBProcessor.REGION, REGION);
@@ -220,7 +215,6 @@ public class PutDynamoDBTest extends AbstractDynamoDBTest {
     public void testStringHashStringRangePutOneSuccessfulOneSizeFailureWithMockBatchSize1() {
         final TestRunner putRunner = TestRunners.newTestRunner(putDynamoDB);
 
-        putRunner.setValidateExpressionUsage(false);
         putRunner.setProperty(AbstractDynamoDBProcessor.ACCESS_KEY,"abcd");
         putRunner.setProperty(AbstractDynamoDBProcessor.SECRET_KEY, "cdef");
         putRunner.setProperty(AbstractDynamoDBProcessor.REGION, REGION);
@@ -259,7 +253,6 @@ public class PutDynamoDBTest extends AbstractDynamoDBTest {
     @Test
     public void testStringHashStringRangePutOneSuccessfulOneSizeFailureWithMockBatchSize5() {
         final TestRunner putRunner = TestRunners.newTestRunner(putDynamoDB);
-        putRunner.setValidateExpressionUsage(false);
         putRunner.setProperty(AbstractDynamoDBProcessor.BATCH_SIZE, "5");
         putRunner.setProperty(AbstractDynamoDBProcessor.ACCESS_KEY,"abcd");
         putRunner.setProperty(AbstractDynamoDBProcessor.SECRET_KEY, "cdef");
@@ -300,7 +293,6 @@ public class PutDynamoDBTest extends AbstractDynamoDBTest {
     public void testStringHashStringRangePutFailedWithItemSizeGreaterThan400Kb() {
         final TestRunner putRunner = TestRunners.newTestRunner(putDynamoDB);
 
-        putRunner.setValidateExpressionUsage(false);
         putRunner.setProperty(AbstractDynamoDBProcessor.ACCESS_KEY,"abcd");
         putRunner.setProperty(AbstractDynamoDBProcessor.SECRET_KEY, "cdef");
         putRunner.setProperty(AbstractDynamoDBProcessor.REGION, REGION);
@@ -348,7 +340,6 @@ public class PutDynamoDBTest extends AbstractDynamoDBTest {
         };
         final TestRunner putRunner = TestRunners.newTestRunner(putDynamoDB);
 
-        putRunner.setValidateExpressionUsage(false);
         putRunner.setProperty(AbstractDynamoDBProcessor.ACCESS_KEY,"abcd");
         putRunner.setProperty(AbstractDynamoDBProcessor.SECRET_KEY, "cdef");
         putRunner.setProperty(AbstractDynamoDBProcessor.REGION, REGION);
@@ -388,7 +379,6 @@ public class PutDynamoDBTest extends AbstractDynamoDBTest {
         };
         final TestRunner putRunner = TestRunners.newTestRunner(putDynamoDB);
 
-        putRunner.setValidateExpressionUsage(false);
         putRunner.setProperty(AbstractDynamoDBProcessor.ACCESS_KEY,"abcd");
         putRunner.setProperty(AbstractDynamoDBProcessor.SECRET_KEY, "cdef");
         putRunner.setProperty(AbstractDynamoDBProcessor.REGION, REGION);
@@ -428,7 +418,6 @@ public class PutDynamoDBTest extends AbstractDynamoDBTest {
         };
         final TestRunner putRunner = TestRunners.newTestRunner(putDynamoDB);
 
-        putRunner.setValidateExpressionUsage(false);
         putRunner.setProperty(AbstractDynamoDBProcessor.ACCESS_KEY,"abcd");
         putRunner.setProperty(AbstractDynamoDBProcessor.SECRET_KEY, "cdef");
         putRunner.setProperty(AbstractDynamoDBProcessor.REGION, REGION);
@@ -465,7 +454,6 @@ public class PutDynamoDBTest extends AbstractDynamoDBTest {
         result.setUnprocessedItems(unprocessed);
         final TestRunner putRunner = TestRunners.newTestRunner(putDynamoDB);
 
-        putRunner.setValidateExpressionUsage(false);
         putRunner.setProperty(AbstractDynamoDBProcessor.ACCESS_KEY,"abcd");
         putRunner.setProperty(AbstractDynamoDBProcessor.SECRET_KEY, "cdef");
         putRunner.setProperty(AbstractDynamoDBProcessor.REGION, REGION);

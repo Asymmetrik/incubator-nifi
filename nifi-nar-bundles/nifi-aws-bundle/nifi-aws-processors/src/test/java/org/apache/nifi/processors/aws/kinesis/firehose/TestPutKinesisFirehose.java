@@ -34,7 +34,6 @@ public class TestPutKinesisFirehose {
     @Before
     public void setUp() throws Exception {
         runner = TestRunners.newTestRunner(PutKinesisFirehose.class);
-        runner.setValidateExpressionUsage(false);
         runner.setProperty(PutKinesisFirehose.ACCESS_KEY, "abcd");
         runner.setProperty(PutKinesisFirehose.SECRET_KEY, "secret key");
         runner.setProperty(PutKinesisFirehose.KINESIS_FIREHOSE_DELIVERY_STREAM_NAME, "deliveryName");
