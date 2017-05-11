@@ -221,11 +221,12 @@ public abstract class AbstractAWSProcessor<ClientType extends AmazonWebServiceCl
 
         // if the endpoint override has been configured, set the endpoint.
         // (per Amazon docs this should only be configured at client creation)
-        final String urlstr = StringUtils.trimToEmpty(context.getProperty(ENDPOINT_OVERRIDE).evaluateAttributeExpressions().getValue());
-        if (!urlstr.isEmpty()) {
-            this.client.setEndpoint(urlstr);
+        if (getSupportedPropertyDescriptors().contains(ENDPOINT_OVERRIDE)) {
+            final String urlstr = StringUtils.trimToEmpty(context.getProperty(ENDPOINT_OVERRIDE).evaluateAttributeExpressions().getValue());
+            if (!urlstr.isEmpty()) {
+                this.client.setEndpoint(urlstr);
+            }
         }
-
     }
 
     /**
