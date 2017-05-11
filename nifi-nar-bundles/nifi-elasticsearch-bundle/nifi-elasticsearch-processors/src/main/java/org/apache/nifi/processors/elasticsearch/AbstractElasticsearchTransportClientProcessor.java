@@ -47,7 +47,6 @@ public abstract class AbstractElasticsearchTransportClientProcessor extends Abst
             .name("Cluster Name")
             .description("Name of the ES cluster (for example, elasticsearch_brew). Defaults to 'elasticsearch'")
             .required(true)
-            .expressionLanguageSupported(true)
             .addValidator(StandardValidators.NON_EMPTY_VALIDATOR)
             .defaultValue("elasticsearch")
             .expressionLanguageSupported(true)
@@ -59,8 +58,9 @@ public abstract class AbstractElasticsearchTransportClientProcessor extends Abst
                     + "host1:port,host2:port,....  For example testcluster:9300. This processor uses the Transport Client to "
                     + "connect to hosts. The default transport client port is 9300.")
             .required(true)
-            .expressionLanguageSupported(true)
+            .expressionLanguageSupported(false)
             .addValidator(StandardValidators.HOSTNAME_PORT_LIST_VALIDATOR)
+            .expressionLanguageSupported(true)
             .build();
 
     public static final PropertyDescriptor PROP_SHIELD_LOCATION = new PropertyDescriptor.Builder()

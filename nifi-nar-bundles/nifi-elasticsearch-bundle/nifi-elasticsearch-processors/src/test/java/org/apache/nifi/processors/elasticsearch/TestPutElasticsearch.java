@@ -78,24 +78,9 @@ public class TestPutElasticsearch {
     }
 
     @Test
-    public void testHostnameExpressionLanguage() throws IOException {
-        runner = TestRunners.newTestRunner(new PutElasticsearchTestProcessor(false)); // no failures
-        runner.setProperty(AbstractElasticsearchTransportClientProcessor.CLUSTER_NAME, "elasticsearch");
-        runner.setProperty(AbstractElasticsearchTransportClientProcessor.HOSTS, "${xxx}");
-        runner.setProperty(AbstractElasticsearchTransportClientProcessor.PING_TIMEOUT, "5s");
-        runner.setProperty(AbstractElasticsearchTransportClientProcessor.SAMPLER_INTERVAL, "5s");
-
-        runner.setProperty(PutElasticsearch.INDEX, "doc");
-        runner.setProperty(PutElasticsearch.TYPE, "status");
-        runner.setProperty(PutElasticsearch.ID_ATTRIBUTE, "doc_id");
-
-        runner.assertValid();
-    }
-
-    @Test
     public void testPutElasticSearchOnTrigger() throws IOException {
         runner = TestRunners.newTestRunner(new PutElasticsearchTestProcessor(false)); // no failures
-        runner.setValidateExpressionUsage(false);
+        runner.setValidateExpressionUsage(true);
         runner.setProperty(AbstractElasticsearchTransportClientProcessor.CLUSTER_NAME, "elasticsearch");
         runner.setProperty(AbstractElasticsearchTransportClientProcessor.HOSTS, "127.0.0.1:9300");
         runner.setProperty(AbstractElasticsearchTransportClientProcessor.PING_TIMEOUT, "5s");
@@ -193,7 +178,7 @@ public class TestPutElasticsearch {
         runner.setProperty(AbstractElasticsearchTransportClientProcessor.SAMPLER_INTERVAL, "5s");
         runner.setProperty(PutElasticsearch.INDEX, "doc");
         runner.setProperty(PutElasticsearch.TYPE, "status");
-        runner.setValidateExpressionUsage(false);
+        runner.setValidateExpressionUsage(true);
         runner.setProperty(PutElasticsearch.ID_ATTRIBUTE, "doc_id");
 
         // No Node Available exception
@@ -308,7 +293,7 @@ public class TestPutElasticsearch {
     @Test
     public void testPutElasticSearchOnTriggerWithInvalidIndexOp() throws IOException {
         runner = TestRunners.newTestRunner(new PutElasticsearchTestProcessor(false)); // no failures
-        runner.setValidateExpressionUsage(false);
+        runner.setValidateExpressionUsage(true);
         runner.setProperty(AbstractElasticsearchTransportClientProcessor.CLUSTER_NAME, "elasticsearch");
         runner.setProperty(AbstractElasticsearchTransportClientProcessor.HOSTS, "127.0.0.1:9300");
         runner.setProperty(AbstractElasticsearchTransportClientProcessor.PING_TIMEOUT, "5s");

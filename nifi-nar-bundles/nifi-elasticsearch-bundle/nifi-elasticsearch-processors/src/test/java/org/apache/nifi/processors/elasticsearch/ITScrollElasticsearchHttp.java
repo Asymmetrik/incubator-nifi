@@ -38,7 +38,7 @@ public class ITScrollElasticsearchHttp {
     @Test
     public void testFetchElasticsearchOnTrigger() throws IOException {
         runner = TestRunners.newTestRunner(ScrollElasticsearchHttp.class); // all docs are found
-        runner.setValidateExpressionUsage(false);
+        runner.setValidateExpressionUsage(true);
         runner.setProperty(AbstractElasticsearchHttpProcessor.ES_URL,
                 "http://ip-172-31-49-152.ec2.internal:9200");
 

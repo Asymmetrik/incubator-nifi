@@ -240,22 +240,6 @@ public class EvaluateJsonPath extends AbstractJsonPathProcessor {
         }
     }
 
-    private final Map<String, JsonPath> attributeToJsonPathMap = new HashMap<>();
-
-    private void compileJsonPaths(ProcessContext processContext) {
-        /*
-         * Build the JsonPath expressions from attributes before processing the
-         * FlowFiles so that we can quickly and efficiently read the JSON path results
-         */
-        for (final Map.Entry<PropertyDescriptor, String> entry : processContext.getProperties().entrySet()) {
-            if (!entry.getKey().isDynamic()) {
-                continue;
-            }
-            final JsonPath jsonPath = JsonPath.compile(entry.getValue());
-            attributeToJsonPathMap.put(entry.getKey().getName(), jsonPath);
-        }
-    }
-
     @OnScheduled
     public void onScheduled(ProcessContext processContext) {
         representationOption = processContext.getProperty(NULL_VALUE_DEFAULT_REPRESENTATION).getValue();
@@ -266,14 +250,11 @@ public class EvaluateJsonPath extends AbstractJsonPathProcessor {
         }
         pathNotFound = processContext.getProperty(PATH_NOT_FOUND).getValue();
         nullDefaultValue = NULL_REPRESENTATION_MAP.get(representationOption);
-
-        compileJsonPaths(processContext);
     }
 
     @OnUnscheduled
     public void onUnscheduled() {
         attributeToJsonPathEntrySetQueue.clear();
-        attributeToJsonPathMap.clear();
     }
 
     @Override
