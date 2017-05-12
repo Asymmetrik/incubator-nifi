@@ -210,7 +210,7 @@ public abstract class AbstractCassandraProcessor extends AbstractProcessor {
             PropertyValue keyspaceProperty = context.getProperty(KEYSPACE).evaluateAttributeExpressions();
             final Session newSession;
             if (keyspaceProperty != null) {
-                newSession = newCluster.connect(keyspaceProperty.evaluateAttributeExpressions().getValue());
+                newSession = newCluster.connect(keyspaceProperty.getValue());
             } else {
                 newSession = newCluster.connect();
             }
