@@ -47,7 +47,6 @@ import java.util.Arrays;
 import java.util.Collection;
 import java.util.HashSet;
 import java.util.List;
-import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.atomic.AtomicReference;
 
@@ -101,6 +100,7 @@ public abstract class AbstractCassandraProcessor extends AbstractProcessor {
             .name("Username")
             .description("Username to access the Cassandra cluster")
             .required(false)
+            .expressionLanguageSupported(true)
             .addValidator(StandardValidators.NON_EMPTY_VALIDATOR)
             .build();
 
@@ -109,6 +109,7 @@ public abstract class AbstractCassandraProcessor extends AbstractProcessor {
             .description("Password to access the Cassandra cluster")
             .required(false)
             .sensitive(true)
+            .expressionLanguageSupported(true)
             .addValidator(StandardValidators.NON_EMPTY_VALIDATOR)
             .build();
 
@@ -124,6 +125,7 @@ public abstract class AbstractCassandraProcessor extends AbstractProcessor {
             .name("Character Set")
             .description("Specifies the character set of the record data.")
             .required(true)
+            .expressionLanguageSupported(true)
             .defaultValue("UTF-8")
             .addValidator(StandardValidators.CHARACTER_SET_VALIDATOR)
             .build();
@@ -151,8 +153,9 @@ public abstract class AbstractCassandraProcessor extends AbstractProcessor {
         Set<ValidationResult> results = new HashSet<>();
 
         // Ensure that if username or password is set, then the other is too
-        Map<PropertyDescriptor, String> propertyMap = validationContext.getProperties();
-        if (StringUtils.isEmpty(propertyMap.get(USERNAME)) != StringUtils.isEmpty(propertyMap.get(PASSWORD))) {
+        String userName = validationContext.getProperty(USERNAME).evaluateAttributeExpressions().getValue();
+        String password = validationContext.getProperty(PASSWORD).evaluateAttributeExpressions().getValue();
+        if (StringUtils.isEmpty(userName) != StringUtils.isEmpty(password)) {
             results.add(new ValidationResult.Builder().valid(false).explanation(
                     "If username or password is specified, then the other must be specified as well").build());
         }
@@ -191,8 +194,8 @@ public abstract class AbstractCassandraProcessor extends AbstractProcessor {
             }
 
             final String username, password;
-            PropertyValue usernameProperty = context.getProperty(USERNAME);
-            PropertyValue passwordProperty = context.getProperty(PASSWORD);
+            PropertyValue usernameProperty = context.getProperty(USERNAME).evaluateAttributeExpressions();
+            PropertyValue passwordProperty = context.getProperty(PASSWORD).evaluateAttributeExpressions();
 
             if (usernameProperty != null && passwordProperty != null) {
                 username = usernameProperty.getValue();
@@ -204,7 +207,7 @@ public abstract class AbstractCassandraProcessor extends AbstractProcessor {
 
             // Create the cluster and connect to it
             Cluster newCluster = createCluster(contactPoints, sslContext, username, password);
-            PropertyValue keyspaceProperty = context.getProperty(KEYSPACE);
+            PropertyValue keyspaceProperty = context.getProperty(KEYSPACE).evaluateAttributeExpressions();
             final Session newSession;
             if (keyspaceProperty != null) {
                 newSession = newCluster.connect(keyspaceProperty.evaluateAttributeExpressions().getValue());

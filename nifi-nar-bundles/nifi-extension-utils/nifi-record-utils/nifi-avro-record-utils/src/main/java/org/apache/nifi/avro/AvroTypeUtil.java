@@ -327,7 +327,13 @@ public class AvroTypeUtil {
 
                     return map;
                 } else if (rawValue instanceof Map) {
-                    return rawValue;
+                    final Map<String, Object> objectMap = (Map<String, Object>) rawValue;
+                    final Map<String, Object> map = new HashMap<>(objectMap.size());
+                    for (final String s : objectMap.keySet()) {
+                        final Object converted = convertToAvroObject(objectMap.get(s), fieldSchema.getValueType(), fieldName);
+                        map.put(s, converted);
+                    }
+                    return map;
                 } else {
                     throw new IllegalTypeConversionException("Cannot convert value " + rawValue + " of type " + rawValue.getClass() + " to a Map");
                 }
@@ -475,7 +481,7 @@ public class AvroTypeUtil {
                 if (LOGICAL_TYPE_DATE.equals(logicalName)) {
                     // date logical name means that the value is number of days since Jan 1, 1970
                     return new java.sql.Date(TimeUnit.DAYS.toMillis((int) value));
-                } else if (LOGICAL_TYPE_TIMESTAMP_MILLIS.equals(logicalName)) {
+                } else if (LOGICAL_TYPE_TIME_MILLIS.equals(logicalName)) {
                     // time-millis logical name means that the value is number of milliseconds since midnight.
                     return new java.sql.Time((int) value);
                 }
