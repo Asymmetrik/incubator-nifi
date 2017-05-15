@@ -32,7 +32,6 @@ import org.apache.nifi.processor.ProcessContext;
 import org.apache.nifi.processor.ProcessSession;
 import org.apache.nifi.processor.Relationship;
 import org.apache.nifi.processor.util.StandardValidators;
-import org.apache.nifi.stream.io.DataOutputStream;
 
 import javax.json.Json;
 import javax.json.JsonArrayBuilder;
@@ -41,6 +40,8 @@ import javax.json.JsonObjectBuilder;
 import javax.json.JsonReader;
 import javax.json.JsonWriter;
 import javax.json.stream.JsonParsingException;
+
+import java.io.DataOutputStream;
 import java.io.IOException;
 import java.io.StringReader;
 import java.io.StringWriter;
@@ -61,7 +62,7 @@ import java.util.TreeSet;
 @InputRequirement(InputRequirement.Requirement.INPUT_REQUIRED)
 @DynamicProperty(name = "A JSON object to add to Slack's \"attachments\" JSON payload.", value = "JSON-formatted string to add to Slack's payload JSON appended to the \"attachments\" JSON array.",
         supportsExpressionLanguage = true,
-        description = "Converts the contents of each value specified by the Dynamic Property's value to JSON and appends it to the payload being send to Slack.")
+        description = "Converts the contents of each value specified by the Dynamic Property's value to JSON and appends it to the payload being sent to Slack.")
 public class PutSlack extends AbstractProcessor {
 
     public static final PropertyDescriptor WEBHOOK_URL = new PropertyDescriptor
@@ -271,7 +272,11 @@ public class PutSlack extends AbstractProcessor {
                 session.transfer(flowFile, REL_FAILURE);
                 context.yield();
             }
-        } catch (IOException | JsonParsingException e) {
+        } catch (JsonParsingException e) {
+            getLogger().error("Failed to parse JSON", e);
+            flowFile = session.penalize(flowFile);
+            session.transfer(flowFile, REL_FAILURE);
+        } catch (IOException e) {
             getLogger().error("Failed to open connection", e);
             flowFile = session.penalize(flowFile);
             session.transfer(flowFile, REL_FAILURE);

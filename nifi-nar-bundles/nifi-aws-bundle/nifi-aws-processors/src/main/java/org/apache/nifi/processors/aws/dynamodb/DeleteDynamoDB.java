@@ -73,7 +73,7 @@ public class DeleteDynamoDB extends AbstractWriteDynamoDBProcessor {
 
     @Override
     public void onTrigger(final ProcessContext context, final ProcessSession session) {
-        List<FlowFile> flowFiles = session.get(context.getProperty(BATCH_SIZE).asInteger());
+        List<FlowFile> flowFiles = session.get(context.getProperty(BATCH_SIZE).evaluateAttributeExpressions().asInteger());
         if (flowFiles == null || flowFiles.size() == 0) {
             return;
         }
@@ -82,9 +82,9 @@ public class DeleteDynamoDB extends AbstractWriteDynamoDBProcessor {
 
         final String table = context.getProperty(TABLE).evaluateAttributeExpressions().getValue();
 
-        final String hashKeyName = context.getProperty(HASH_KEY_NAME).getValue();
+        final String hashKeyName = context.getProperty(HASH_KEY_NAME).evaluateAttributeExpressions().getValue();
         final String hashKeyValueType = context.getProperty(HASH_KEY_VALUE_TYPE).getValue();
-        final String rangeKeyName = context.getProperty(RANGE_KEY_NAME).getValue();
+        final String rangeKeyName = context.getProperty(RANGE_KEY_NAME).evaluateAttributeExpressions().getValue();
         final String rangeKeyValueType = context.getProperty(RANGE_KEY_VALUE_TYPE).getValue();
 
         TableWriteItems tableWriteItems = new TableWriteItems(table);
