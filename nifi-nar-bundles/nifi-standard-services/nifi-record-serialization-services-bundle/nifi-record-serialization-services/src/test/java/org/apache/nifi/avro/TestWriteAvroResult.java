@@ -27,6 +27,7 @@ import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
 import java.math.BigDecimal;
+import java.io.OutputStream;
 import java.nio.ByteBuffer;
 import java.sql.Date;
 import java.sql.Time;
@@ -39,12 +40,15 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.TimeZone;
 
 import org.apache.avro.Conversions;
+import org.apache.avro.LogicalType;
 import org.apache.avro.Schema;
 import org.apache.avro.generic.GenericData.Array;
 import org.apache.avro.generic.GenericRecord;
+import org.apache.nifi.serialization.RecordSetWriter;
 import org.apache.nifi.serialization.SimpleRecordSchema;
 import org.apache.nifi.serialization.WriteResult;
 import org.apache.nifi.serialization.record.DataType;
@@ -58,7 +62,7 @@ import org.junit.Test;
 
 public abstract class TestWriteAvroResult {
 
-    protected abstract WriteAvroResult createWriter(Schema schema);
+    protected abstract RecordSetWriter createWriter(Schema schema, OutputStream out) throws IOException;
 
     protected abstract GenericRecord readRecord(InputStream in, Schema schema) throws IOException;
 
@@ -68,7 +72,17 @@ public abstract class TestWriteAvroResult {
     @Test
     public void testLogicalTypes() throws IOException, ParseException {
         final Schema schema = new Schema.Parser().parse(new File("src/test/resources/avro/logical-types.avsc"));
-        final WriteAvroResult writer = createWriter(schema);
+        testLogicalTypes(schema);
+    }
+
+    @Test
+    public void testNullableLogicalTypes() throws IOException, ParseException {
+        final Schema schema = new Schema.Parser().parse(new File("src/test/resources/avro/logical-types-nullable.avsc"));
+        testLogicalTypes(schema);
+    }
+
+    private void testLogicalTypes(Schema schema) throws ParseException, IOException {
+        final ByteArrayOutputStream baos = new ByteArrayOutputStream();
 
         final List<RecordField> fields = new ArrayList<>();
         fields.add(new RecordField("timeMillis", RecordFieldType.TIME.getDataType()));
@@ -96,11 +110,11 @@ public abstract class TestWriteAvroResult {
         values.put("decimal", expectedDecimal.doubleValue());
         final Record record = new MapRecord(recordSchema, values);
 
-        final byte[] data;
-        try (final ByteArrayOutputStream baos = new ByteArrayOutputStream()) {
-            writer.write(RecordSet.of(record.getSchema(), record), baos);
-            data = baos.toByteArray();
+        try (final RecordSetWriter writer = createWriter(schema, baos)) {
+            writer.write(RecordSet.of(record.getSchema(), record));
         }
+
+        final byte[] data = baos.toByteArray();
 
         try (final InputStream in = new ByteArrayInputStream(data)) {
             final GenericRecord avroRecord = readRecord(in, schema);
@@ -114,7 +128,11 @@ public abstract class TestWriteAvroResult {
             assertEquals(17260, avroRecord.get("date"));
             // Double value will be converted into logical decimal if Avro schema is defined as logical decimal.
             final Schema decimalSchema = schema.getField("decimal").schema();
-            final BigDecimal decimal = new Conversions.DecimalConversion().fromBytes((ByteBuffer) avroRecord.get("decimal"), decimalSchema, decimalSchema.getLogicalType());
+            final LogicalType logicalType = decimalSchema.getLogicalType() != null
+                    ? decimalSchema.getLogicalType()
+                    // Union type doesn't return logical type. Find the first logical type defined within the union.
+                    : decimalSchema.getTypes().stream().map(s -> s.getLogicalType()).filter(Objects::nonNull).findFirst().get();
+            final BigDecimal decimal = new Conversions.DecimalConversion().fromBytes((ByteBuffer) avroRecord.get("decimal"), decimalSchema, logicalType);
             assertEquals(expectedDecimal, decimal);
         }
     }
@@ -122,7 +140,7 @@ public abstract class TestWriteAvroResult {
     @Test
     public void testDataTypes() throws IOException {
         final Schema schema = new Schema.Parser().parse(new File("src/test/resources/avro/datatypes.avsc"));
-        final WriteAvroResult writer = createWriter(schema);
+        final ByteArrayOutputStream baos = new ByteArrayOutputStream();
 
         final List<RecordField> subRecordFields = Collections.singletonList(new RecordField("field1", RecordFieldType.STRING.getDataType()));
         final RecordSchema subRecordSchema = new SimpleRecordSchema(subRecordFields);
@@ -162,12 +180,13 @@ public abstract class TestWriteAvroResult {
 
         final Record record = new MapRecord(recordSchema, values);
 
-        final byte[] data;
-        try (final ByteArrayOutputStream baos = new ByteArrayOutputStream()) {
-            final WriteResult writeResult = writer.write(RecordSet.of(record.getSchema(), record), baos);
-            verify(writeResult);
-            data = baos.toByteArray();
+        final WriteResult writeResult;
+        try (final RecordSetWriter writer = createWriter(schema, baos)) {
+            writeResult = writer.write(RecordSet.of(record.getSchema(), record));
         }
+
+        verify(writeResult);
+        final byte[] data = baos.toByteArray();
 
         try (final InputStream in = new ByteArrayInputStream(data)) {
             final GenericRecord avroRecord = readRecord(in, schema);

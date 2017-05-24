@@ -59,6 +59,7 @@ import org.apache.nifi.processor.SimpleProcessLogger;
 import org.apache.nifi.registry.VariableRegistry;
 import org.apache.nifi.scheduling.ExecutionNode;
 import org.apache.nifi.scheduling.SchedulingStrategy;
+import org.apache.nifi.util.CharacterFilterUtils;
 import org.apache.nifi.util.FormatUtils;
 import org.apache.nifi.util.NiFiProperties;
 import org.apache.nifi.util.ReflectionUtils;
@@ -255,10 +256,7 @@ public class StandardProcessorNode extends ProcessorNode implements Connectable 
      */
     @Override
     public synchronized void setComments(final String comments) {
-        if (isRunning()) {
-            throw new IllegalStateException("Cannot modify Processor configuration while the Processor is running");
-        }
-        this.comments.set(comments);
+        this.comments.set(CharacterFilterUtils.filterInvalidXmlCharacters(comments));
     }
 
     @Override
@@ -404,9 +402,6 @@ public class StandardProcessorNode extends ProcessorNode implements Connectable 
 
     @Override
     public synchronized void setName(final String name) {
-        if (isRunning()) {
-            throw new IllegalStateException("Cannot modify Processor configuration while the Processor is running");
-        }
         super.setName(name);
     }
 

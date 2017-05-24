@@ -39,6 +39,7 @@ import org.apache.nifi.persistence.TemplateSerializer;
 import org.apache.nifi.processor.Relationship;
 import org.apache.nifi.remote.RemoteGroupPort;
 import org.apache.nifi.remote.RootGroupPort;
+import org.apache.nifi.util.CharacterFilterUtils;
 import org.apache.nifi.util.StringUtils;
 import org.w3c.dom.DOMException;
 import org.w3c.dom.Document;
@@ -78,7 +79,7 @@ public class StandardFlowSerializer implements FlowSerializer {
     }
 
     @Override
-    public void serialize(final FlowController controller, final OutputStream os) throws FlowSerializationException {
+    public void serialize(final FlowController controller, final OutputStream os, final ScheduledStateLookup scheduledStateLookup) throws FlowSerializationException {
         try {
             // create a new, empty document
             final DocumentBuilderFactory docFactory = DocumentBuilderFactory.newInstance();
@@ -93,7 +94,7 @@ public class StandardFlowSerializer implements FlowSerializer {
             doc.appendChild(rootNode);
             addTextElement(rootNode, "maxTimerDrivenThreadCount", controller.getMaxTimerDrivenThreadCount());
             addTextElement(rootNode, "maxEventDrivenThreadCount", controller.getMaxEventDrivenThreadCount());
-            addProcessGroup(rootNode, controller.getGroup(controller.getRootGroupId()), "rootGroup");
+            addProcessGroup(rootNode, controller.getGroup(controller.getRootGroupId()), "rootGroup", scheduledStateLookup);
 
             // Add root-level controller services
             final Element controllerServicesNode = doc.createElement("controllerServices");
@@ -143,7 +144,7 @@ public class StandardFlowSerializer implements FlowSerializer {
         parentElement.appendChild(element);
     }
 
-    private void addProcessGroup(final Element parentElement, final ProcessGroup group, final String elementName) {
+    private void addProcessGroup(final Element parentElement, final ProcessGroup group, final String elementName, final ScheduledStateLookup scheduledStateLookup) {
         final Document doc = parentElement.getOwnerDocument();
         final Element element = doc.createElement(elementName);
         parentElement.appendChild(element);
@@ -153,7 +154,7 @@ public class StandardFlowSerializer implements FlowSerializer {
         addTextElement(element, "comment", group.getComments());
 
         for (final ProcessorNode processor : group.getProcessors()) {
-            addProcessor(element, processor);
+            addProcessor(element, processor, scheduledStateLookup);
         }
 
         if (group.isRootGroup()) {
@@ -183,7 +184,7 @@ public class StandardFlowSerializer implements FlowSerializer {
         }
 
         for (final ProcessGroup childGroup : group.getProcessGroups()) {
-            addProcessGroup(element, childGroup, "processGroup");
+            addProcessGroup(element, childGroup, "processGroup", scheduledStateLookup);
         }
 
         for (final RemoteProcessGroup remoteRef : group.getRemoteProcessGroups()) {
@@ -362,7 +363,7 @@ public class StandardFlowSerializer implements FlowSerializer {
         parentElement.appendChild(element);
     }
 
-    private void addProcessor(final Element parentElement, final ProcessorNode processor) {
+    private void addProcessor(final Element parentElement, final ProcessorNode processor, final ScheduledStateLookup scheduledStateLookup) {
         final Document doc = parentElement.getOwnerDocument();
         final Element element = doc.createElement("processor");
         parentElement.appendChild(element);
@@ -383,7 +384,7 @@ public class StandardFlowSerializer implements FlowSerializer {
         addTextElement(element, "yieldPeriod", processor.getYieldPeriod());
         addTextElement(element, "bulletinLevel", processor.getBulletinLevel().toString());
         addTextElement(element, "lossTolerant", String.valueOf(processor.isLossTolerant()));
-        addTextElement(element, "scheduledState", processor.getScheduledState().name());
+        addTextElement(element, "scheduledState", scheduledStateLookup.getScheduledState(processor).name());
         addTextElement(element, "schedulingStrategy", processor.getSchedulingStrategy().name());
         addTextElement(element, "executionNode", processor.getExecutionNode().name());
         addTextElement(element, "runDurationNanos", processor.getRunDuration(TimeUnit.NANOSECONDS));
@@ -524,7 +525,7 @@ public class StandardFlowSerializer implements FlowSerializer {
     private static void addTextElement(final Element element, final String name, final String value) {
         final Document doc = element.getOwnerDocument();
         final Element toAdd = doc.createElement(name);
-        toAdd.setTextContent(value);
+        toAdd.setTextContent(CharacterFilterUtils.filterInvalidXmlCharacters(value)); // value should already be filtered, but just in case ensure there are no invalid xml characters
         element.appendChild(toAdd);
     }
 

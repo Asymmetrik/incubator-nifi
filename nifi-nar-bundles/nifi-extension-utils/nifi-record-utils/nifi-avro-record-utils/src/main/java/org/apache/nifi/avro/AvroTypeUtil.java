@@ -24,8 +24,10 @@ import org.apache.avro.Schema;
 import org.apache.avro.Schema.Field;
 import org.apache.avro.Schema.Type;
 import org.apache.avro.generic.GenericData;
+import org.apache.avro.generic.GenericData.Array;
 import org.apache.avro.generic.GenericFixed;
 import org.apache.avro.generic.GenericRecord;
+import org.apache.avro.specific.SpecificRecord;
 import org.apache.avro.util.Utf8;
 import org.apache.avro.JsonProperties;
 import org.apache.nifi.schema.access.SchemaNotFoundException;
@@ -39,6 +41,8 @@ import org.apache.nifi.serialization.record.RecordSchema;
 import org.apache.nifi.serialization.record.SchemaIdentifier;
 import org.apache.nifi.serialization.record.util.DataTypeUtils;
 import org.apache.nifi.serialization.record.util.IllegalTypeConversionException;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
 import java.math.BigDecimal;
@@ -58,6 +62,7 @@ import java.util.function.Function;
 import java.util.stream.Collectors;
 
 public class AvroTypeUtil {
+    private static final Logger logger = LoggerFactory.getLogger(AvroTypeUtil.class);
     public static final String AVRO_SCHEMA_FORMAT = "avro";
 
     private static final String LOGICAL_TYPE_DATE = "date";
@@ -275,6 +280,7 @@ public class AvroTypeUtil {
         return convertToAvroObject(rawValue, fieldSchema, fieldSchema.getName());
     }
 
+    @SuppressWarnings("unchecked")
     private static Object convertToAvroObject(final Object rawValue, final Schema fieldSchema, final String fieldName) {
         if (rawValue == null) {
             return null;
@@ -386,24 +392,6 @@ public class AvroTypeUtil {
                 }
                 return avroRecord;
             case UNION:
-                // Ignore null types in union
-                final List<Schema> nonNullFieldSchemas = getNonNullSubSchemas(fieldSchema);
-
-                // If at least one non-null type exists, find the first compatible type
-                if (nonNullFieldSchemas.size() >= 1) {
-                    for (final Schema nonNullFieldSchema : nonNullFieldSchemas) {
-                        final Object avroObject = convertToAvroObject(rawValue, nonNullFieldSchema, fieldName);
-                        final DataType desiredDataType = AvroTypeUtil.determineDataType(nonNullFieldSchema);
-                        if (DataTypeUtils.isCompatibleDataType(avroObject, desiredDataType)
-                                // For logical types those store with different type (e.g. BigDecimal as ByteBuffer), check compatibility using the original rawValue
-                                || (nonNullFieldSchema.getLogicalType() != null && DataTypeUtils.isCompatibleDataType(rawValue, desiredDataType))) {
-                            return avroObject;
-                        }
-                    }
-
-                    throw new IllegalTypeConversionException("Cannot convert value " + rawValue + " of type " + rawValue.getClass()
-                            + " because no compatible types exist in the UNION");
-                }
                 return convertUnionFieldValue(rawValue, fieldSchema, schema -> convertToAvroObject(rawValue, schema, fieldName));
             case ARRAY:
                 final Object[] objectArray = (Object[]) rawValue;
@@ -477,12 +465,23 @@ public class AvroTypeUtil {
         // If at least one non-null type exists, find the first compatible type
         if (nonNullFieldSchemas.size() >= 1) {
             for (final Schema nonNullFieldSchema : nonNullFieldSchemas) {
-                final Object convertedValue = conversion.apply(nonNullFieldSchema);
                 final DataType desiredDataType = AvroTypeUtil.determineDataType(nonNullFieldSchema);
-                if (DataTypeUtils.isCompatibleDataType(convertedValue, desiredDataType)
-                        // For logical types those store with different type (e.g. BigDecimal as ByteBuffer), check compatibility using the original rawValue
-                        || (nonNullFieldSchema.getLogicalType() != null && DataTypeUtils.isCompatibleDataType(originalValue, desiredDataType))) {
-                    return convertedValue;
+                try {
+                    final Object convertedValue = conversion.apply(nonNullFieldSchema);
+
+                    if (isCompatibleDataType(convertedValue, desiredDataType)) {
+                        return convertedValue;
+                    }
+
+                    // For logical types those store with different type (e.g. BigDecimal as ByteBuffer), check compatibility using the original rawValue
+                    if (nonNullFieldSchema.getLogicalType() != null && DataTypeUtils.isCompatibleDataType(originalValue, desiredDataType)) {
+                        return convertedValue;
+                    }
+                } catch (Exception e) {
+                    // If failed with one of possible types, continue with the next available option.
+                    if (logger.isDebugEnabled()) {
+                        logger.debug("Cannot convert value {} to type {}", originalValue, desiredDataType, e);
+                    }
                 }
             }
 
@@ -491,6 +490,33 @@ public class AvroTypeUtil {
         }
         return null;
     }
+
+    private static boolean isCompatibleDataType(final Object value, final DataType dataType) {
+        if (value == null) {
+            return false;
+        }
+
+        switch (dataType.getFieldType()) {
+            case RECORD:
+                if (value instanceof GenericRecord || value instanceof SpecificRecord) {
+                    return true;
+                }
+                break;
+            case STRING:
+                if (value instanceof Utf8) {
+                    return true;
+                }
+                break;
+            case ARRAY:
+                if (value instanceof Array) {
+                    return true;
+                }
+                break;
+        }
+
+        return DataTypeUtils.isCompatibleDataType(value, dataType);
+    }
+
 
     /**
      * Convert an Avro object to a normal Java objects for further processing.

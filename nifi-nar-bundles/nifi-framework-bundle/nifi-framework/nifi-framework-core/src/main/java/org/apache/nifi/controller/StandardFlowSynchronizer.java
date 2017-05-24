@@ -725,25 +725,27 @@ public class StandardFlowSynchronizer implements FlowSynchronizer {
             final ProcessorDTO dto = FlowFromDOMFactory.getProcessor(processorElement, encryptor);
             final ProcessorNode procNode = processGroup.getProcessor(dto.getId());
 
+            updateNonFingerprintedProcessorSettings(procNode, dto);
+
             if (!procNode.getScheduledState().name().equals(dto.getState())) {
                 try {
                     switch (ScheduledState.valueOf(dto.getState())) {
                         case DISABLED:
                             // switch processor do disabled. This means we have to stop it (if it's already stopped, this method does nothing),
                             // and then we have to disable it.
-                            procNode.getProcessGroup().stopProcessor(procNode);
+                            controller.stopProcessor(procNode.getProcessGroupIdentifier(), procNode.getIdentifier());
                             procNode.getProcessGroup().disableProcessor(procNode);
                             break;
                         case RUNNING:
                             // we want to run now. Make sure processor is not disabled and then start it.
                             procNode.getProcessGroup().enableProcessor(procNode);
-                            procNode.getProcessGroup().startProcessor(procNode);
+                            controller.startProcessor(procNode.getProcessGroupIdentifier(), procNode.getIdentifier());
                             break;
                         case STOPPED:
                             if (procNode.getScheduledState() == ScheduledState.DISABLED) {
                                 procNode.getProcessGroup().enableProcessor(procNode);
                             } else if (procNode.getScheduledState() == ScheduledState.RUNNING) {
-                                procNode.getProcessGroup().stopProcessor(procNode);
+                                controller.stopProcessor(procNode.getProcessGroupIdentifier(), procNode.getIdentifier());
                             }
                             break;
                     }
@@ -964,15 +966,12 @@ public class StandardFlowSynchronizer implements FlowSynchronizer {
     private void updateProcessor(final ProcessorNode procNode, final ProcessorDTO processorDTO, final ProcessGroup processGroup, final FlowController controller)
             throws ProcessorInstantiationException {
         final ProcessorConfigDTO config = processorDTO.getConfig();
-        procNode.setPosition(toPosition(processorDTO.getPosition()));
-        procNode.setName(processorDTO.getName());
-        procNode.setStyle(processorDTO.getStyle());
         procNode.setProcessGroup(processGroup);
-        procNode.setComments(config.getComments());
         procNode.setLossTolerant(config.isLossTolerant());
         procNode.setPenalizationPeriod(config.getPenaltyDuration());
         procNode.setYieldPeriod(config.getYieldDuration());
         procNode.setBulletinLevel(LogLevel.valueOf(config.getBulletinLevel()));
+        updateNonFingerprintedProcessorSettings(procNode, processorDTO);
 
         if (config.getSchedulingStrategy() != null) {
             procNode.setSchedulingStrategy(SchedulingStrategy.valueOf(config.getSchedulingStrategy()));
@@ -1006,7 +1005,16 @@ public class StandardFlowSynchronizer implements FlowSynchronizer {
             controller.startProcessor(processGroup.getIdentifier(), procNode.getIdentifier());
         } else if (ScheduledState.DISABLED.equals(scheduledState)) {
             processGroup.disableProcessor(procNode);
+        } else if (ScheduledState.STOPPED.equals(scheduledState)) {
+            controller.stopProcessor(processGroup.getIdentifier(), procNode.getIdentifier());
         }
+    }
+
+    private void updateNonFingerprintedProcessorSettings(final ProcessorNode procNode, final ProcessorDTO processorDTO) {
+        procNode.setName(processorDTO.getName());
+        procNode.setPosition(toPosition(processorDTO.getPosition()));
+        procNode.setStyle(processorDTO.getStyle());
+        procNode.setComments(processorDTO.getConfig().getComments());
     }
 
     private ProcessGroup addProcessGroup(final FlowController controller, final ProcessGroup parentGroup, final Element processGroupElement,

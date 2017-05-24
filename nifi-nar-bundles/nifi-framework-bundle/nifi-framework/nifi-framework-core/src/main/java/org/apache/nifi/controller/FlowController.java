@@ -138,6 +138,7 @@ import org.apache.nifi.controller.serialization.FlowSerializationException;
 import org.apache.nifi.controller.serialization.FlowSerializer;
 import org.apache.nifi.controller.serialization.FlowSynchronizationException;
 import org.apache.nifi.controller.serialization.FlowSynchronizer;
+import org.apache.nifi.controller.serialization.ScheduledStateLookup;
 import org.apache.nifi.controller.service.ControllerServiceInvocationHandler;
 import org.apache.nifi.controller.service.ControllerServiceNode;
 import org.apache.nifi.controller.service.ControllerServiceProvider;
@@ -1196,6 +1197,11 @@ public class FlowController implements EventAccess, ControllerServiceProvider, R
 
         final String id = existingNode.getProcessor().getIdentifier();
 
+        // ghost components will have a null logger
+        if (existingNode.getLogger() != null) {
+            existingNode.getLogger().debug("Reloading component {} to type {} from bundle {}", new Object[]{id, newType, bundleCoordinate});
+        }
+
         // createProcessor will create a new instance class loader for the same id so
         // save the instance class loader to use it for calling OnRemoved on the existing processor
         final ClassLoader existingInstanceClassLoader = ExtensionManager.getInstanceClassLoader(id);
@@ -1217,6 +1223,9 @@ public class FlowController implements EventAccess, ControllerServiceProvider, R
         final LoggableComponent<Processor> newProcessor = new LoggableComponent<>(newNode.getProcessor(), newNode.getBundleCoordinate(), newNode.getLogger());
         existingNode.setProcessor(newProcessor);
         existingNode.setExtensionMissing(newNode.isExtensionMissing());
+
+        // need to refresh the properties in case we are changing from ghost component to real component
+        existingNode.refreshProperties();
     }
 
     /**
@@ -1509,7 +1518,8 @@ public class FlowController implements EventAccess, ControllerServiceProvider, R
     public void serialize(final FlowSerializer serializer, final OutputStream os) throws FlowSerializationException {
         readLock.lock();
         try {
-            serializer.serialize(this, os);
+            final ScheduledStateLookup scheduledStateLookup = procNode -> startConnectablesAfterInitialization.contains(procNode) ? ScheduledState.RUNNING : procNode.getScheduledState();
+            serializer.serialize(this, os, scheduledStateLookup);
         } finally {
             readLock.unlock();
         }
@@ -2932,6 +2942,8 @@ public class FlowController implements EventAccess, ControllerServiceProvider, R
             throw new IllegalStateException("Cannot find ProcessorNode with ID " + processorId + " within ProcessGroup with ID " + parentGroupId);
         }
         group.stopProcessor(node);
+        // If we are ready to start the processor upon initialization of the controller, don't.
+        startConnectablesAfterInitialization.remove(node);
     }
 
     public void stopAllProcessors() {
@@ -3061,6 +3073,11 @@ public class FlowController implements EventAccess, ControllerServiceProvider, R
 
         final String id = existingNode.getReportingTask().getIdentifier();
 
+        // ghost components will have a null logger
+        if (existingNode.getLogger() != null) {
+            existingNode.getLogger().debug("Reloading component {} to type {} from bundle {}", new Object[]{id, newType, bundleCoordinate});
+        }
+
         // createReportingTask will create a new instance class loader for the same id so
         // save the instance class loader to use it for calling OnRemoved on the existing processor
         final ClassLoader existingInstanceClassLoader = ExtensionManager.getInstanceClassLoader(id);
@@ -3080,6 +3097,9 @@ public class FlowController implements EventAccess, ControllerServiceProvider, R
         final LoggableComponent<ReportingTask> newReportingTask = new LoggableComponent<>(newNode.getReportingTask(), newNode.getBundleCoordinate(), newNode.getLogger());
         existingNode.setReportingTask(newReportingTask);
         existingNode.setExtensionMissing(newNode.isExtensionMissing());
+
+        // need to refresh the properties in case we are changing from ghost component to real component
+        existingNode.refreshProperties();
     }
 
     @Override
@@ -3171,6 +3191,11 @@ public class FlowController implements EventAccess, ControllerServiceProvider, R
 
         final String id = existingNode.getIdentifier();
 
+        // ghost components will have a null logger
+        if (existingNode.getLogger() != null) {
+            existingNode.getLogger().debug("Reloading component {} to type {} from bundle {}", new Object[]{id, newType, bundleCoordinate});
+        }
+
         // createControllerService will create a new instance class loader for the same id so
         // save the instance class loader to use it for calling OnRemoved on the existing service
         final ClassLoader existingInstanceClassLoader = ExtensionManager.getInstanceClassLoader(id);
@@ -3199,6 +3224,9 @@ public class FlowController implements EventAccess, ControllerServiceProvider, R
         // set the new impl, proxy, and invocation handler into the existing node
         existingNode.setControllerServiceAndProxy(loggableImplementation, loggableProxy, invocationHandler);
         existingNode.setExtensionMissing(newNode.isExtensionMissing());
+
+        // need to refresh the properties in case we are changing from ghost component to real component
+        existingNode.refreshProperties();
     }
 
     @Override
