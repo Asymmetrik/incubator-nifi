@@ -17,13 +17,18 @@
 
 package org.apache.nifi.reporting;
 
+import org.apache.commons.lang3.StringUtils;
 import org.apache.nifi.annotation.behavior.Restricted;
 import org.apache.nifi.annotation.behavior.Stateful;
 import org.apache.nifi.annotation.documentation.CapabilityDescription;
 import org.apache.nifi.annotation.documentation.Tags;
+import org.apache.nifi.annotation.lifecycle.OnScheduled;
+import org.apache.nifi.annotation.lifecycle.OnUnscheduled;
+import org.apache.nifi.components.AllowableValue;
 import org.apache.nifi.components.PropertyDescriptor;
 import org.apache.nifi.components.state.Scope;
 import org.apache.nifi.components.state.StateManager;
+import org.apache.nifi.controller.ConfigurationContext;
 import org.apache.nifi.controller.status.PortStatus;
 import org.apache.nifi.controller.status.ProcessGroupStatus;
 import org.apache.nifi.controller.status.ProcessorStatus;
@@ -31,6 +36,7 @@ import org.apache.nifi.controller.status.RemoteProcessGroupStatus;
 import org.apache.nifi.processor.exception.ProcessException;
 import org.apache.nifi.processor.util.StandardValidators;
 import org.apache.nifi.provenance.ProvenanceEventRecord;
+import org.apache.nifi.provenance.ProvenanceEventType;
 import org.apache.nifi.remote.Transaction;
 import org.apache.nifi.remote.TransferDirection;
 
@@ -47,6 +53,7 @@ import java.nio.charset.StandardCharsets;
 import java.text.DateFormat;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.HashMap;
@@ -55,6 +62,7 @@ import java.util.Map;
 import java.util.TimeZone;
 import java.util.UUID;
 import java.util.concurrent.TimeUnit;
+import java.util.regex.Pattern;
 
 @Tags({"provenance", "lineage", "tracking", "site", "site to site", "restricted"})
 @CapabilityDescription("Publishes Provenance events using the Site To Site protocol.")
@@ -65,8 +73,14 @@ public class SiteToSiteProvenanceReportingTask extends AbstractSiteToSiteReporti
     static final String TIMESTAMP_FORMAT = "yyyy-MM-dd'T'HH:mm:ss.SSS'Z'";
     static final String LAST_EVENT_ID_KEY = "last_event_id";
 
+    static final AllowableValue BEGINNING_OF_STREAM = new AllowableValue("beginning-of-stream", "Beginning of Stream",
+        "Start reading provenance Events from the beginning of the stream (the oldest event first)");
+    static final AllowableValue END_OF_STREAM = new AllowableValue("end-of-stream", "End of Stream",
+        "Start reading provenance Events from the end of the stream, ignoring old events");
+
     static final PropertyDescriptor PLATFORM = new PropertyDescriptor.Builder()
         .name("Platform")
+        .displayName("Platform")
         .description("The value to use for the platform field in each provenance event.")
         .required(true)
         .expressionLanguageSupported(true)
@@ -74,12 +88,95 @@ public class SiteToSiteProvenanceReportingTask extends AbstractSiteToSiteReporti
         .addValidator(StandardValidators.NON_EMPTY_VALIDATOR)
         .build();
 
+    static final PropertyDescriptor FILTER_EVENT_TYPE = new PropertyDescriptor.Builder()
+        .name("s2s-prov-task-event-filter")
+        .displayName("Event Type")
+        .description("Comma-separated list of event types that will be used to filter the provenance events sent by the reporting task. "
+                + "Available event types are " + ProvenanceEventType.values() + ". If no filter is set, all the events are sent. If "
+                        + "multiple filters are set, the filters are cumulative.")
+        .required(false)
+        .addValidator(StandardValidators.NON_EMPTY_VALIDATOR)
+        .build();
+
+    static final PropertyDescriptor FILTER_COMPONENT_TYPE = new PropertyDescriptor.Builder()
+        .name("s2s-prov-task-type-filter")
+        .displayName("Component Type")
+        .description("Regular expression to filter the provenance events based on the component type. Only the events matching the regular "
+                + "expression will be sent. If no filter is set, all the events are sent. If multiple filters are set, the filters are cumulative.")
+        .required(false)
+        .addValidator(StandardValidators.REGULAR_EXPRESSION_VALIDATOR)
+        .build();
+
+    static final PropertyDescriptor FILTER_COMPONENT_ID = new PropertyDescriptor.Builder()
+        .name("s2s-prov-task-id-filter")
+        .displayName("Component ID")
+        .description("Comma-separated list of component UUID that will be used to filter the provenance events sent by the reporting task. If no "
+                + "filter is set, all the events are sent. If multiple filters are set, the filters are cumulative.")
+        .required(false)
+        .addValidator(StandardValidators.NON_EMPTY_VALIDATOR)
+        .build();
+
+    static final PropertyDescriptor START_POSITION = new PropertyDescriptor.Builder()
+        .name("start-position")
+        .displayName("Start Position")
+        .description("If the Reporting Task has never been run, or if its state has been reset by a user, specifies where in the stream of Provenance Events the Reporting Task should start")
+        .allowableValues(BEGINNING_OF_STREAM, END_OF_STREAM)
+        .defaultValue(BEGINNING_OF_STREAM.getValue())
+        .required(true)
+        .build();
+
     private volatile long firstEventId = -1L;
+    private volatile boolean isFilteringEnabled = false;
+    private volatile Pattern componentTypeRegex;
+    private volatile List<ProvenanceEventType> eventTypes = new ArrayList<ProvenanceEventType>();
+    private volatile List<String> componentIds = new ArrayList<String>();
+    private volatile boolean scheduled = false;
+
+    @OnScheduled
+    public void onScheduled(final ConfigurationContext context) throws IOException {
+        // initialize component type filtering
+        componentTypeRegex = StringUtils.isBlank(context.getProperty(FILTER_COMPONENT_TYPE).getValue()) ? null : Pattern.compile(context.getProperty(FILTER_COMPONENT_TYPE).getValue());
+
+        final String[] eventList = StringUtils.stripAll(StringUtils.split(context.getProperty(FILTER_EVENT_TYPE).getValue(), ','));
+        if(eventList != null) {
+            for(String type : eventList) {
+                try {
+                    eventTypes.add(ProvenanceEventType.valueOf(type));
+                } catch (Exception e) {
+                    getLogger().warn(type + " is not a correct event type, removed from the filtering.");
+                }
+            }
+        }
+
+        // initialize component ID filtering
+        final String[] componentIdList = StringUtils.stripAll(StringUtils.split(context.getProperty(FILTER_COMPONENT_ID).getValue(), ','));
+        if(componentIdList != null) {
+            componentIds.addAll(Arrays.asList(componentIdList));
+        }
+
+        // set a boolean whether filtering will be applied or not
+        isFilteringEnabled = componentTypeRegex != null || !eventTypes.isEmpty() || !componentIds.isEmpty();
+
+        scheduled = true;
+    }
+
+    @OnUnscheduled
+    public void onUnscheduled() {
+        scheduled = false;
+    }
+
+    public boolean isScheduled() {
+        return scheduled;
+    }
 
     @Override
     protected List<PropertyDescriptor> getSupportedPropertyDescriptors() {
         final List<PropertyDescriptor> properties = new ArrayList<>(super.getSupportedPropertyDescriptors());
         properties.add(PLATFORM);
+        properties.add(FILTER_EVENT_TYPE);
+        properties.add(FILTER_COMPONENT_TYPE);
+        properties.add(FILTER_COMPONENT_ID);
+        properties.add(START_POSITION);
         return properties;
     }
 
@@ -142,14 +239,27 @@ public class SiteToSiteProvenanceReportingTask extends AbstractSiteToSiteReporti
                 getLogger().error("Failed to get state at start up due to:" + e.getMessage(), e);
                 return;
             }
+
+            final String startPositionValue = context.getProperty(START_POSITION).getValue();
+
             if (state.containsKey(LAST_EVENT_ID_KEY)) {
                 firstEventId = Long.parseLong(state.get(LAST_EVENT_ID_KEY)) + 1;
+            } else {
+                if (END_OF_STREAM.getValue().equals(startPositionValue)) {
+                    firstEventId = currMaxId;
+                }
             }
 
-            if(currMaxId < (firstEventId - 1)){
-                getLogger().warn("Current provenance max id is {} which is less than what was stored in state as the last queried event, which was {}. This means the provenance restarted its " +
+            if (currMaxId < (firstEventId - 1)) {
+                if (BEGINNING_OF_STREAM.getValue().equals(startPositionValue)) {
+                    getLogger().warn("Current provenance max id is {} which is less than what was stored in state as the last queried event, which was {}. This means the provenance restarted its " +
                         "ids. Restarting querying from the beginning.", new Object[]{currMaxId, firstEventId});
-                firstEventId = -1;
+                    firstEventId = -1;
+                } else {
+                    getLogger().warn("Current provenance max id is {} which is less than what was stored in state as the last queried event, which was {}. This means the provenance restarted its " +
+                        "ids. Restarting querying from the latest event in the Provenance Repository.", new Object[] {currMaxId, firstEventId});
+                    firstEventId = currMaxId;
+                }
             }
         }
 
@@ -160,7 +270,7 @@ public class SiteToSiteProvenanceReportingTask extends AbstractSiteToSiteReporti
 
         List<ProvenanceEventRecord> events;
         try {
-            events = context.getEventAccess().getProvenanceEvents(firstEventId, context.getProperty(BATCH_SIZE).asInteger());
+            events = filterEvents(context.getEventAccess().getProvenanceEvents(firstEventId, context.getProperty(BATCH_SIZE).asInteger()));
         } catch (final IOException ioe) {
             getLogger().error("Failed to retrieve Provenance Events from repository due to: " + ioe.getMessage(), ioe);
             return;
@@ -190,7 +300,7 @@ public class SiteToSiteProvenanceReportingTask extends AbstractSiteToSiteReporti
         final DateFormat df = new SimpleDateFormat(TIMESTAMP_FORMAT);
         df.setTimeZone(TimeZone.getTimeZone("Z"));
 
-        while (events != null && !events.isEmpty()) {
+        while (events != null && !events.isEmpty() && isScheduled()) {
             final long start = System.nanoTime();
 
             // Create a JSON array of all the events in the current batch
@@ -243,13 +353,36 @@ public class SiteToSiteProvenanceReportingTask extends AbstractSiteToSiteReporti
 
             // Retrieve the next batch
             try {
-                events = context.getEventAccess().getProvenanceEvents(firstEventId, context.getProperty(BATCH_SIZE).asInteger());
+                events = filterEvents(context.getEventAccess().getProvenanceEvents(firstEventId, context.getProperty(BATCH_SIZE).asInteger()));
             } catch (final IOException ioe) {
                 getLogger().error("Failed to retrieve Provenance Events from repository due to: " + ioe.getMessage(), ioe);
                 return;
             }
         }
 
+    }
+
+    private List<ProvenanceEventRecord> filterEvents(List<ProvenanceEventRecord> provenanceEvents) {
+        if(isFilteringEnabled) {
+            List<ProvenanceEventRecord> filteredEvents = new ArrayList<ProvenanceEventRecord>();
+
+            for (ProvenanceEventRecord provenanceEventRecord : provenanceEvents) {
+                if(!componentIds.isEmpty() && !componentIds.contains(provenanceEventRecord.getComponentId())) {
+                    continue;
+                }
+                if(!eventTypes.isEmpty() && !eventTypes.contains(provenanceEventRecord.getEventType())) {
+                    continue;
+                }
+                if(componentTypeRegex != null && !componentTypeRegex.matcher(provenanceEventRecord.getComponentType()).matches()) {
+                    continue;
+                }
+                filteredEvents.add(provenanceEventRecord);
+            }
+
+            return filteredEvents;
+        } else {
+            return provenanceEvents;
+        }
     }
 
     static JsonObject serialize(final JsonBuilderFactory factory, final JsonObjectBuilder builder, final ProvenanceEventRecord event, final DateFormat df,

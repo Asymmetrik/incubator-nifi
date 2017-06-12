@@ -27,12 +27,15 @@ public interface StringLookupService extends LookupService<String> {
      *
      * @param coordinates the coordinates to lookup
      * @return an Optional String that represents the value for the given coordinates
+     *
+     * @throws LookupFailureException if unable to lookup a value for the given key
      */
     @Override
-    Optional<String> lookup(Map<String, String> coordinates);
+    Optional<String> lookup(Map<String, String> coordinates) throws LookupFailureException;
 
     @Override
     default Class<?> getValueType() {
         return String.class;
     }
+
 }
